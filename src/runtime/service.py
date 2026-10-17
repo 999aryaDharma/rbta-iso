@@ -149,6 +149,9 @@ class LiveRBTAService:
         self.finalized_history: List[ScoredMetaAlert] = []
         self.source_checkpoint: Dict[str, Any] = {}
         self._last_persisted_history_idx = 0
+        # Wall-clock UTC saat engine memfinalkan MetaAlert (meta_id -> ISO); ditulis ke kolom
+        # finalized_history.finalized_at saat checkpoint, lalu dibuang dari memori.
+        self._finalized_at: Dict[int, str] = {}
 
         # Pulihkan dari state durable saat startup.
         self._restore_from_disk()
@@ -184,6 +187,13 @@ class LiveRBTAService:
             except Exception as exc:
                 logger.warning("Error parsing scored alert: %s", exc)
         return None
+
+    def _enqueue_finalized(self, metas: List[MetaAlert]) -> None:
+        """Antrekan MetaAlert final untuk scoring dan catat waktu finalisasinya (latensi T7)."""
+        now = datetime.now(timezone.utc).isoformat()
+        for meta in metas:
+            self._finalized_at.setdefault(meta.meta_id, now)
+        self.pending_scoring.extend(metas)
 
     def _restore_from_disk(self) -> None:
         """Coba pulihkan state engine, pending scoring, dan outbox dari disk."""
@@ -230,7 +240,10 @@ class LiveRBTAService:
             source_checkpoint=self.source_checkpoint,
             new_finalized_history=history_payload,
             pending_scoring=pending_payload,
+            finalized_at=self._finalized_at,
         )
+        for item in new_items:
+            self._finalized_at.pop(item.meta_id, None)
         # SQLite adalah index duplikat acuan. Di memori cukup disimpan hot set terbatas
         # untuk request berulang yang cepat di proses ini.
         if len(self.engine._seen_alert_ids) > 10_000:
@@ -311,7 +324,7 @@ class LiveRBTAService:
 
         finalized_metas = self.engine.process(alert)
         if finalized_metas:
-            self.pending_scoring.extend(finalized_metas)
+            self._enqueue_finalized(finalized_metas)
 
         if should_persist:
             self._persist_to_disk()
@@ -336,7 +349,7 @@ class LiveRBTAService:
         should_persist = self.auto_persist if auto_persist is None else auto_persist
         finalized_metas = self.engine.flush_idle(current_event_time)
         if finalized_metas:
-            self.pending_scoring.extend(finalized_metas)
+            self._enqueue_finalized(finalized_metas)
             if should_persist:
                 self._persist_to_disk()
 
@@ -385,7 +398,7 @@ class LiveRBTAService:
         """Kuras semua bucket engine yang sedang aktif, skor, lalu simpan."""
         drained_metas = self.engine.drain()
         if drained_metas:
-            self.pending_scoring.extend(drained_metas)
+            self._enqueue_finalized(drained_metas)
             self._persist_to_disk()
             return self._drain_pending_scoring()
         return []
@@ -417,7 +430,7 @@ class LiveRBTAService:
         if drain:
             drained_metas = self.engine.drain()
             if drained_metas:
-                self.pending_scoring.extend(drained_metas)
+                self._enqueue_finalized(drained_metas)
 
         self._persist_to_disk()
         return self._drain_pending_scoring()

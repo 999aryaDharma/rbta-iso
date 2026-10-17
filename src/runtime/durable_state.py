@@ -76,6 +76,8 @@ class DurableStateManager:
                 )
                 """
             )
+            # Migrasi aditif (T7) untuk DB lama: kolom latensi, NULL untuk baris sebelum migrasi.
+            self._ensure_column(conn, "finalized_history", "finalized_at", "TEXT")
             conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS seen_alert_ids (
@@ -130,6 +132,14 @@ class DurableStateManager:
                 )
                 """
             )
+            self._ensure_column(conn, "notification_log", "sent_at", "TEXT")
+
+    @staticmethod
+    def _ensure_column(conn: sqlite3.Connection, table: str, column: str, decl: str) -> None:
+        """ALTER TABLE ADD COLUMN bila kolom belum ada (idempoten, aman untuk DB yang sudah berisi)."""
+        existing = {row[1] for row in conn.execute(f"PRAGMA table_info({table})").fetchall()}
+        if column not in existing:
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {decl}")
 
     def _assert_no_finalized_collision(self, new_finalized_history: List[Dict[str, Any]]) -> None:
         """Gagal tertutup bila meta_id dalam batch sudah ada di finalized_history.
@@ -402,13 +412,53 @@ class DurableStateManager:
         Dipanggil oleh dispatcher lewat getattr; mengembalikan row id AUTOINCREMENT dari
         baris putusan yang ditambahkan.
         """
+        # Dispatcher mencatat SENT tepat setelah sendMessage sukses: itulah sent_at (latensi T7).
+        sent_at = datetime.now(timezone.utc).isoformat() if verdict == "SENT" else None
         with sqlite3.connect(self.history_db_path) as conn:
             cursor = conn.execute(
-                "INSERT INTO notification_log (meta_id, run_id, verdict) VALUES (?, ?, ?)",
-                (int(meta_id), str(run_id), str(verdict)),
+                "INSERT INTO notification_log (meta_id, run_id, verdict, sent_at) VALUES (?, ?, ?, ?)",
+                (int(meta_id), str(run_id), str(verdict), sent_at),
             )
             conn.commit()
             return int(cursor.lastrowid or 0)
+
+    def latency_samples(self, start_iso: str, end_iso: str) -> Dict[str, List[float]]:
+        """Sampel latensi (detik) untuk MetaAlert yang difinalkan pada [start_iso, end_iso).
+
+        * ``event_to_finalize``: finalized_at - end_time MetaAlert (event terakhir anggota).
+        * ``finalize_to_sent``: sent_at Telegram pertama yang sukses - finalized_at.
+        Baris sebelum migrasi T7 (finalized_at NULL) tidak ikut dihitung.
+        """
+        with sqlite3.connect(self.history_db_path) as conn:
+            rows = conn.execute(
+                """
+                SELECT h.finalized_at, json_extract(h.scored_data, '$.end_time'),
+                       (SELECT MIN(n.sent_at) FROM notification_log n
+                        WHERE n.meta_id = h.meta_id AND n.verdict = 'SENT' AND n.sent_at IS NOT NULL)
+                FROM finalized_history h
+                WHERE h.finalized_at IS NOT NULL AND h.finalized_at >= ? AND h.finalized_at < ?
+                """,
+                (start_iso, end_iso),
+            ).fetchall()
+        out: Dict[str, List[float]] = {"event_to_finalize": [], "finalize_to_sent": []}
+        for finalized_at, end_time, sent_at in rows:
+            fin = datetime.fromisoformat(finalized_at)
+            if end_time:
+                out["event_to_finalize"].append((fin - datetime.fromisoformat(end_time)).total_seconds())
+            if sent_at:
+                out["finalize_to_sent"].append((datetime.fromisoformat(sent_at) - fin).total_seconds())
+        return out
+
+    def latency_summary(self, start_iso: str, end_iso: str) -> Dict[str, Optional[float]]:
+        """p50/p95 (detik) dari :meth:`latency_samples`; None bila tidak ada sampel."""
+        import numpy as np
+
+        summary: Dict[str, Optional[float]] = {}
+        for name, values in self.latency_samples(start_iso, end_iso).items():
+            summary[f"{name}_n"] = len(values)
+            for q in (50, 95):
+                summary[f"{name}_p{q}"] = float(np.percentile(values, q)) if values else None
+        return summary
 
     def notification_count(self) -> int:
         """Kembalikan COUNT(*) putusan notifikasi dispatcher yang tercatat."""
@@ -489,6 +539,7 @@ class DurableStateManager:
         source_checkpoint: Optional[Dict[str, Any]] = None,
         new_finalized_history: Optional[List[Dict[str, Any]]] = None,
         pending_scoring: Optional[List[Dict[str, Any]]] = None,
+        finalized_at: Optional[Dict[int, str]] = None,
     ) -> None:
         """Simpan state engine, bucket aktif, ID alert seen, pending scoring, dan outbox ke disk secara atomik."""
         self.filepath.parent.mkdir(parents=True, exist_ok=True)
@@ -558,11 +609,16 @@ class DurableStateManager:
         # Serialisasi dulu sebelum menulis apa pun. Satu commit SQLite menjadi acuan untuk
         # proteksi duplikat sekaligus mutasi RBTA yang dilindunginya.
         serialized = json.dumps(payload, indent=2)
-        history_rows = [(item["meta_id"], json.dumps(item)) for item in (new_finalized_history or [])]
+        finalized_at = finalized_at or {}
+        history_rows = [
+            (item["meta_id"], json.dumps(item), finalized_at.get(int(item["meta_id"])))
+            for item in (new_finalized_history or [])
+        ]
         with sqlite3.connect(self.history_db_path) as conn:
             conn.execute("PRAGMA synchronous=FULL")
             conn.executemany(
-                "INSERT OR IGNORE INTO finalized_history (meta_id, scored_data) VALUES (?, ?)", history_rows,
+                "INSERT OR IGNORE INTO finalized_history (meta_id, scored_data, finalized_at) VALUES (?, ?, ?)",
+                history_rows,
             )
             conn.executemany(
                 "INSERT OR IGNORE INTO seen_alert_ids (wazuh_alert_id) VALUES (?)",

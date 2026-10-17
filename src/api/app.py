@@ -1,5 +1,5 @@
 from collections import defaultdict, deque
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from hmac import compare_digest
 import os
 from pathlib import Path
@@ -362,6 +362,17 @@ def create_app(
             except Exception:
                 ingested_total = None
 
+        # Latensi ujung-ke-ujung 24 jam terakhir (event->finalize, finalize->Telegram sent).
+        latency_24h: Optional[Dict[str, Any]] = None
+        if service is not None:
+            try:
+                now_utc = datetime.now(timezone.utc)
+                summary_fn = getattr(service.state_manager, "latency_summary", None)
+                if callable(summary_fn):
+                    latency_24h = summary_fn((now_utc - timedelta(hours=24)).isoformat(), now_utc.isoformat())
+            except Exception:
+                latency_24h = None
+
         excluded_agents: List[str] = []
         excluded_alerts_total: Dict[str, int] = {}
         coordinator = getattr(worker, "coordinator", None) if worker is not None else None
@@ -399,6 +410,7 @@ def create_app(
             "excluded_agents": excluded_agents,
             "excluded_alerts_total": excluded_alerts_total,
             "agent_criticality_file": _criticality_file_info(),
+            "latency_24h": latency_24h,
         }
 
     @app.post("/ingest/wazuh", tags=["Ingress"])

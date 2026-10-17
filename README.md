@@ -116,6 +116,8 @@ dengan polling Wazuh Indexer dan notifikasi Telegram. Langkah setup dan auto-upd
 ## Dokumentasi lain
 
 - [`docs/research-spec/`](docs/research-spec/README.md) — spesifikasi metodologi dan arsitektur.
+- [`docs/deployment/PROD-HARDENING-RUNBOOK.md`](docs/deployment/PROD-HARDENING-RUNBOOK.md) — model thesis, env baru, bukti harian, tag rilis.
+- [`docs/KNOWN-LIMITATIONS.md`](docs/KNOWN-LIMITATIONS.md) — batas implementasi yang belum diperbaiki.
 - [`docs/deployment/LIVE-STATE-RECOVERY.md`](docs/deployment/LIVE-STATE-RECOVERY.md) — kontrak pemulihan state live/replay.
 - [`docs/deployment/FLAT-API-FREEZE.md`](docs/deployment/FLAT-API-FREEZE.md) — kontrak event custom API kampus.
 - [`docs/demo/SIDANG-RUNBOOK.md`](docs/demo/SIDANG-RUNBOOK.md) — runbook demo sidang.

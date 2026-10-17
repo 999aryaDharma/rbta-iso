@@ -132,6 +132,7 @@ docs/*
 !docs/thesis/**
 !docs/demo/
 !docs/demo/**
+!docs/KNOWN-LIMITATIONS.md
 
 # Large Data Files & Research Run Outputs
 data/*

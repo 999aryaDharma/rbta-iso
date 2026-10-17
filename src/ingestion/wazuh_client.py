@@ -1,4 +1,4 @@
-"""Authenticated HTTPS client for Wazuh Indexer (OpenSearch-compatible API)."""
+"""Client HTTPS terautentikasi untuk Wazuh Indexer (API kompatibel OpenSearch)."""
 
 import logging
 import os
@@ -11,32 +11,32 @@ logger = logging.getLogger(__name__)
 
 
 class WazuhClientError(RuntimeError):
-    """Base error for Wazuh Indexer client operations."""
+    """Error dasar untuk operasi client Wazuh Indexer."""
     pass
 
 
 class WazuhAuthError(WazuhClientError):
-    """Raised when authentication (401/403) to Wazuh Indexer fails."""
+    """Dilempar bila autentikasi (401/403) ke Wazuh Indexer gagal."""
     pass
 
 
 class WazuhIndexerClient:
-    """Secure client for communicating with Wazuh Indexer via OpenSearch REST API.
+    """Client aman untuk berkomunikasi dengan Wazuh Indexer lewat REST API OpenSearch.
 
     Parameters
     ----------
     base_url : str
-        Wazuh Indexer base URL (e.g. "https://172.16.83.180:9200").
+        Base URL Wazuh Indexer (mis. "https://172.16.83.180:9200").
     username : str | None
-        HTTP Basic Auth username (defaults to WAZUH_INDEXER_USERNAME env var).
+        Username HTTP Basic Auth (default dari env WAZUH_INDEXER_USERNAME).
     password : str | None
-        HTTP Basic Auth password (defaults to WAZUH_INDEXER_PASSWORD env var).
+        Password HTTP Basic Auth (default dari env WAZUH_INDEXER_PASSWORD).
     verify_tls : bool | str
-        SSL verification setting. True (default), False, or path to CA bundle.
+        Pengaturan verifikasi SSL: True (default), False, atau path CA bundle.
     timeout : Tuple[float, float]
-        (connect_timeout, read_timeout) in seconds.
+        (connect_timeout, read_timeout) dalam detik.
     max_retries : int
-        Max retries on transient network/5xx errors.
+        Batas retry saat error jaringan sementara/5xx.
     """
 
     def __init__(
@@ -89,7 +89,7 @@ class WazuhIndexerClient:
         json_data: Optional[Dict[str, Any]] = None,
         params: Optional[Dict[str, Any]] = None,
     ) -> requests.Response:
-        """Execute authenticated request with transient error retry and 401/403 fail-fast."""
+        """Jalankan request terautentikasi dengan retry untuk error sementara; 401/403 langsung gagal."""
         url = f"{self.base_url}/{endpoint.lstrip('/')}"
         headers = {"Content-Type": "application/json"}
 
@@ -105,13 +105,13 @@ class WazuhIndexerClient:
                     timeout=self.timeout,
                 )
 
-                # 401 / 403 Fail Fast
+                # 401 / 403 langsung gagal.
                 if resp.status_code in (401, 403):
                     raise WazuhAuthError(
                         f"Authentication failed ({resp.status_code}) against Wazuh Indexer at {self.base_url}"
                     )
 
-                # Transient server errors (429, 502, 503, 504) -> retry
+                # Error server sementara (429, 502, 503, 504) -> retry.
                 if resp.status_code in (429, 502, 503, 504) and attempt < self.max_retries:
                     delay = min(30.0, (2 ** (attempt - 1)) * 0.5) + self._random_fn() * 0.5
                     self._sleep_fn(delay)
@@ -137,41 +137,41 @@ class WazuhIndexerClient:
         raise WazuhClientError("Exceeded max retries calling Wazuh Indexer")
 
     def list_indices(self, pattern: str = "wazuh-alerts-*") -> List[str]:
-        """List cluster index names matching the pattern.
+        """Daftar nama index cluster yang cocok dengan pola.
 
         Parameters
         ----------
         pattern : str
-            Index pattern wildcard (e.g. 'wazuh-alerts-*').
+            Wildcard pola index (mis. 'wazuh-alerts-*').
 
         Returns
         -------
         List[str]
-            List of matching index names.
+            Daftar nama index yang cocok.
         """
         resp = self._request("GET", f"/_cat/indices/{pattern}", params={"format": "json"})
         indices_data = resp.json()
         return [str(item["index"]) for item in indices_data if "index" in item]
 
     def create_point_in_time(self, index_name: str, keep_alive: str = "5m") -> str:
-        """Open a Point-In-Time (PIT) snapshot on a single daily index.
+        """Buka snapshot Point-In-Time (PIT) pada satu index harian.
 
         Parameters
         ----------
         index_name : str
-            Target daily index name.
+            Nama index harian tujuan.
         keep_alive : str
-            PIT retention duration string (e.g. '5m').
+            Durasi retensi PIT (mis. '5m').
 
         Returns
         -------
         str
-            Unique Point-In-Time ID.
+            ID Point-In-Time yang unik.
 
         Raises
         ------
         WazuhClientError
-            If PIT creation fails or contains partial shard failures.
+            Bila pembuatan PIT gagal atau ada kegagalan sebagian shard.
         """
         resp = self._request("POST", f"/{index_name}/_search/point_in_time", params={"keep_alive": keep_alive})
         data = resp.json()
@@ -189,17 +189,17 @@ class WazuhIndexerClient:
         return str(pit_id)
 
     def close_point_in_time(self, pit_id: str) -> bool:
-        """Close an active Point-In-Time snapshot context.
+        """Tutup konteks snapshot Point-In-Time yang aktif.
 
         Parameters
         ----------
         pit_id : str
-            Point-In-Time ID to close.
+            ID Point-In-Time yang akan ditutup.
 
         Returns
         -------
         bool
-            True if closure succeeded.
+            True bila penutupan berhasil.
         """
         try:
             resp = self._request("DELETE", "/_search/point_in_time", json_data={"pit_id": [pit_id]})
@@ -217,25 +217,25 @@ class WazuhIndexerClient:
         sort: Optional[Sequence[Dict[str, str]]] = None,
         keep_alive: str = "5m",
     ) -> List[Dict[str, Any]]:
-        """Fetch a page of hits from a Point-In-Time using search_after.
+        """Ambil satu halaman hit dari Point-In-Time memakai search_after.
 
         Parameters
         ----------
         pit_id : str
-            Active Point-In-Time ID.
+            ID Point-In-Time yang aktif.
         page_size : int
-            Number of hits per page.
+            Jumlah hit per halaman.
         search_after : Sequence[Any] | None
-            Cursor values from the last hit of the preceding page.
+            Nilai cursor dari hit terakhir halaman sebelumnya.
         sort : Sequence[Dict[str, str]] | None
-            Exact sort criteria (default: [{"@timestamp": "asc"}, {"id": "asc"}]).
+            Kriteria sort (default: [{"@timestamp": "asc"}, {"id": "asc"}]).
         keep_alive : str
-            PIT keep_alive extension duration.
+            Durasi perpanjangan keep_alive PIT.
 
         Returns
         -------
         List[Dict[str, Any]]
-            List of raw OpenSearch hit objects.
+            Daftar objek hit OpenSearch mentah.
         """
         sort_criteria = sort or [{"@timestamp": "asc"}, {"id": "asc"}]
         body: Dict[str, Any] = {

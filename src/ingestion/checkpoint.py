@@ -1,4 +1,4 @@
-"""Historical ingestion checkpoint persistence module."""
+"""Persistensi checkpoint ingestion historis."""
 
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
@@ -8,30 +8,30 @@ from typing import Any, List, Optional, Union
 
 
 class CheckpointError(RuntimeError):
-    """Raised when checkpoint file is corrupt or has invalid fields."""
+    """Dilempar bila file checkpoint rusak atau field-nya tidak valid."""
     pass
 
 
 @dataclass
 class HistoricalCheckpoint:
-    """State of historical ingestion progress across daily indices.
+    """State progres ingestion historis lintas index harian.
 
     Attributes
     ----------
     mode : str
-        Ingestion mode ("historical").
+        Mode ingestion ("historical").
     current_index : str | None
-        Name of the daily index currently being processed.
+        Nama index harian yang sedang diproses.
     last_sort : list[Any] | None
-        OpenSearch/Wazuh Indexer search_after cursor array.
+        Array cursor search_after OpenSearch/Wazuh Indexer.
     processed_count : int
-        Total number of raw alerts processed/yielded.
+        Jumlah raw alert yang sudah diproses/di-yield.
     last_wazuh_alert_id : str | None
-        Last successfully emitted Wazuh alert ID.
+        ID alert Wazuh terakhir yang berhasil dikeluarkan.
     completed_indices : list[str]
-        List of daily index names fully exhausted.
+        Daftar index harian yang sudah habis dibaca.
     updated_at : str
-        UTC ISO-8601 timestamp of the last checkpoint update.
+        Timestamp UTC ISO-8601 dari update checkpoint terakhir.
     """
 
     mode: str = "historical"
@@ -48,7 +48,7 @@ class HistoricalCheckpoint:
         last_sort: List[Any],
         wazuh_alert_id: str,
     ) -> None:
-        """Update cursor position after processing an alert or page."""
+        """Perbarui posisi cursor setelah memproses satu alert atau satu halaman."""
         self.current_index = index_name
         self.last_sort = list(last_sort)
         self.last_wazuh_alert_id = wazuh_alert_id
@@ -56,7 +56,7 @@ class HistoricalCheckpoint:
         self.updated_at = datetime.now(timezone.utc).isoformat()
 
     def mark_index_completed(self, index_name: str) -> None:
-        """Mark a daily index as completed and reset the active cursor."""
+        """Tandai index harian selesai dan reset cursor aktif."""
         if index_name not in self.completed_indices:
             self.completed_indices.append(index_name)
         self.current_index = None
@@ -65,13 +65,13 @@ class HistoricalCheckpoint:
 
 
 class CheckpointManager:
-    """Manages disk serialization and restoration of HistoricalCheckpoint objects."""
+    """Mengelola serialisasi ke disk dan pemulihan objek HistoricalCheckpoint."""
 
     def __init__(self, filepath: Union[str, Path] = "checkpoints/historical_checkpoint.json") -> None:
         self.filepath: Path = Path(filepath).resolve()
 
     def load(self) -> HistoricalCheckpoint:
-        """Load checkpoint from JSON file, or return fresh checkpoint if file does not exist."""
+        """Muat checkpoint dari file JSON, atau kembalikan checkpoint baru bila file belum ada."""
         if not self.filepath.exists():
             return HistoricalCheckpoint()
 
@@ -81,37 +81,31 @@ class CheckpointManager:
         except (json.JSONDecodeError, UnicodeDecodeError) as exc:
             raise CheckpointError(f"Corrupt checkpoint file '{self.filepath}': {exc}") from exc
 
-        # Validate field types
+        # Validasi tipe field.
         if not isinstance(data, dict):
             raise CheckpointError(f"Checkpoint is not a JSON object: {type(data).__name__}")
 
-        # mode
         if "mode" in data:
             if not isinstance(data["mode"], str) or data["mode"] != "historical":
                 raise CheckpointError(f"Invalid 'mode': expected 'historical', got {data['mode']!r}")
 
-        # current_index
         if "current_index" in data and data["current_index"] is not None:
             if not isinstance(data["current_index"], str):
                 raise CheckpointError(f"Invalid 'current_index' type: expected str or None, got {type(data['current_index']).__name__}")
 
-        # last_sort
         if "last_sort" in data and data["last_sort"] is not None:
             if not isinstance(data["last_sort"], list) or isinstance(data["last_sort"], (str, bytes)):
                 raise CheckpointError(f"Invalid 'last_sort' type: expected list or None, got {type(data['last_sort']).__name__}")
 
-        # processed_count
         if "processed_count" in data:
             val = data["processed_count"]
             if isinstance(val, bool) or not isinstance(val, int) or val < 0:
                 raise CheckpointError(f"Invalid 'processed_count': expected non-negative int, got {val!r}")
 
-        # last_wazuh_alert_id
         if "last_wazuh_alert_id" in data and data["last_wazuh_alert_id"] is not None:
             if not isinstance(data["last_wazuh_alert_id"], str):
                 raise CheckpointError(f"Invalid 'last_wazuh_alert_id' type: expected str or None, got {type(data['last_wazuh_alert_id']).__name__}")
 
-        # completed_indices
         if "completed_indices" in data:
             if not isinstance(data["completed_indices"], list):
                 raise CheckpointError(f"Invalid 'completed_indices' type: {type(data['completed_indices']).__name__}")
@@ -119,7 +113,6 @@ class CheckpointManager:
                 if not isinstance(idx, str):
                     raise CheckpointError(f"Invalid 'completed_indices' item: expected str, got {type(idx).__name__}")
 
-        # updated_at
         if "updated_at" in data:
             if not isinstance(data["updated_at"], str):
                 raise CheckpointError(f"Invalid 'updated_at' type: expected str, got {type(data['updated_at']).__name__}")
@@ -143,7 +136,7 @@ class CheckpointManager:
         )
 
     def save(self, checkpoint: HistoricalCheckpoint) -> None:
-        """Save checkpoint to disk atomically via temporary file."""
+        """Simpan checkpoint ke disk secara atomik lewat file sementara."""
         self.filepath.parent.mkdir(parents=True, exist_ok=True)
         tmp_file = self.filepath.with_suffix(".tmp")
 

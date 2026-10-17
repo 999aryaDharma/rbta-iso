@@ -1,4 +1,4 @@
-"""Decision Matrix and False Positive Gate evaluation module."""
+"""Decision Matrix dan False Positive Gate."""
 
 from typing import Tuple
 
@@ -10,9 +10,9 @@ def evaluate_decision(
     alert_count: int,
     mitre_tactic_count: int,
 ) -> Tuple[str, str, bool]:
-    """Evaluate final operational decision and action for a scored meta-alert.
+    """Tentukan keputusan operasional akhir dan tindakan untuk meta-alert terskor.
 
-    Applies the False Positive Gate and the 4-quadrant Decision Matrix:
+    Menerapkan False Positive Gate dan Decision Matrix 4 kuadran:
 
     False Positive Gate:
         if max_severity < 7 and alert_count < 5 and mitre_tactic_count == 0 and anomaly_score >= threshold:
@@ -33,15 +33,15 @@ def evaluate_decision(
     Parameters
     ----------
     anomaly_score : float
-        Calibrated anomaly score.
+        Skor anomali terkalibrasi.
     threshold : float
-        Active model Tukey threshold.
+        Threshold Tukey milik model aktif.
     max_severity : int
-        Maximum severity level in bucket.
+        Level severity tertinggi dalam bucket.
     alert_count : int
-        Number of raw alerts in bucket.
+        Jumlah raw alert dalam bucket.
     mitre_tactic_count : int
-        Number of unique MITRE tactics in bucket.
+        Jumlah taktik MITRE unik dalam bucket.
 
     Returns
     -------
@@ -51,7 +51,7 @@ def evaluate_decision(
     anomaly_high = anomaly_score >= threshold
     severity_high = max_severity >= 7
 
-    # False Positive Gate Check
+    # Cek False Positive Gate.
     if anomaly_high:
         if max_severity < 7 and alert_count < 5 and mitre_tactic_count == 0:
             return "CONTEXTUAL_ANOMALY", "SUPPRESS", False

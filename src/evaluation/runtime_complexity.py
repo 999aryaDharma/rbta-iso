@@ -1,4 +1,4 @@
-"""Empirical runtime complexity and throughput evaluation module."""
+"""Evaluasi empiris kompleksitas runtime dan throughput."""
 
 from dataclasses import dataclass
 from datetime import timedelta
@@ -17,7 +17,7 @@ RUNTIME_EVALUATION_SUBSETS: int = 8
 
 @dataclass(frozen=True)
 class RuntimeComplexityResult:
-    """Outcome of empirical runtime complexity evaluation."""
+    """Hasil evaluasi empiris kompleksitas runtime."""
 
     subset_df: pd.DataFrame
     slope: float
@@ -35,21 +35,21 @@ def run_runtime_complexity_evaluation(
     delta_t: timedelta = timedelta(minutes=15),
     repetitions: int = 5,
 ) -> RuntimeComplexityResult:
-    """Measure RBTA throughput across increasing data scale subsets and fit linear regression.
+    """Ukur throughput RBTA pada subset data yang makin besar lalu fit regresi linear.
 
     Parameters
     ----------
     alerts : Iterable[CanonicalRawAlert]
-        Evaluation dataset.
+        Dataset evaluasi.
     n_subsets : int
-        Number of scaling steps (default 8).
+        Jumlah langkah skala (default 8).
     delta_t : timedelta
-        Aggregation window.
+        Window agregasi.
 
     Returns
     -------
     RuntimeComplexityResult
-        Subset measurements, regression parameters (slope, intercept, R^2), and throughput statistics.
+        Pengukuran per subset, parameter regresi (slope, intercept, R^2), dan statistik throughput.
     """
     if repetitions < 3:
         raise ValueError("Runtime evaluation requires at least 3 repetitions")
@@ -65,7 +65,7 @@ def run_runtime_complexity_evaluation(
         k = max(1, int(round(total_len * frac)))
         subset = sorted_alerts[:k]
 
-        # Warm caches and interpreter paths without using the sample in results.
+        # Panaskan cache dan jalur interpreter; sampel ini tidak ikut ke hasil.
         BatchResearchRunner(base_delta_t=delta_t, adaptive=True).run(subset)
         samples: List[float] = []
         n_meta_values: List[int] = []
@@ -96,7 +96,7 @@ def run_runtime_complexity_evaluation(
 
     df = pd.DataFrame(records)
 
-    # Linear regression: n_alerts -> execution_time_ms
+    # Regresi linear: n_alerts -> execution_time_ms
     x = df["n_alerts"].values
     y = df["execution_time_ms"].values
 

@@ -1,4 +1,4 @@
-"""Mandatory End-to-End Integration Proof: Wazuh Alert to Shuffle SOAR (Sprint 9)."""
+"""Integration test end-to-end: alert Wazuh sampai ke Shuffle SOAR."""
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -31,10 +31,10 @@ def make_clean_alert(idx: int, ts: datetime, group: str = "pam", level: int = 3,
 
 
 def test_e2e_wazuh_alert_to_shuffle_exactly_once(tmp_path: Path):
-    """Prove that Wazuh alerts traverse through the full research pipeline into Shuffle exactly once."""
+    """Alert Wazuh melewati seluruh pipeline penelitian dan sampai ke Shuffle tepat satu kali."""
     base_t = datetime(2026, 8, 28, 10, 0, 0, tzinfo=timezone.utc)
 
-    # 1. Train and publish reference model bundle
+    # Latih dan publikasikan bundle model reference.
     training_alerts = [
         make_clean_alert(i, base_t + timedelta(minutes=i * 20), level=(i % 12) + 1)
         for i in range(30)
@@ -45,7 +45,7 @@ def test_e2e_wazuh_alert_to_shuffle_exactly_once(tmp_path: Path):
     registry = ModelRegistry(base_dir=tmp_path / "models")
     registry.publish_bundle(bundle, "e2e-v1")
 
-    # 2. Initialize Live Service and API App
+    # Siapkan live service dan aplikasi API.
     state_mgr = DurableStateManager(tmp_path / "state.json")
     service = LiveRBTAService(
         scoring_pipeline=ScoringPipeline(bundle),
@@ -58,7 +58,7 @@ def test_e2e_wazuh_alert_to_shuffle_exactly_once(tmp_path: Path):
     api_client = TestClient(app)
     headers = {"Authorization": "Bearer test-secret"}
 
-    # 3. Simulate Shuffle Webhook endpoint with receiver tracking
+    # Simulasikan endpoint webhook Shuffle beserta pencatat penerimaan.
     shuffle_forwarder = ShuffleWebhookForwarder(
         webhook_url="https://shuffle.campus.local/api/v1/hooks/rbta_scored",
         api_key="shuffle-token-xyz",
@@ -71,8 +71,8 @@ def test_e2e_wazuh_alert_to_shuffle_exactly_once(tmp_path: Path):
         received_webhooks.append({"headers": dict(headers), "payload": dict(json)})
         return resp
 
-    # 4. Ingest raw Wazuh alerts into REST boundary
-    # Event 1 at 10:00 (accumulates)
+    # Ingest raw alert Wazuh lewat boundary REST.
+    # Event 1 pukul 10:00 (terakumulasi).
     raw_1 = {
         "id": "e2e_wazuh_001",
         "timestamp": "2026-08-28T10:00:00.000+0000",
@@ -83,12 +83,12 @@ def test_e2e_wazuh_alert_to_shuffle_exactly_once(tmp_path: Path):
     assert r1.status_code == 200
     assert r1.json()["is_duplicate"] is False
 
-    # Retry duplicate event 1 -> accepted as duplicate without mutating core
+    # Ulangi event 1 -> diterima sebagai duplikat tanpa mengubah core.
     r1_dup = api_client.post("/api/v1/alerts/ingest", json=raw_1, headers=headers)
     assert r1_dup.status_code == 200
     assert r1_dup.json()["is_duplicate"] is True
 
-    # Event 2 at 10:20 (20 min gap > 15 min delta_t -> finalizes bucket 1)
+    # Event 2 pukul 10:20 (jeda 20 menit > delta_t 15 menit -> bucket 1 difinalkan).
     raw_2 = {
         "id": "e2e_wazuh_002",
         "timestamp": "2026-08-28T10:20:00.000+0000",
@@ -98,25 +98,25 @@ def test_e2e_wazuh_alert_to_shuffle_exactly_once(tmp_path: Path):
     r2 = api_client.post("/api/v1/alerts/ingest", json=raw_2, headers=headers)
     assert r2.status_code == 200
 
-    # 5. Check outbox: contains exactly 1 finalized scored meta-alert from event 1
+    # Outbox berisi tepat 1 meta-alert terskor yang sudah final dari event 1.
     outbox_resp = api_client.get("/api/v1/outbox", headers=headers)
     assert outbox_resp.status_code == 200
     outbox_items = outbox_resp.json()
     assert len(outbox_items) == 1
     scored_meta_dict = outbox_items[0]
 
-    # 6. Forward from Outbox to Shuffle via ShuffleWebhookForwarder
+    # Teruskan dari outbox ke Shuffle lewat ShuffleWebhookForwarder.
     with patch("requests.Session.post", side_effect=mock_post):
-        # Forward the meta alert to Shuffle
+        # Kirim meta-alert ke Shuffle.
         scored_obj = service.get_outbox()[0]
         success = shuffle_forwarder.forward(scored_obj)
         assert success.success is True
 
-        # Acknowledge and dequeue outbox item
+        # Konfirmasi dan keluarkan item dari outbox.
         ack_res = api_client.post(f"/api/v1/outbox/{scored_obj.meta_id}/ack", headers=headers)
         assert ack_res.status_code == 200
 
-    # 7. Verify Shuffle received exactly 1 webhook with correct event ID and payload
+    # Shuffle menerima tepat 1 webhook dengan event ID dan payload yang benar.
     assert len(received_webhooks) == 1
     webhook = received_webhooks[0]
     assert webhook["headers"]["X-Event-ID"] == f"rbta-meta-{scored_obj.meta_id}"
@@ -125,6 +125,6 @@ def test_e2e_wazuh_alert_to_shuffle_exactly_once(tmp_path: Path):
     assert "Initial Access" in webhook["payload"]["mitre_tactics"]
     assert webhook["payload"]["decision"] in ("CRITICAL", "SUSPICIOUS", "NOISE_HIGH", "NOISE", "CONTEXTUAL_ANOMALY")
 
-    # 8. Outbox is now empty and durable state reflects acknowledgment
+    # Outbox kini kosong dan state durable mencerminkan konfirmasi.
     final_outbox = api_client.get("/api/v1/outbox", headers=headers).json()
     assert len(final_outbox) == 0

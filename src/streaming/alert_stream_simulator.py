@@ -1,13 +1,12 @@
-"""
-alert_stream_simulator.py  —  Real-time Alert Stream Emulator
-==============================================================
-Simulate online alert streaming dari static CSV dataset dengan:
-  - Time-accurate replay dengan acceleration control
-  - Informatif logging untuk monitoring simulasi
-  - Callback interface untuk real-time processing
-  - Statistik lengkap tentang stream content
+"""Emulator aliran alert real-time dari dataset CSV statis.
 
-Usage:
+Fitur:
+  - Replay dengan jeda waktu yang akurat dan bisa dipercepat
+  - Logging untuk memantau simulasi
+  - Callback untuk pemrosesan real-time
+  - Statistik isi aliran
+
+Contoh:
   sim = AlertStreamSimulator(
       csv_path="data/raw/rbta_ready_all.csv",
       speed_factor=100
@@ -30,13 +29,10 @@ import pandas as pd
 log = logging.getLogger(__name__)
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# Data Classes
-# ══════════════════════════════════════════════════════════════════════════════
 
 @dataclass
 class StreamStats:
-    """Statistics collector untuk streaming simulation."""
+    """Pengumpul statistik untuk simulasi streaming."""
     total_alerts: int = 0
     start_time: Optional[datetime] = None
     end_time: Optional[datetime] = None
@@ -47,29 +43,29 @@ class StreamStats:
     mitre_coverage: int = 0
 
     def add_alert(self, alert: pd.Series) -> None:
-        """Update stats dengan alert baru."""
+        """Perbarui statistik dengan alert baru."""
         self.total_alerts += 1
 
-        # Agent distribution
+        # Distribusi agent.
         agent = str(alert.get("agent_name", "unknown")).strip()
         self.agent_counts[agent] = self.agent_counts.get(agent, 0) + 1
 
-        # Rule group distribution
+        # Distribusi rule group.
         rg = str(alert.get("rule_group_primary", "unknown")).strip()
         self.rule_group_counts[rg] = self.rule_group_counts.get(rg, 0) + 1
 
-        # Severity distribution
+        # Distribusi severity.
         sev = int(alert.get("rule_level", 1))
         sev_bucket = self._severity_bucket(sev)
         self.severity_counts[sev_bucket] = self.severity_counts.get(sev_bucket, 0) + 1
 
-        # MITRE coverage
+        # Cakupan MITRE.
         if pd.notna(alert.get("mitre_tactic")) and str(alert.get("mitre_tactic")).strip():
             self.mitre_coverage += 1
 
     @staticmethod
     def _severity_bucket(level: int) -> str:
-        """Bucket severity ke kategori."""
+        """Kelompokkan severity ke kategori."""
         if level <= 2:
             return "1-2_Info"
         elif level <= 4:
@@ -81,33 +77,30 @@ class StreamStats:
 
     @property
     def duration_sec(self) -> float:
-        """Duration simulasi dalam detik."""
+        """Durasi simulasi dalam detik."""
         if self.start_time and self.end_time:
             return (self.end_time - self.start_time).total_seconds()
         return 0.0
 
     @property
     def alerts_per_sec(self) -> float:
-        """Throughput (alerts/sec)."""
+        """Throughput (alert/detik)."""
         dur = self.duration_sec
         if dur > 0:
             return self.total_alerts / dur
         return 0.0
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# Logger Setup
-# ══════════════════════════════════════════════════════════════════════════════
 
 def setup_stream_logger(
     log_file: Optional[str] = None,
     log_level: str = "INFO",
 ) -> logging.Logger:
-    """Setup logger untuk streaming simulation."""
+    """Siapkan logger untuk simulasi streaming."""
     logger = logging.getLogger("AlertStreamSimulator")
     logger.setLevel(getattr(logging, log_level.upper()))
 
-    # Console handler
+    # Handler console.
     ch = logging.StreamHandler()
     ch.setLevel(getattr(logging, log_level.upper()))
     formatter = logging.Formatter(
@@ -117,7 +110,7 @@ def setup_stream_logger(
     ch.setFormatter(formatter)
     logger.addHandler(ch)
 
-    # File handler (jika specified)
+    # Handler file (bila ditentukan).
     if log_file:
         os.makedirs(os.path.dirname(log_file) if os.path.dirname(log_file) else ".", exist_ok=True)
         fh = logging.FileHandler(log_file, encoding="utf-8")
@@ -129,20 +122,16 @@ def setup_stream_logger(
     return logger
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# Main Simulator
-# ══════════════════════════════════════════════════════════════════════════════
 
 class AlertStreamSimulator:
-    """
-    Real-time alert streaming simulator dari static CSV.
+    """Simulator streaming alert real-time dari CSV statis.
 
-    Features:
-      - Load CSV dan sort by timestamp
-      - Replay dengan time-accurate delays (accelerated)
-      - Callback interface untuk setiap alert
-      - Informatif logging dengan progress tracking
-      - Statistical summary di akhir
+    Fitur:
+      - Muat CSV dan urutkan menurut timestamp
+      - Replay dengan jeda waktu yang akurat (dipercepat)
+      - Callback untuk setiap alert
+      - Logging dengan pelacakan progres
+      - Ringkasan statistik di akhir
     """
 
     def __init__(
@@ -157,27 +146,26 @@ class AlertStreamSimulator:
         export_jsonl: bool = False,
         export_path: Optional[str] = None,
     ):
-        """
-        Parameters
+        """Parameters
         ----------
         csv_path : str
-            Path ke raw CSV alert data
+            Path ke data alert CSV mentah
         speed_factor : float
-            Acceleration multiplier (100 = 100x kecepatan)
+            Pengali kecepatan (100 = 100x lebih cepat)
         log_file : str, optional
-            Path untuk output log file
+            Path file log output
         log_level : str
-            Log level (DEBUG, INFO, WARNING, ERROR)
+            Level log (DEBUG, INFO, WARNING, ERROR)
         log_frequency : int
-            Log progress setiap N alerts
+            Catat progres setiap N alert
         filter_agents : list, optional
-            Jika set, hanya replay alerts dari agent ini
+            Bila diisi, hanya replay alert dari agent ini
         filter_severity_min : int, optional
-            Jika set, hanya replay alerts dengan severity >= ini
+            Bila diisi, hanya replay alert dengan severity >= nilai ini
         export_jsonl : bool
-            Export alerts ke JSONL format alongside
+            Sekaligus export alert ke format JSONL
         export_path : str, optional
-            Path untuk exported JSONL (jika export_jsonl=True)
+            Path JSONL hasil export (bila export_jsonl=True)
         """
         self.csv_path = csv_path
         self.speed_factor = speed_factor
@@ -194,7 +182,7 @@ class AlertStreamSimulator:
         self._export_file = None
 
     def load_data(self) -> int:
-        """Load dan preprocess CSV data."""
+        """Muat dan praproses data CSV."""
         self.logger.info("Loading CSV data: %s", self.csv_path)
 
         if not os.path.exists(self.csv_path):
@@ -210,7 +198,7 @@ class AlertStreamSimulator:
             self.logger.error("Failed to load CSV: %s", e)
             raise
 
-        # Parse timestamps
+        # Parse timestamp.
         try:
             self.df["timestamp_utc"] = pd.to_datetime(
                 self.df["timestamp_utc"], errors="coerce"
@@ -219,13 +207,13 @@ class AlertStreamSimulator:
             self.logger.warning("Failed to parse timestamps: %s", e)
             self.df["timestamp_utc"] = pd.NaT
 
-        # Sort by timestamp
+        # Urutkan menurut timestamp.
         self.df = self.df.sort_values("timestamp_utc").reset_index(drop=True)
 
         n_raw = len(self.df)
         self.logger.info("Loaded %d raw alerts", n_raw)
 
-        # Apply filters
+        # Terapkan filter.
         if self.filter_agents:
             mask_agent = self.df["agent_name"].isin(self.filter_agents)
             self.df = self.df[mask_agent]
@@ -243,7 +231,7 @@ class AlertStreamSimulator:
             self.logger.info("After filtering: %d alerts (%.1f%% of original)",
                            n_filtered, n_filtered / n_raw * 100)
 
-        # Date range info
+        # Info rentang tanggal.
         t_min = self.df["timestamp_utc"].min()
         t_max = self.df["timestamp_utc"].max()
         if pd.notna(t_min) and pd.notna(t_max):
@@ -254,7 +242,7 @@ class AlertStreamSimulator:
             self.logger.info("Simulation will take ~%.1f seconds at %.0fx speed",
                            sim_duration_sec, self.speed_factor)
 
-        # Agent & rule_group diversity
+        # Keragaman agent & rule_group.
         n_agents = self.df["agent_name"].nunique()
         n_rulegroups = self.df["rule_group_primary"].nunique()
         self.logger.info("Alert diversity: %d unique agents, %d unique rule groups",
@@ -263,12 +251,12 @@ class AlertStreamSimulator:
         return n_filtered
 
     def on_alert(self, callback: Callable[[pd.Series], None]) -> None:
-        """Register callback untuk setiap alert yang di-replay."""
+        """Daftarkan callback untuk setiap alert yang di-replay."""
         self.callback = callback
         self.logger.debug("Callback registered: %s", callback.__name__)
 
     def replay(self) -> StreamStats:
-        """Main simulation loop — replay semua alerts dengan time-accurate delays."""
+        """Loop simulasi utama — replay semua alert dengan jeda waktu yang akurat."""
         if self.df is None:
             n = self.load_data()
         else:
@@ -278,13 +266,13 @@ class AlertStreamSimulator:
             self.logger.warning("No alerts to replay after filtering")
             return self.stats
 
-        # Setup export
+        # Siapkan export.
         if self.export_jsonl:
             os.makedirs(os.path.dirname(self.export_path) or ".", exist_ok=True)
             self._export_file = open(self.export_path, "w", encoding="utf-8")
             self.logger.info("Exporting to JSONL: %s", self.export_path)
 
-        # Print header
+        # Cetak header.
         self.logger.info("=" * 80)
         self.logger.info("  ALERT STREAM SIMULATION — STARTING")
         self.logger.info("=" * 80)
@@ -301,7 +289,7 @@ class AlertStreamSimulator:
 
         try:
             for idx, (_, alert) in enumerate(self.df.iterrows(), 1):
-                # Calculate delay
+                # Hitung jeda.
                 t_alert = alert.get("timestamp_utc")
                 if pd.notna(t_alert) and pd.notna(t_base):
                     delay_sec = (t_alert - t_base).total_seconds() / self.speed_factor
@@ -310,18 +298,18 @@ class AlertStreamSimulator:
                     if sleep_time > 0:
                         time.sleep(sleep_time)
 
-                # Callback
+                # Callback.
                 if self.callback:
                     try:
                         self.callback(alert)
                     except Exception as e:
                         self.logger.error("Callback failed for alert %d: %s", idx, e)
 
-                # Export
+                # Export.
                 if self._export_file:
                     try:
                         alert_dict = alert.to_dict()
-                        # Convert non-serializable types
+                        # Ubah tipe yang tidak bisa diserialisasi.
                         for k, v in alert_dict.items():
                             if pd.isna(v):
                                 alert_dict[k] = None
@@ -333,10 +321,10 @@ class AlertStreamSimulator:
                     except Exception as e:
                         self.logger.warning("Failed to export alert %d: %s", idx, e)
 
-                # Update stats
+                # Perbarui statistik.
                 self.stats.add_alert(alert)
 
-                # Logging & progress
+                # Logging & progres.
                 if idx % self.log_frequency == 0 or idx == n:
                     t_now_wall = time.perf_counter()
                     elapsed_wall = t_now_wall - t_start_wall
@@ -350,7 +338,7 @@ class AlertStreamSimulator:
                         idx, n, pct, rate, eta_sec
                     )
 
-                    # Agent distribution snapshot
+                    # Snapshot distribusi agent.
                     top_agents = sorted(
                         self.stats.agent_counts.items(),
                         key=lambda x: x[1],
@@ -359,7 +347,7 @@ class AlertStreamSimulator:
                     agent_str = " | ".join([f"{a}:{c}" for a, c in top_agents])
                     self.logger.debug("  Top agents: %s", agent_str)
 
-                    # Rule group snapshot
+                    # Snapshot rule group.
                     top_rulegroups = sorted(
                         self.stats.rule_group_counts.items(),
                         key=lambda x: x[1],
@@ -378,13 +366,13 @@ class AlertStreamSimulator:
 
         self.stats.end_time = datetime.now()
 
-        # Print summary
+        # Cetak ringkasan.
         self._print_summary()
 
         return self.stats
 
     def _print_summary(self) -> None:
-        """Print detailed summary di akhir replay."""
+        """Cetak ringkasan detail di akhir replay."""
         self.logger.info("=" * 80)
         self.logger.info("  ALERT STREAM SIMULATION — COMPLETED")
         self.logger.info("=" * 80)
@@ -394,7 +382,7 @@ class AlertStreamSimulator:
         self.logger.info("Processing rate: %.0f alerts/sec", self.stats.alerts_per_sec)
         self.logger.info("")
 
-        # Agent distribution
+        # Distribusi agent.
         self.logger.info("Agent distribution:")
         for agent, count in sorted(
             self.stats.agent_counts.items(),
@@ -406,7 +394,7 @@ class AlertStreamSimulator:
 
         self.logger.info("")
 
-        # Rule group distribution
+        # Distribusi rule group.
         self.logger.info("Alert type distribution (rule_group):")
         for rg, count in sorted(
             self.stats.rule_group_counts.items(),
@@ -418,7 +406,7 @@ class AlertStreamSimulator:
 
         self.logger.info("")
 
-        # Severity distribution
+        # Distribusi severity.
         self.logger.info("Severity distribution:")
         for sev_bucket, count in sorted(self.stats.severity_counts.items()):
             pct = count / self.stats.total_alerts * 100
@@ -426,7 +414,7 @@ class AlertStreamSimulator:
 
         self.logger.info("")
 
-        # MITRE coverage
+        # Cakupan MITRE.
         mitre_pct = self.stats.mitre_coverage / self.stats.total_alerts * 100
         self.logger.info("MITRE ATT&CK coverage: %d alerts (%.1f%%)",
                        self.stats.mitre_coverage, mitre_pct)
@@ -434,16 +422,13 @@ class AlertStreamSimulator:
         self.logger.info("=" * 80)
 
     def get_statistics(self) -> StreamStats:
-        """Return collected statistics."""
+        """Kembalikan statistik yang terkumpul."""
         return self.stats
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# Example / Testing
-# ══════════════════════════════════════════════════════════════════════════════
 
 if __name__ == "__main__":
-    # Example 1: Basic replay dengan logging
+    # Contoh: replay dasar dengan logging.
     sim = AlertStreamSimulator(
         csv_path="data/raw/rbta_ready_all.csv",
         speed_factor=100,
@@ -452,7 +437,7 @@ if __name__ == "__main__":
         log_frequency=5000,
     )
 
-    # Simple callback untuk count
+    # Callback sederhana untuk menghitung.
     alert_count = [0]
     def simple_callback(alert):
         alert_count[0] += 1

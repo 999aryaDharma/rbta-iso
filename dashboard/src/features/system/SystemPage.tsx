@@ -31,7 +31,6 @@ export function SystemPage() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Model Bundle Card */}
           <div className="p-6 rounded-xl border border-kumo-hairline bg-kumo-canvas shadow-xs space-y-4">
             <div className="flex items-center gap-3 pb-3 border-b border-kumo-hairline">
               <div className="w-8 h-8 rounded-lg border border-kumo-hairline bg-kumo-recessed text-kumo-strong flex items-center justify-center">
@@ -79,7 +78,6 @@ export function SystemPage() {
             </dl>
           </div>
 
-          {/* Runtime Environment Card */}
           <div className="p-6 rounded-xl border border-kumo-hairline bg-kumo-canvas shadow-xs space-y-4">
             <div className="flex items-center gap-3 pb-3 border-b border-kumo-hairline">
               <div className="w-8 h-8 rounded-lg border border-kumo-hairline bg-kumo-recessed text-kumo-strong flex items-center justify-center">

@@ -1,11 +1,11 @@
-"""Governance tests for API package (Sprint 9)."""
+"""Test batas tanggung jawab paket API."""
 from pathlib import Path
 
 API_SRC = Path(__file__).resolve().parent.parent.parent.parent / "src" / "api"
 
 
 def test_no_research_logic_in_api_adapters():
-    """Verify that Shuffle adapter and Telegram formatter contain zero algorithmic/model logic."""
+    """Adapter Shuffle dan formatter Telegram tidak boleh berisi logika algoritma/model."""
     forbidden = [
         "IsolationForest",
         "RobustScaler",

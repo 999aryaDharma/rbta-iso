@@ -1,4 +1,4 @@
-"""Batch runner for research experiments, sensitivity analysis, and offline artifact generation."""
+"""Batch runner untuk eksperimen penelitian, analisis sensitivitas, dan pembuatan artefak offline."""
 
 from dataclasses import dataclass
 from datetime import timedelta
@@ -17,7 +17,7 @@ from src.rbta.reorder_buffer import LosslessReorderBuffer
 
 @dataclass(frozen=True)
 class BatchRunResult:
-    """Output bundle produced by BatchResearchRunner."""
+    """Bundle output yang dihasilkan BatchResearchRunner."""
 
     meta_alerts: List[MetaAlert]
     features_df: pd.DataFrame
@@ -26,18 +26,18 @@ class BatchRunResult:
 
 
 class BatchResearchRunner:
-    """Executes high-throughput offline batch processing using the shared Research Core.
+    """Pemrosesan batch offline ber-throughput tinggi memakai Research Core yang sama.
 
     Parameters
     ----------
     base_delta_t : timedelta
-        Experiment aggregation time window.
+        Window waktu agregasi eksperimen.
     adaptive : bool
-        Whether to enable per-agent EMA adaptation after 100-event warmup.
+        Aktifkan adaptasi EMA per agent setelah warmup 100 event.
     reorder_capacity : int
-        Bounded reorder buffer capacity.
+        Kapasitas reorder buffer.
     scoring_pipeline : ScoringPipeline | None
-        Optional loaded scoring pipeline to score meta-alerts.
+        Scoring pipeline opsional untuk menskor meta-alert.
     """
 
     def __init__(
@@ -53,17 +53,17 @@ class BatchResearchRunner:
         self.scoring_pipeline: Optional[ScoringPipeline] = scoring_pipeline
 
     def run(self, alerts: Iterable[CanonicalRawAlert]) -> BatchRunResult:
-        """Process canonical raw alerts through RBTA, extract features, and optionally score.
+        """Proses raw alert kanonis lewat RBTA, ekstrak fitur, dan skor bila pipeline tersedia.
 
         Parameters
         ----------
         alerts : Iterable[CanonicalRawAlert]
-            Stream of raw canonical alerts.
+            Aliran raw alert kanonis.
 
         Returns
         -------
         BatchRunResult
-            Aggregated meta-alerts, feature matrix, and optional scored outputs.
+            Meta-alert hasil agregasi, matriks fitur, dan output skor opsional.
         """
         buffer = LosslessReorderBuffer(capacity=self.reorder_capacity)
         engine = RBTAEngine(base_delta_t=self.base_delta_t, adaptive=self.adaptive)
@@ -74,14 +74,14 @@ class BatchResearchRunner:
             for ready in ready_alerts:
                 finalized_metas.extend(engine.process(ready))
 
-        # Drain reorder buffer
+        # Kuras reorder buffer.
         for ready in buffer.drain():
             finalized_metas.extend(engine.process(ready))
 
-        # Drain RBTA engine
+        # Kuras engine RBTA.
         finalized_metas.extend(engine.drain())
 
-        # Extract 7 features
+        # Ekstrak 7 fitur.
         features_df = SevenFeatureExtractor.extract_features_df(finalized_metas)
 
         scored_metas: Optional[List[ScoredMetaAlert]] = None

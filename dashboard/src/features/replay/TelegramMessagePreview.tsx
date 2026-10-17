@@ -10,7 +10,7 @@ function isClosingTag(token: string, activeTag: TelegramTag | null): boolean {
   return activeTag !== null && token === `</${activeTag}>`;
 }
 
-/** Renders only the small HTML subset Telegram supports for this payload. */
+/** Hanya merender subset HTML kecil yang didukung Telegram untuk payload ini. */
 export function TelegramMessagePreview({ message }: { message: string }) {
   const nodes: ReactNode[] = [];
   let activeTag: TelegramTag | null = null;

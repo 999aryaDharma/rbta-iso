@@ -1,4 +1,4 @@
-"""Unit tests for ScoringPipeline and single-event inference reproducibility (Sprint 4)."""
+"""Unit test ScoringPipeline dan reprodusibilitas inferensi per event."""
 from datetime import datetime, timezone
 import pytest
 from sklearn.ensemble import IsolationForest
@@ -32,8 +32,8 @@ def make_meta(meta_id: int, count: int = 5, max_sev: int = 4, mitre: tuple[str, 
 
 
 def test_train_reference_pipeline_and_bundle_attributes():
-    """train_reference_pipeline trains RobustScaler, IsolationForest (200 trees, contamination auto), calibration, and threshold."""
-    # Generate 50 synthetic MetaAlerts for reference
+    """train_reference_pipeline melatih RobustScaler, IsolationForest (200 tree, contamination auto), kalibrasi, dan threshold."""
+    # Bangkitkan 50 MetaAlert sintetis untuk reference.
     metas = [make_meta(i, count=i % 20 + 1, max_sev=i % 15, mitre=("Execution",) if i % 4 == 0 else (), crit=i % 4 + 1) for i in range(1, 51)]
 
     bundle = train_reference_pipeline(metas, random_state=42, model_version="test-model-v1")
@@ -48,16 +48,16 @@ def test_train_reference_pipeline_and_bundle_attributes():
 
 
 def test_single_event_inference_parity_with_batch():
-    """Scoring single events individually through ScoringPipeline yields exact same results as batch."""
+    """Skor event satu per satu lewat ScoringPipeline memberi hasil yang sama persis dengan batch."""
     metas = [make_meta(i, count=i % 10 + 1, max_sev=i % 12, crit=1) for i in range(1, 40)]
     bundle = train_reference_pipeline(metas, random_state=42, model_version="test-model-v1")
     pipeline = ScoringPipeline(bundle)
 
-    # Batch score
+    # Skor batch.
     df_scored, batch_scored = pipeline.score_meta_alerts(metas)
     assert len(batch_scored) == len(metas)
 
-    # Single-event stream score
+    # Skor stream per event.
     single_scored = [pipeline.score_single(m) for m in metas]
 
     for b, s in zip(batch_scored, single_scored):
@@ -72,7 +72,7 @@ def test_single_event_inference_parity_with_batch():
 
 
 def test_training_and_calibration_populations_are_separate():
-    """Scaler/IF fit reference rows while calibration and Tukey use later rows."""
+    """Scaler/IF di-fit pada baris reference, sementara kalibrasi dan Tukey memakai baris yang lebih belakang."""
     reference = [
         make_meta(i, count=(i % 6) + 1, max_sev=(i % 8) + 1, crit=(i % 4) + 1)
         for i in range(1, 31)
@@ -105,16 +105,16 @@ def test_training_and_calibration_populations_are_separate():
 
 
 def test_single_event_inference_does_not_collapse():
-    """Inference on a single meta-alert does not collapse to 0.5 or fail."""
+    """Inferensi pada satu meta-alert tidak runtuh ke 0.5 atau gagal."""
     metas = [make_meta(i, count=i % 10 + 1, max_sev=i % 12) for i in range(1, 30)]
     bundle = train_reference_pipeline(metas, random_state=42, model_version="v1")
     pipeline = ScoringPipeline(bundle)
 
-    # A single extreme event
+    # Satu event ekstrem.
     extreme_meta = make_meta(999, count=500, max_sev=15, mitre=("Initial Access", "Execution", "Impact"), crit=4)
     scored = pipeline.score_single(extreme_meta)
 
     assert isinstance(scored, ScoredMetaAlert)
     assert scored.meta_id == 999
-    assert scored.anomaly_score != 0.5  # Not a collapsed fallback
+    assert scored.anomaly_score != 0.5  # bukan fallback yang runtuh
     assert scored.seven_features["alert_count_log"] > 0

@@ -44,7 +44,6 @@ export function RBTAPage() {
           <MetricCard label="Open Active Buckets" value={formatNumber(activeBuckets)} sub="In-flight aggregation windows" />
         </div>
 
-        {/* Agent States Table */}
         <div className="rounded-xl border border-kumo-hairline bg-kumo-canvas shadow-xs overflow-hidden">
           <div className="px-6 py-4 border-b border-kumo-hairline flex items-center justify-between">
             <div>
@@ -120,7 +119,6 @@ export function RBTAPage() {
           )}
         </div>
 
-        {/* Active Buckets Table */}
         <div className="rounded-xl border border-kumo-hairline bg-kumo-canvas shadow-xs overflow-hidden">
           <div className="px-6 py-4 border-b border-kumo-hairline flex items-center justify-between">
             <div>

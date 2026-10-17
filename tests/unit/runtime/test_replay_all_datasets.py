@@ -109,7 +109,7 @@ def test_all_datasets_single_run_id(tmp_path: Path, test_bundle):
     controller.wait_until_complete(5.0)
     
     assert controller.run_id is not None
-    # Verify there is exactly one run workspace created
+    # Harus ada tepat satu workspace run yang dibuat.
     runs = list(runs_dir.iterdir())
     assert len(runs) == 1
     assert runs[0].name == controller.run_id
@@ -133,9 +133,9 @@ def test_all_datasets_continuous_state(tmp_path: Path, test_bundle):
     controller.start(ALL_DATASETS_SENTINEL, speed_factor="MAX")
     controller.wait_until_complete(5.0)
 
-    # Check that events from both datasets were processed continuously
+    # Event dari kedua dataset diproses secara berkesinambungan.
     assert controller.processed_count == 20
-    # Current dataset should end at part2
+    # Dataset terakhir harus berakhir di part2.
     assert controller.current_dataset == "part2.jsonl"
     assert controller.current_dataset_index == 1
 
@@ -148,7 +148,7 @@ def test_all_datasets_error_reports_correct_dataset(tmp_path: Path, test_bundle)
     create_sample_wazuh_jsonl(data_dir / "1_good.jsonl", 5)
     
     bad_file = data_dir / "2_bad.jsonl"
-    # Line 1 good, line 2 bad
+    # Baris 1 valid, baris 2 rusak.
     bad_file.write_text("{\"id\": \"1\", \"timestamp\": \"2026-08-29T10:00:00Z\", \"agent\": {\"id\": \"001\"}, \"rule\": {\"id\": \"1\", \"level\": 3, \"groups\": [\"syslog\"]}}\nNOT_JSON\n", encoding="utf-8")
 
     controller = ReplayController(

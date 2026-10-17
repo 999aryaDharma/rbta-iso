@@ -34,10 +34,10 @@ export function MetaAlertsPage() {
     [runId]
   );
 
-  // Sync local search from URL
+  // Sinkronkan pencarian lokal dari URL
   useEffect(() => { setLocalSearch(urlSearch); }, [urlSearch]);
 
-  // Debounce search
+  // Debounce pencarian
   useEffect(() => {
     const timer = setTimeout(() => {
       if (localSearch !== urlSearch) {
@@ -68,7 +68,7 @@ export function MetaAlertsPage() {
     staleTime: 5000,
   });
 
-  // Prefetch next page
+  // Prefetch halaman berikutnya
   useEffect(() => {
     const totalPages = data ? Math.ceil(data.total / META_ALERT_PAGE_SIZE) || 1 : 1;
     if (data && page < totalPages) {
@@ -131,7 +131,6 @@ export function MetaAlertsPage() {
             }
           }}
         />
-        {/* Filter toolbar card */}
         <div className="p-5 rounded-xl border border-kumo-hairline bg-kumo-canvas shadow-xs flex flex-wrap items-center justify-between gap-4">
           <div className="flex flex-wrap items-center gap-3 flex-1 min-w-[280px]">
             <div className="w-full sm:w-80">
@@ -180,7 +179,6 @@ export function MetaAlertsPage() {
           </div>
         </div>
 
-        {/* Table container */}
         <div className={`rounded-xl border border-kumo-hairline bg-kumo-canvas shadow-xs overflow-hidden transition-opacity ${isPlaceholderData ? 'opacity-70' : ''}`}>
           <Table>
             <Table.Header>
@@ -232,7 +230,6 @@ export function MetaAlertsPage() {
             </Table.Body>
           </Table>
 
-          {/* Pagination */}
           <div className="px-6 py-4 border-t border-kumo-hairline bg-kumo-recessed/20">
             <Pagination
               page={page}

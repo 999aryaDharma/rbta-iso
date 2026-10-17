@@ -1,4 +1,4 @@
-"""Mandatory Integration Proof: Batch and Replay Equivalence (Sprint 6)."""
+"""Integration test: kesetaraan mode batch dan replay."""
 from datetime import datetime, timedelta, timezone
 import random
 import pytest
@@ -12,12 +12,12 @@ from src.runners.replay_runner import ReplayStreamRunner
 
 
 def generate_equivalence_stream() -> list[CanonicalRawAlert]:
-    """Generate a rich, deterministic synthetic stream with out-of-order jitter and multi-agent events."""
+    """Bangkitkan aliran sintetis deterministik multi-agent dengan jitter out-of-order."""
     rng = random.Random(42)
     base_t = datetime(2026, 8, 28, 8, 0, 0, tzinfo=timezone.utc)
     stream: list[CanonicalRawAlert] = []
 
-    # Agent 001: 120 events
+    # Agent 001: 120 event.
     curr_t = base_t
     for i in range(120):
         step = rng.choice([2, 5, 12, 18, 30])
@@ -37,7 +37,7 @@ def generate_equivalence_stream() -> list[CanonicalRawAlert]:
             )
         )
 
-    # Agent 002: 80 events
+    # Agent 002: 80 event.
     curr_t2 = base_t + timedelta(minutes=5)
     for i in range(80):
         curr_t2 += timedelta(seconds=rng.choice([1, 4, 8]))
@@ -56,18 +56,18 @@ def generate_equivalence_stream() -> list[CanonicalRawAlert]:
             )
         )
 
-    # Shuffle to simulate bounded out-of-order network arrival
+    # Acak untuk menyimulasikan kedatangan jaringan out-of-order yang terbatas.
     shuffled = list(stream)
     rng.shuffle(shuffled)
     return shuffled
 
 
 def test_batch_and_replay_exact_equivalence():
-    """Prove that BatchResearchRunner and ReplayStreamRunner produce 100% strictly identical outputs."""
+    """BatchResearchRunner dan ReplayStreamRunner menghasilkan output yang identik 100%."""
     stream = generate_equivalence_stream()
     base_delta_t = timedelta(minutes=15)
 
-    # 1. Train model artifact bundle using batch runner output
+    # Latih bundle artefak model dari output batch runner.
     unscored_batch = BatchResearchRunner(base_delta_t=base_delta_t, adaptive=True).run(stream)
     assert len(unscored_batch.meta_alerts) > 0
 
@@ -78,7 +78,7 @@ def test_batch_and_replay_exact_equivalence():
     )
     scoring_pipeline = ScoringPipeline(bundle)
 
-    # 2. Run Batch Mode with scoring
+    # Jalankan mode batch dengan scoring.
     batch_runner = BatchResearchRunner(
         base_delta_t=base_delta_t,
         adaptive=True,
@@ -88,7 +88,7 @@ def test_batch_and_replay_exact_equivalence():
     batch_scored = batch_result.scored_meta_alerts
     assert batch_scored is not None
 
-    # 3. Run Replay Mode (MAX speed) with same scoring pipeline and same input stream
+    # Jalankan mode replay (kecepatan MAX) dengan scoring pipeline dan aliran input yang sama.
     replay_runner = ReplayStreamRunner(
         scoring_pipeline=scoring_pipeline,
         clock=ReplayClock(speed_factor="MAX"),
@@ -97,7 +97,7 @@ def test_batch_and_replay_exact_equivalence():
     )
     replay_scored = list(replay_runner.run(stream))
 
-    # 4. Strict 100% Equivalence Proof
+    # Kesetaraan ketat 100%.
     assert len(batch_scored) == len(replay_scored), (
         f"Count mismatch: batch produced {len(batch_scored)} vs replay {len(replay_scored)}"
     )

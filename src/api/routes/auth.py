@@ -6,5 +6,5 @@ router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 
 @router.get("/check")
 def check_auth(api_key: str = Depends(get_api_key)):
-    """Lightweight endpoint for frontend to validate an API key before storing in sessionStorage."""
+    """Endpoint ringan untuk frontend memvalidasi API key sebelum disimpan di sessionStorage."""
     return {"status": "authenticated", "authenticated": True}

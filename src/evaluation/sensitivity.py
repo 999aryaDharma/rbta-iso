@@ -1,4 +1,4 @@
-"""Delta-t sensitivity analysis across eight static window durations."""
+"""Analisis sensitivitas delta-t pada delapan durasi window statis."""
 
 from dataclasses import dataclass
 from datetime import timedelta
@@ -16,14 +16,14 @@ SENSITIVITY_DELTA_T_MINUTES: Tuple[int, ...] = (1, 5, 10, 15, 20, 30, 45, 60)
 
 @dataclass(frozen=True)
 class SensitivityResult:
-    """Outcome of Delta-t sensitivity evaluation."""
+    """Hasil evaluasi sensitivitas delta-t."""
 
     summary_df: pd.DataFrame
     recommended_elbow_delta_t: int
 
 
 def _find_elbow_point(x_vals: Sequence[float], y_vals: Sequence[float]) -> int:
-    """Identify optimal elbow point using maximum perpendicular distance to secant line."""
+    """Cari titik elbow optimal dengan jarak tegak lurus terbesar ke garis secant."""
     if len(x_vals) < 3:
         return int(x_vals[0])
 
@@ -39,7 +39,7 @@ def _find_elbow_point(x_vals: Sequence[float], y_vals: Sequence[float]) -> int:
     v1 = p2 - p1
     for x, y in zip(x_vals, y_vals):
         v2 = p1 - np.array([x, y])
-        # 2D cross product: x1*y2 - y1*x2
+        # Cross product 2D: x1*y2 - y1*x2
         cross_2d = float(v1[0] * v2[1] - v1[1] * v2[0])
         d = abs(cross_2d) / line_len
         distances.append(d)
@@ -52,19 +52,19 @@ def run_delta_t_sensitivity_analysis(
     alerts: Iterable[CanonicalRawAlert],
     delta_t_values: Sequence[int] = SENSITIVITY_DELTA_T_MINUTES,
 ) -> SensitivityResult:
-    """Execute RBTA batch aggregation across static delta-t values with adaptive ETW disabled.
+    """Jalankan agregasi batch RBTA pada nilai delta-t statis dengan ETW adaptif dimatikan.
 
     Parameters
     ----------
     alerts : Iterable[CanonicalRawAlert]
-        Evaluation alerts dataset.
+        Dataset alert evaluasi.
     delta_t_values : Sequence[int]
-        Delta-t values in minutes to evaluate (default: 1, 5, 10, 15, 20, 30, 45, 60).
+        Nilai delta-t dalam menit yang dievaluasi (default: 1, 5, 10, 15, 20, 30, 45, 60).
 
     Returns
     -------
     SensitivityResult
-        Summary DataFrame and computed elbow recommendation.
+        Ringkasan DataFrame dan rekomendasi elbow.
     """
     alert_list = list(alerts)
     n_raw = len(alert_list)
@@ -74,7 +74,7 @@ def run_delta_t_sensitivity_analysis(
     for dt_min in delta_t_values:
         runner = BatchResearchRunner(
             base_delta_t=timedelta(minutes=dt_min),
-            adaptive=False,  # Strict ceteris paribus
+            adaptive=False,  # ceteris paribus ketat
         )
 
         start_time = time.perf_counter()
@@ -94,7 +94,7 @@ def run_delta_t_sensitivity_analysis(
 
     df = pd.DataFrame(records)
 
-    # Compute elbow point from ARR curve
+    # Hitung titik elbow dari kurva ARR.
     x_vals = [r["delta_t_min"] for r in records]
     y_vals = [r["arr"] for r in records]
     elbow_dt = _find_elbow_point(x_vals, y_vals)

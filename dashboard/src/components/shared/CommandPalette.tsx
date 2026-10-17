@@ -67,7 +67,6 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
   return (
     <DialogRoot open={open} onOpenChange={(o) => { if (!o) { setQuery(''); onClose(); } }}>
       <Dialog className="max-w-xl w-full p-0 bg-kumo-canvas border border-kumo-hairline shadow-2xl rounded-xl overflow-hidden">
-        {/* Search Header Input */}
         <div className="flex items-center gap-3 px-5 py-4 border-b border-kumo-hairline bg-kumo-canvas">
           <MagnifyingGlass size={18} className="text-kumo-strong shrink-0" />
           <input
@@ -89,9 +88,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
           )}
         </div>
 
-        {/* Results Body */}
         <div className="p-3 max-h-[360px] overflow-y-auto space-y-1.5">
-          {/* Quick Direct Jump if Numeric ID */}
           {isNumericId && (
             <button
               onClick={() => {
@@ -121,7 +118,6 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
             </button>
           )}
 
-          {/* Navigation Items */}
           {filteredItems.map((item, idx) => {
             const Icon = item.icon;
             const isSelected = idx === selectedIndex && !isNumericId;
@@ -168,7 +164,6 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
           )}
         </div>
 
-        {/* Footer with Hotkey Hints */}
         <div className="px-5 py-3 border-t border-kumo-hairline bg-kumo-recessed/40 flex items-center justify-between text-[11px] text-kumo-subtle">
           <div className="flex items-center gap-3">
             <span className="flex items-center gap-1.5">

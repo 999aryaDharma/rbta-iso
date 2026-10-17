@@ -748,12 +748,12 @@ test.describe('RBTA + Cloudflare Kumo Dashboard Complete E2E Suite', () => {
     }, VALID_API_KEY);
     await page.goto('/dashboard/overview');
 
-    // Click shortcuts button in topbar
+    // Klik tombol shortcut di topbar
     const shortcutsBtn = page.locator('button[aria-label="Keyboard shortcuts"]');
     await shortcutsBtn.click();
     await expect(page.getByRole('heading', { name: 'Keyboard Shortcuts' })).toBeVisible();
 
-    // Close modal
+    // Tutup modal
     await page.keyboard.press('Escape');
     await expect(page.getByRole('heading', { name: 'Keyboard Shortcuts' })).not.toBeVisible();
   });
@@ -794,7 +794,7 @@ test.describe('RBTA + Cloudflare Kumo Dashboard Complete E2E Suite', () => {
     await startBtn.click();
     await expect(page.locator('text=Operational Processing Pipeline')).toBeVisible();
 
-    // Verify 9 stages exist
+    // Pastikan 9 tahap ada
     await expect(page.locator('text=1. Dataset')).toBeVisible();
     await expect(page.locator('text=2. Canonicalize')).toBeVisible();
     await expect(page.locator('text=3. Raw Evidence')).toBeVisible();
@@ -805,7 +805,7 @@ test.describe('RBTA + Cloudflare Kumo Dashboard Complete E2E Suite', () => {
     await expect(page.locator('text=8. Level')).toBeVisible();
     await expect(page.locator('text=9. Output Sink')).toBeVisible();
 
-    // Click 6. 7 Features to open stage detail
+    // Klik tahap '6. 7 Features' untuk membuka detailnya
     await page.locator('button:has-text("6. 7 Features")').click();
     await expect(page.locator('text=Stage Inspection: FEATURES')).toBeVisible();
   });

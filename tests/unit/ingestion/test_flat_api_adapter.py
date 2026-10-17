@@ -1,4 +1,4 @@
-"""RED: flat custom API events must map to canonical alerts without touching canonicalizer."""
+"""Event flat dari custom API harus terpetakan ke alert kanonis tanpa mengubah canonicalizer."""
 
 import pytest
 

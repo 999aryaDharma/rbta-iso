@@ -41,9 +41,7 @@ from src.engine.rbta_core import (
 log = logging.getLogger(__name__)
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # Struktur Meta-Alert (skema identik dengan RBTA v4)
-# ══════════════════════════════════════════════════════════════════════════════
 
 @dataclass
 class FixedMetaAlert:
@@ -112,7 +110,7 @@ class FixedMetaAlert:
             "start_time":               safe_strftime(self.start_time),
             "end_time":                 safe_strftime(self.end_time),
             "duration_sec":             duration_sec,
-            # ── Fitur f1-f9 (identik dengan RBTA v4) ─────────────────────
+            # Fitur f1-f9 (identik dengan RBTA v4)
             "alert_count":              self.alert_count,               # f1
             "max_severity":             self.max_severity,              # f2
             # f3: duration_sec
@@ -122,7 +120,7 @@ class FixedMetaAlert:
             "hour_of_day":              hour_of_day,                    # f7
             "unique_rules_triggered":   unique_rules_triggered,         # f8 [BARU]
             "mitre_hit_count":          self.mitre_hit_count,           # f9 [BARU]
-            # ── Kolom konteks ─────────────────────────────────────────────
+            # Kolom konteks
             "external_threat_count":    self.external_threat_count,
             "internal_src_count":       self.internal_src_count,
             "attacker_ips":             "|".join(sorted(set(ip for ip in self.srcip_list if ip))),
@@ -132,9 +130,7 @@ class FixedMetaAlert:
         }
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # Fixed Tumbling Window Aggregation
-# ══════════════════════════════════════════════════════════════════════════════
 
 def run_fixed_window(
     df:              pd.DataFrame,
@@ -265,9 +261,7 @@ def run_fixed_window(
     return df_meta, alert_index_map
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # Tabel Komparasi Loss Data
-# ══════════════════════════════════════════════════════════════════════════════
 
 def loss_analysis(
     df_raw:          pd.DataFrame,
@@ -325,9 +319,7 @@ def loss_analysis(
     return df_loss
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # Entry Point
-# ══════════════════════════════════════════════════════════════════════════════
 
 if __name__ == "__main__":
     import sys

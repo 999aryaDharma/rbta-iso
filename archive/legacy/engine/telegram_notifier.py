@@ -25,9 +25,7 @@ import pandas as pd
 log = logging.getLogger(__name__)
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # Format Telegram Compact (4 baris)
-# ══════════════════════════════════════════════════════════════════════════════
 
 def format_telegram_notification(
     agent_name:       str,
@@ -150,9 +148,7 @@ def format_telegram_batch(
     return notifications
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # Export ke file telegram_messages.txt
-# ══════════════════════════════════════════════════════════════════════════════
 
 def export_telegram_messages(
     df_scored:    pd.DataFrame,
@@ -219,9 +215,7 @@ def export_telegram_messages(
     return output_path
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # Unit Tests & Example
-# ══════════════════════════════════════════════════════════════════════════════
 
 if __name__ == "__main__":
     logging.basicConfig(

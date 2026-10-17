@@ -1,7 +1,7 @@
 # Deploy produksi ke CT Proxmox (Docker)
 
 Satu container: backend FastAPI + dashboard statis (`/dashboard/`).
-File lama `Dockerfile`/`deploy/asus`/`deploy/local` TIDAK diubah (historis).
+Konfigurasi deployment ASUS yang lama ada di `archive/asus/` sebagai arsip.
 
 ## 1. Siapkan CT (manual, sekali saja)
 
@@ -97,7 +97,7 @@ tail -f ~/rbta/deploy/ct/cd.log   # pantau hasil tiap jadwal
 CI (`/.github/workflows/ci.yml`, Ubuntu publik) berjalan tiap push:
 backend `pytest`, frontend `lint + typecheck + vitest`. CD di CT
 sengaja tidak menunggu CI hijau — branch ini rilis manual peneliti;
-jangan push kode yang belum lolos gate lokal.
+jangan push kode yang belum lolos test lokal.
 
 Backup berkala: `docker run --rm -v rbta-ct-live:/s -v $PWD:/b
 alpine tar czf /b/live-backup.tgz -C /s .` (sama untuk `rbta-ct-archive`).
@@ -108,6 +108,6 @@ alpine tar czf /b/live-backup.tgz -C /s .` (sama untuk `rbta-ct-archive`).
   base `python:3.13-slim` (3.11 tak punya wheel numpy 2.5.x),
   `scikit-learn==1.9.0` di `pyproject.toml` + `constraints.txt`
   (model `rbta-if-v1` dilatih 1.7.2 — ada `InconsistentVersionWarning`
-  saat load, sudah terbukti stabil di semua gate lokal + shadow run).
+  saat load, sudah terbukti stabil di semua test lokal + shadow run).
 - Pin TLS = leaf interim; ganti ke CA permanen bila server menerbitkan ulang.
 - Retensi arsip `rbta-ct-archive` belum otomatis — jadwalkan hapus manual.

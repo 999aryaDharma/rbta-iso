@@ -1,4 +1,4 @@
-"""Isolation Forest scoring pipeline and reference training module."""
+"""Scoring pipeline Isolation Forest dan training reference."""
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -22,7 +22,7 @@ from src.model.threshold import TukeyThreshold, compute_tukey_threshold
 
 @dataclass(frozen=True)
 class ModelArtifactBundle:
-    """In-memory bundle of all 6 components constituting a trained model artifact."""
+    """Bundle in-memory berisi keenam komponen artefak model hasil training."""
 
     scaler: RobustScaler
     model: IsolationForest
@@ -41,40 +41,40 @@ def train_reference_pipeline(
     git_commit: Optional[str] = None,
     research_config_hash: Optional[str] = None,
 ) -> ModelArtifactBundle:
-    """Train reference Isolation Forest model and generate calibrated artifact bundle.
+    """Latih model Isolation Forest reference dan hasilkan bundle artefak terkalibrasi.
 
     Parameters
     ----------
     metas : Sequence[MetaAlert]
-        Training reference meta-alerts.
+        Meta-alert reference untuk training.
     random_state : int
-        Fixed random seed for reproducibility.
+        Seed acak tetap demi reprodusibilitas.
     model_version : str
-        Version identifier for the trained model.
+        ID versi model yang dilatih.
     training_run_id : str | None
-        Unique identifier for the training run.
+        ID unik run training.
     git_commit : str | None
-        Git commit SHA-256 for research reproducibility.
+        SHA commit Git untuk reprodusibilitas penelitian.
     research_config_hash : str | None
-        Cryptographic hash of the research hyperparameters.
+        Hash kriptografis dari hyperparameter penelitian.
 
     Returns
     -------
     ModelArtifactBundle
-        Complete bundle ready for serialization and inference.
+        Bundle lengkap yang siap diserialisasi dan dipakai inferensi.
     """
     if len(metas) < 4:
         raise ValueError(f"At least 4 meta-alerts are required to train reference pipeline, got {len(metas)}")
 
-    # 1. Extract 7 canonical features as DataFrame with feature names
+    # Ekstrak 7 fitur kanonis sebagai DataFrame bernama kolom.
     X_df = SevenFeatureExtractor.extract_features_df(metas)
 
-    # 2. Fit RobustScaler
+    # Fit RobustScaler.
     scaler = RobustScaler()
     scaler.fit(X_df)
     X_scaled = scaler.transform(X_df)
 
-    # 3. Fit IsolationForest (200 trees, contamination="auto")
+    # Fit IsolationForest (200 tree, contamination="auto").
     model = IsolationForest(
         n_estimators=200,
         contamination="auto",
@@ -83,9 +83,9 @@ def train_reference_pipeline(
     )
     model.fit(X_scaled)
 
-    # 4. Derive calibration scores on a distinct later population when
-    # supplied. Backward-compatible callers retain the legacy same-population
-    # behavior, but official research orchestration always supplies this set.
+    # Skor kalibrasi diturunkan dari populasi lain yang lebih belakang bila tersedia.
+    # Pemanggil lama tetap memakai populasi yang sama, tetapi orkestrasi penelitian
+    # resmi selalu menyediakan set ini.
     calibration_population = list(calibration_metas) if calibration_metas is not None else list(metas)
     if len(calibration_population) < 4:
         raise ValueError(
@@ -97,7 +97,7 @@ def train_reference_pipeline(
     raw_min = float(np.min(raw_scores))
     raw_max = float(np.max(raw_scores))
 
-    # 5. Fit Score Calibration
+    # Fit kalibrasi skor.
     calibration = ScoreCalibration(
         raw_min=raw_min,
         raw_max=raw_max,
@@ -105,11 +105,11 @@ def train_reference_pipeline(
         version="minmax-v1",
     )
 
-    # 6. Derive Calibrated Scores and Tukey IQR Threshold
+    # Hitung skor terkalibrasi dan threshold Tukey IQR.
     cal_scores = [calibration.calibrate(float(s)) for s in raw_scores]
     threshold = compute_tukey_threshold(cal_scores)
 
-    # 7. Metadata and Schema
+    # Metadata dan skema.
     schema = {
         "schema_version": "1.0",
         "features": list(FEATURE_COLUMNS),
@@ -174,7 +174,7 @@ def train_reference_pipeline(
 
 
 class ScoringPipeline:
-    """Inference scoring pipeline executing strictly in read-only prediction mode."""
+    """Scoring pipeline inferensi yang hanya berjalan dalam mode prediksi (read-only)."""
 
     def __init__(self, bundle: ModelArtifactBundle) -> None:
         self.bundle: ModelArtifactBundle = bundle
@@ -185,31 +185,31 @@ class ScoringPipeline:
         self.metadata: Dict[str, Any] = bundle.metadata
         self.schema: Dict[str, Any] = bundle.schema
 
-        # Verify schema matches canonical FEATURE_COLUMNS
+        # Skema harus sesuai FEATURE_COLUMNS kanonis.
         schema_features = tuple(self.schema.get("features", []))
         if schema_features != FEATURE_COLUMNS:
             raise ValueError(f"Bundle feature schema {schema_features} != expected {FEATURE_COLUMNS}")
 
     def score_single(self, meta: MetaAlert) -> ScoredMetaAlert:
-        """Score a single MetaAlert event in stream/live mode without fitting.
+        """Skor satu event MetaAlert dalam mode stream/live tanpa fitting.
 
         Parameters
         ----------
         meta : MetaAlert
-            Incoming MetaAlert DTO.
+            DTO MetaAlert yang masuk.
 
         Returns
         -------
         ScoredMetaAlert
-            Immutable scored result DTO.
+            DTO hasil skor yang immutable.
         """
         features_dict = SevenFeatureExtractor.extract_features_dict(meta)
         X_single_df = pd.DataFrame([features_dict], columns=list(FEATURE_COLUMNS))
 
-        # Use persisted scaler to transform single row
+        # Transform satu baris memakai scaler yang tersimpan.
         X_scaled = self.scaler.transform(X_single_df)
 
-        # Inference only: score_samples
+        # Hanya inferensi: score_samples.
         raw_score = float(-self.model.score_samples(X_scaled)[0])
         anomaly_score = float(self.calibration.calibrate(raw_score))
 
@@ -245,17 +245,17 @@ class ScoringPipeline:
         )
 
     def score_batch(self, metas: Sequence[MetaAlert]) -> List[ScoredMetaAlert]:
-        """Score a batch of MetaAlert events efficiently.
+        """Skor sekumpulan event MetaAlert secara efisien.
 
         Parameters
         ----------
         metas : Sequence[MetaAlert]
-            Batch of MetaAlert DTOs.
+            Batch DTO MetaAlert.
 
         Returns
         -------
         List[ScoredMetaAlert]
-            List of immutable scored result DTOs in the same order.
+            Daftar DTO hasil skor immutable dengan urutan yang sama.
         """
         if not metas:
             return []
@@ -263,7 +263,7 @@ class ScoringPipeline:
         features_dicts = [SevenFeatureExtractor.extract_features_dict(m) for m in metas]
         X_batch_df = pd.DataFrame(features_dicts, columns=list(FEATURE_COLUMNS))
         
-        # Batch transform and score
+        # Transform dan skor per batch.
         X_scaled = self.scaler.transform(X_batch_df)
         raw_scores = -self.model.score_samples(X_scaled)
         
@@ -311,17 +311,17 @@ class ScoringPipeline:
         self,
         metas: Sequence[MetaAlert],
     ) -> Tuple[pd.DataFrame, List[ScoredMetaAlert]]:
-        """Score a sequence of MetaAlerts in batch mode.
+        """Skor sekumpulan MetaAlert dalam mode batch.
 
         Parameters
         ----------
         metas : Sequence[MetaAlert]
-            Sequence of MetaAlert DTOs.
+            Urutan DTO MetaAlert.
 
         Returns
         -------
         Tuple[pd.DataFrame, List[ScoredMetaAlert]]
-            DataFrame of scored results and corresponding list of ScoredMetaAlert objects.
+            DataFrame hasil skor beserta daftar objek ScoredMetaAlert yang sesuai.
         """
         scored_list = self.score_batch(metas)
         rows = [

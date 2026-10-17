@@ -1,4 +1,4 @@
-"""Production FastAPI server bootstrap with validated configuration and lifecycle management."""
+"""Bootstrap server FastAPI produksi: validasi konfigurasi dan pengelolaan lifecycle."""
 
 from contextlib import asynccontextmanager
 import logging
@@ -22,28 +22,28 @@ def create_production_app(
     env: Optional[Dict[str, str]] = None,
     strict: bool = False,
 ) -> FastAPI:
-    """Create and configure the production FastAPI application with full dependency injection.
+    """Buat dan konfigurasi aplikasi FastAPI produksi lengkap dengan dependency injection.
 
     Parameters
     ----------
     env : Dict[str, str] | None
-        Optional environment override dictionary for testing or programmatic bootstrap.
+        Override environment opsional, untuk test atau bootstrap terprogram.
     strict : bool
-        When True, strictly requires non-empty RBTA_API_KEY and RBTA_MODEL_VERSION.
+        Bila True, RBTA_API_KEY dan RBTA_MODEL_VERSION wajib terisi.
 
     Returns
     -------
     FastAPI
-        Configured production application instance.
+        Instance aplikasi produksi yang sudah dikonfigurasi.
 
     Raises
     ------
     RuntimeError
-        If strict=True and mandatory security/model environment variables are missing.
+        Bila strict=True dan variabel environment keamanan/model wajib tidak ada.
     ValueError
-        If mandatory paths cannot be validated or written.
+        Bila path wajib tidak bisa divalidasi atau ditulis.
     ModelRegistryError
-        If model artifacts are corrupted or invalid.
+        Bila artefak model rusak atau tidak valid.
     """
     env_map = os.environ if env is None else env
 
@@ -58,14 +58,14 @@ def create_production_app(
         if not model_version or not model_version.strip():
             raise RuntimeError("RBTA_MODEL_VERSION environment variable is mandatory and must not be empty in production.")
 
-    # N4: single live writer per state file for EVERY bootstrap (not only
-    # worker-enabled): take the OS-level lock before any DurableStateManager
-    # or service can write, so a second process fails fast here.
+    # Satu writer live per file state untuk SETIAP bootstrap (bukan hanya saat worker aktif):
+    # ambil lock level OS sebelum DurableStateManager atau service sempat menulis,
+    # supaya proses kedua langsung gagal di sini.
     from src.runtime.live_worker import acquire_state_lock as _acquire_state_lock
 
     _acquire_state_lock(state_file_path)
 
-    # 1. State directory accessibility check
+    # Pastikan direktori state bisa diakses.
     state_dir = state_file_path.parent
     try:
         state_dir.mkdir(parents=True, exist_ok=True)
@@ -74,10 +74,8 @@ def create_production_app(
 
     state_mgr = DurableStateManager(state_file_path)
 
-    # 2. Model registry initialization
     registry = ModelRegistry(base_dir=registry_dir, explicit_version=model_version)
 
-    # 3. Model bundle resolution
     active_version = registry.get_active_version()
     scoring_pipe: Optional[ScoringPipeline] = None
 
@@ -98,11 +96,10 @@ def create_production_app(
     raw_evidence_db = env_map.get("RBTA_RAW_EVIDENCE_DB", "data/runtime/raw_alert_evidence.sqlite3")
     raw_evidence_store = RawAlertEvidenceStore(raw_evidence_db)
 
-    # 4. Construct live stateful service
-    # When the live worker is opted in and RBTA_SOURCE_MODE is not set
-    # explicitly, the live service defaults to LIVE. The demonstration
-    # replay controller always builds its own REPLAY-scoped service, so
-    # replay behavior is untouched by this default.
+    # Service live stateful.
+    # Bila live worker diaktifkan dan RBTA_SOURCE_MODE tidak diset eksplisit, service
+    # live default ke LIVE. Replay controller demo selalu membangun service REPLAY
+    # sendiri, jadi perilaku replay tidak terpengaruh default ini.
     from src.runtime.live_worker import worker_enabled_from_env as _worker_on
 
     _worker_enabled = _worker_on(env_map)
@@ -124,8 +121,8 @@ def create_production_app(
             source_mode=source_mode,
         )
 
-    # Insecure-TLS fail-visible: warn at startup and always record the
-    # operator choice in the live source state for thesis evidence lineage.
+    # TLS insecure harus terlihat: beri peringatan saat startup dan selalu catat pilihan
+    # operator di state live source untuk jejak bukti penelitian.
     tls_verify_raw = str(env_map.get("WAZUH_INDEXER_VERIFY_TLS", "true")).strip().lower()
     tls_verify = tls_verify_raw != "false"
     if not tls_verify:
@@ -137,7 +134,7 @@ def create_production_app(
     if service is not None:
         service.update_live_source_state({"tls_verify": tls_verify})
 
-    # 5. Construct demonstration replay controller
+    # Replay controller untuk demo.
     replay_controller: Optional[ReplayController] = None
     if scoring_pipe is not None:
         default_replay_dir = "/app/data/replay" if Path("/app/data/replay").exists() else "data/test_datasets"
@@ -148,7 +145,7 @@ def create_production_app(
             replay_runs_dir=env_map.get("RBTA_REPLAY_RUNS_DIR"),
         )
 
-    # 6. Lifespan for graceful shutdown (+ optional live worker thread, L2)
+    # Lifespan untuk shutdown yang rapi (+ thread live worker opsional).
     from src.runtime.live_worker import (
         LiveWorker,
         drain_on_stop_from_env,
@@ -158,8 +155,7 @@ def create_production_app(
 
     live_worker: Optional[LiveWorker] = None
     if service is not None and worker_enabled_from_env(env_map):
-        # The state lock was already taken for every bootstrap above; no
-        # second acquire here.
+        # Lock state sudah diambil di atas untuk setiap bootstrap; tidak perlu acquire lagi.
         from src.runtime.live_coordinator import LiveIngestionCoordinator
 
         buffer_enabled = str(env_map.get("RBTA_ORDER_BUFFER_ENABLED", "false")).strip().lower() == "true"
@@ -189,13 +185,12 @@ def create_production_app(
             derivation_override=env_map.get("RBTA_LIVE_DERIVATION_OVERRIDE"),
         )
 
-    # Telegram dispatcher (L5): attached beside the worker, never touching it.
-    # Without bot credentials it stays disabled (dry-run only: the thread
-    # still starts so the outbox is drained and each pass is logged, but
-    # nothing is sent). The send path runs only when credentials exist via
-    # make_telegram_sender.
-    # RBTA_TELEGRAM_DRY_RUN=true forces dry-run mode: credentials are NOT
-    # passed to the constructor, so the dispatcher stays disabled by design.
+    # Dispatcher Telegram dipasang di samping worker, tidak pernah menyentuhnya.
+    # Tanpa kredensial bot ia tetap nonaktif (hanya dry-run: thread tetap jalan agar outbox
+    # dikuras dan setiap putaran dicatat, tapi tidak ada yang dikirim). Jalur kirim hanya
+    # aktif bila kredensial tersedia lewat make_telegram_sender.
+    # RBTA_TELEGRAM_DRY_RUN=true memaksa dry-run: kredensial TIDAK diteruskan ke
+    # constructor, sehingga dispatcher memang sengaja nonaktif.
     telegram_dispatcher: Optional[Any] = None
     if live_worker is not None:
         from src.runtime.telegram_dispatcher import TelegramDispatcher, make_telegram_sender
@@ -212,10 +207,9 @@ def create_production_app(
         telegram_dispatcher = TelegramDispatcher(
             service, sender=sender, bot_token=bot_token or None, chat_id=chat_id or None
         )
-        # P2: fail-visible startup hint — worker exists but the dispatcher is
-        # HOLDING the outbox for lack of credentials, and the operator did not
-        # explicitly opt into dry-run. Warn exactly once here (not in the
-        # lifespan loop) so a silent no-notify deployment is obvious.
+        # Petunjuk startup yang terlihat: worker ada tetapi dispatcher MENAHAN outbox karena
+        # kredensial tidak ada, dan operator tidak memilih dry-run secara eksplisit. Peringatan
+        # cukup sekali di sini (bukan di loop lifespan) agar deployment tanpa notifikasi langsung ketahuan.
         if not telegram_dry_run and not telegram_dispatcher.enabled:
             logger.warning(
                 "Telegram credentials missing; dispatcher HOLDING outbox — "
@@ -268,7 +262,7 @@ def create_production_app(
 
 
 def run() -> None:
-    """Production server entrypoint."""
+    """Entrypoint server produksi."""
     log_level = os.getenv("RBTA_LOG_LEVEL", "info").lower()
     logging.basicConfig(level=getattr(logging, log_level.upper(), logging.INFO))
 

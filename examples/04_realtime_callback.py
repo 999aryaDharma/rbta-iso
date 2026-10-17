@@ -1,12 +1,9 @@
-"""
-04_realtime_callback.py  —  Real-Time Processing Callback
-========================================================
-Process alerts saat-saat mereka di-replay (online/streaming mode).
+"""Proses alert saat di-replay (mode online/streaming).
 
-Gunakan untuk:
-  - Real-time aggregation (count by agent, rule, severity)
-  - Integration dengan detection engines (RBTA, IF)
-  - Simulation pipeline testing
+Berguna untuk:
+  - Agregasi real-time (hitungan per agent, rule, severity)
+  - Integrasi dengan engine deteksi (RBTA, IF)
+  - Menguji pipeline simulasi
 """
 
 import sys
@@ -18,7 +15,7 @@ from src.streaming import AlertStreamSimulator
 
 
 class RealtimeAggregator:
-    """Real-time aggregation of alerts during replay."""
+    """Agregasi alert secara real-time selama replay."""
     
     def __init__(self):
         self.agent_counts = collections.defaultdict(int)
@@ -31,7 +28,7 @@ class RealtimeAggregator:
         """Callback untuk setiap alert."""
         self.total += 1
         
-        # Aggregate
+        # Agregasi.
         agent = alert.get('agent_name', 'unknown')
         rule_group = alert.get('rule_group_primary', 'unknown')
         severity = int(alert.get('rule_level', 1))
@@ -42,7 +39,7 @@ class RealtimeAggregator:
         sev_bucket = 'L1-2' if severity <= 2 else 'L3-4' if severity <= 4 else 'L5-6' if severity <= 6 else 'L7+'
         self.severity_counts[sev_bucket] += 1
         
-        # Track high-severity
+        # Catat alert severity tinggi.
         if severity >= 7:
             self.high_severity_alerts.append({
                 'agent': agent,
@@ -52,7 +49,7 @@ class RealtimeAggregator:
             })
     
     def print_summary(self):
-        """Print aggregation summary."""
+        """Cetak ringkasan agregasi."""
         print("\n" + "-"*80)
         print("REAL-TIME AGGREGATION SUMMARY")
         print("-"*80)
@@ -89,10 +86,10 @@ def main():
     print("EXAMPLE 4: Real-Time Callback Processing")
     print("="*80 + "\n")
     
-    # Initialize aggregator
+    # Siapkan aggregator.
     agg = RealtimeAggregator()
     
-    # Initialize simulator
+    # Siapkan simulator.
     sim = AlertStreamSimulator(
         csv_path="data/raw/rbta_ready_all.csv",
         speed_factor=100,
@@ -101,13 +98,13 @@ def main():
         log_frequency=10000,
     )
     
-    # Register callback
+    # Daftarkan callback.
     sim.on_alert(agg.process_alert)
     
     print("Running real-time aggregation...\n")
     stats = sim.replay()
     
-    # Print aggregation results
+    # Cetak hasil agregasi.
     agg.print_summary()
     
     print("="*80)

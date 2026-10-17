@@ -1,4 +1,4 @@
-"""Validation script for production state directory ownership and permissions."""
+"""Script validasi kepemilikan dan permission direktori state produksi."""
 
 import argparse
 import os
@@ -15,16 +15,16 @@ def check_state_dir_permissions(
     target_uid: int = REQUIRED_UID,
     target_gid: int = REQUIRED_GID,
 ) -> tuple[bool, str]:
-    """Validate that state directory satisfies the runtime non-root UID/GID ownership and secure write/execute contract.
+    """Validasi bahwa direktori state memenuhi kontrak kepemilikan UID/GID non-root dan izin tulis/eksekusi yang aman.
 
     Parameters
     ----------
     state_dir : Path
-        Target directory to inspect.
+        Direktori tujuan yang diperiksa.
     target_uid : int
-        Expected owner UID (default 10001).
+        UID pemilik yang diharapkan (default 10001).
     target_gid : int
-        Expected owner GID (default 10001).
+        GID pemilik yang diharapkan (default 10001).
 
     Returns
     -------
@@ -37,7 +37,7 @@ def check_state_dir_permissions(
     if not state_dir.is_dir():
         return False, f"Path '{state_dir}' is not a directory."
 
-    # POSIX numeric UID/GID ownership & permission mode check
+    # Cek kepemilikan UID/GID numerik dan mode permission di POSIX.
     if os.name == "posix":
         st = os.stat(state_dir)
         uid = st.st_uid
@@ -78,7 +78,7 @@ def check_state_dir_permissions(
 
         return True, f"PASS: State directory '{state_dir}' verified owned by {target_uid}:{target_gid} with secure permissions ({oct(mode)})."
 
-    # Non-POSIX fallback (Windows development workstation)
+    # Fallback non-POSIX (workstation development Windows).
     test_file = state_dir / f".preflight_test_{os.getpid()}"
     try:
         test_file.touch()

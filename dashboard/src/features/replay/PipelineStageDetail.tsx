@@ -41,7 +41,6 @@ export function PipelineStageDetail({
         </Badge>
       </div>
 
-      {/* STAGE: FEATURES */}
       {activeStage === 'FEATURES' && (
         <div className="space-y-3">
           <div className="text-xs text-kumo-subtle">
@@ -118,7 +117,6 @@ export function PipelineStageDetail({
         </div>
       )}
 
-      {/* STAGE: ISOLATION_FOREST or DECISION */}
       {(activeStage === 'ISOLATION_FOREST' || activeStage === 'DECISION') && (
         <div className="space-y-3 font-mono text-xs">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -165,7 +163,6 @@ export function PipelineStageDetail({
         </div>
       )}
 
-      {/* STAGE: RBTA */}
       {activeStage === 'RBTA' && (
         <div className="space-y-3 font-mono text-xs">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -206,7 +203,6 @@ export function PipelineStageDetail({
         </div>
       )}
 
-      {/* STAGE: OUTPUT_SINK */}
       {activeStage === 'OUTPUT_SINK' && (
         <div className="space-y-3">
           <div className="flex items-center justify-between text-xs font-mono">
@@ -243,7 +239,6 @@ export function PipelineStageDetail({
         </div>
       )}
 
-      {/* STAGE: DATASET / CANONICAL / EVIDENCE / META_ALERT */}
       {(activeStage === 'DATASET' || activeStage === 'CANONICAL' || activeStage === 'EVIDENCE' || activeStage === 'META_ALERT') && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 font-mono text-xs">
           <div className="p-3 rounded bg-kumo-recessed border border-kumo-hairline space-y-1">

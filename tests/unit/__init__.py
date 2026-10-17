@@ -1,1 +1,1 @@
-"""Unit tests package."""
+"""Paket unit test."""

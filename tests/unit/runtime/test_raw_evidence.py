@@ -75,7 +75,7 @@ def test_store_and_retrieve_roundtrip(store: RawAlertEvidenceStore):
 def test_store_idempotent_identical_duplicate(store: RawAlertEvidenceStore):
     alert = make_alert("wazuh-dup")
     assert store.store(alert) is True
-    # Re-storing exact same alert is safe NO-OP
+    # Menyimpan ulang alert yang persis sama adalah NO-OP yang aman.
     assert store.store(alert) is False
     assert store.count() == 1
 
@@ -103,7 +103,7 @@ def test_transport_envelope_does_not_change_evidence_identity(tmp_path, legacy):
         fields["agent_criticality"] = float(fields["agent_criticality"])
         original_hash = hashlib.sha256(deterministic_json_dumps(fields).encode()).hexdigest()
         with sqlite3.connect(path) as conn:
-            # Reproduce a database created before fingerprint versioning existed.
+            # Reproduksi database yang dibuat sebelum ada versi fingerprint.
             columns = {row[1] for row in conn.execute("PRAGMA table_info(raw_alert_evidence)")}
             if "fingerprint_version" in columns:
                 conn.execute("UPDATE raw_alert_evidence SET fingerprint_version = 1")
@@ -120,7 +120,7 @@ def test_store_conflicting_duplicate_raises_error(store: RawAlertEvidenceStore):
     alert1 = make_alert("wazuh-conflict", rule_level=5)
     assert store.store(alert1) is True
 
-    # Same ID but different rule_level -> conflict error!
+    # ID sama tetapi rule_level berbeda -> error konflik.
     alert2 = make_alert("wazuh-conflict", rule_level=12)
     with pytest.raises(RawEvidenceConflictError) as exc_info:
         store.store(alert2)
@@ -142,13 +142,13 @@ def test_nested_immutable_metadata_serialization(store: RawAlertEvidenceStore):
     alert = make_alert("wazuh-nested", metadata=nested_meta)
     assert store.store(alert) is True
 
-    # Unredacted
+    # Tanpa penyamaran.
     unredacted = store.get("wazuh-nested", redact=False)
     assert unredacted is not None
     assert unredacted["metadata"]["secret_token"] == "super_secret_12345"
     assert unredacted["metadata"]["data"]["tags"] == ["tag1", "tag2"]
 
-    # Redacted presentation
+    # Tampilan yang disamarkan.
     redacted = store.get("wazuh-nested", redact=True)
     assert redacted is not None
     assert redacted["metadata"]["secret_token"] == "[REDACTED]"
@@ -161,7 +161,7 @@ def test_get_meta_alert_raw_alerts_resolution_and_unresolved(store: RawAlertEvid
     store.store(alert1)
     store.store(alert2)
 
-    # Source IDs include aid-1, aid-2, and missing aid-3
+    # ID sumber berisi aid-1, aid-2, dan aid-3 yang hilang.
     source_ids = ["aid-1", "aid-2", "aid-3"]
     res = store.get_meta_alert_raw_alerts(source_ids, meta_id=101, page=1, page_size=10)
 
@@ -183,14 +183,14 @@ def test_get_meta_alert_raw_alerts_filters_and_search(store: RawAlertEvidenceSto
 
     source_ids = ["aid-a", "aid-b"]
 
-    # Filter by level_min
+    # Filter berdasarkan level_min.
     res = store.get_meta_alert_raw_alerts(source_ids, level_min=8)
     assert res["source_total"] == 2
     assert res["resolved_total"] == 2
     assert res["filtered_total"] == 1
     assert res["items"][0]["wazuh_alert_id"] == "aid-b"
 
-    # Multi-field search by description
+    # Pencarian multi-field berdasarkan deskripsi.
     res_search = store.get_meta_alert_raw_alerts(source_ids, search="root login")
     assert res_search["filtered_total"] == 1
     assert res_search["items"][0]["wazuh_alert_id"] == "aid-b"
@@ -202,12 +202,12 @@ def test_search_multi_field(store: RawAlertEvidenceStore):
     store.store(alert1)
     store.store(alert2)
 
-    # Search by full_log content
+    # Pencarian berdasarkan isi full_log.
     found = store.search(query="Kernel panic")
     assert len(found) == 1
     assert found[0]["wazuh_alert_id"] == "search-1"
 
-    # Search by IP
+    # Pencarian berdasarkan IP.
     found_ip = store.search(query="172.16.0.2")
     assert len(found_ip) == 1
     assert found_ip[0]["wazuh_alert_id"] == "search-2"
@@ -228,7 +228,7 @@ def test_count_by_hour_valid_and_corrupt_timestamp(store: RawAlertEvidenceStore)
     )
     assert counts.get("2026-08-29 10:00") == 2
 
-    # Inject corrupt timestamp directly into DB to test fail-closed integrity
+    # Sisipkan timestamp rusak langsung ke DB untuk menguji integritas gagal-tertutup.
     with store._get_conn() as conn:
         conn.execute(
             "UPDATE raw_alert_evidence SET timestamp = '2026-08-29T10:invalid' WHERE wazuh_alert_id = 'hourly-1'"
@@ -242,7 +242,7 @@ def test_count_by_hour_valid_and_corrupt_timestamp(store: RawAlertEvidenceStore)
 
 
 def test_store_decoder_object_from_canonical_metadata(store: RawAlertEvidenceStore):
-    """Wazuh decoder objects must be safely persisted through immutable metadata."""
+    """Objek decoder Wazuh harus tersimpan aman lewat metadata immutable."""
     alert = make_alert(
         "wazuh-decoder-object",
         metadata={
@@ -268,7 +268,7 @@ def test_store_decoder_object_from_canonical_metadata(store: RawAlertEvidenceSto
 
 
 def test_replay_duplicate_count_tracks_rows_actually_inserted(store: RawAlertEvidenceStore):
-    """Replay fast mode must not report two evidence rows for one primary key."""
+    """Mode replay cepat tidak boleh melaporkan dua baris evidence untuk satu primary key."""
     alert = make_alert("replay-duplicate")
 
     assert store.store(alert, source_mode="REPLAY", skip_conflict_check=True) is True
@@ -277,7 +277,7 @@ def test_replay_duplicate_count_tracks_rows_actually_inserted(store: RawAlertEvi
 
 
 def test_replay_duplicate_keeps_full_canonical_conflict_detection(store: RawAlertEvidenceStore):
-    """Replay optimization must not weaken the canonical evidence fingerprint."""
+    """Optimasi replay tidak boleh melemahkan fingerprint evidence kanonis."""
     original = make_alert("replay-conflict", rule_level=4)
     conflicting = make_alert("replay-conflict", rule_level=12)
 
@@ -287,7 +287,7 @@ def test_replay_duplicate_keeps_full_canonical_conflict_detection(store: RawAler
 
 
 def test_replay_can_preserve_sanitized_original_envelope(store: RawAlertEvidenceStore):
-    """A replay run can retain its exact source envelope for audit drill-down."""
+    """Replay run bisa menyimpan envelope sumber yang persis untuk drill-down audit."""
     alert = make_alert("replay-envelope")
     original = {"id": "replay-envelope", "authorization": "secret", "nested": {"value": 7}}
 

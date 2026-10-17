@@ -1,4 +1,4 @@
-"""Wazuh ingestion package for historical and live acquisition."""
+"""Paket ingestion Wazuh untuk akuisisi historis dan live."""
 
 from src.ingestion.checkpoint import CheckpointManager, HistoricalCheckpoint
 from src.ingestion.flat_api_adapter import flat_api_event_to_raw, flat_api_page_to_raw_list

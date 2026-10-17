@@ -1,11 +1,11 @@
-"""Unit tests for HistoricalCheckpoint persistence (Sprint 5)."""
+"""Unit test persistensi HistoricalCheckpoint."""
 from pathlib import Path
 import pytest
 from src.ingestion.checkpoint import HistoricalCheckpoint, CheckpointManager
 
 
 def test_checkpoint_defaults_and_updates():
-    """Checkpoint initializes with defaults and correctly updates position."""
+    """Checkpoint terinisialisasi dengan default dan memperbarui posisi dengan benar."""
     cp = HistoricalCheckpoint()
     assert cp.mode == "historical"
     assert cp.current_index is None
@@ -30,11 +30,11 @@ def test_checkpoint_defaults_and_updates():
 
 
 def test_checkpoint_file_persistence_roundtrip(tmp_path: Path):
-    """CheckpointManager saves to JSON file and restores identically."""
+    """CheckpointManager menyimpan ke file JSON dan memulihkannya secara identik."""
     cp_file = tmp_path / "checkpoint.json"
     manager = CheckpointManager(cp_file)
 
-    # Initial load on missing file returns fresh checkpoint
+    # Load awal tanpa file mengembalikan checkpoint baru.
     cp = manager.load()
     assert cp.processed_count == 0
 
@@ -43,7 +43,7 @@ def test_checkpoint_file_persistence_roundtrip(tmp_path: Path):
 
     assert cp_file.exists()
 
-    # Restore from disk
+    # Pulihkan dari disk.
     restored = manager.load()
     assert restored.current_index == "wazuh-alerts-4.x-2026.04.02"
     assert restored.last_sort == [100, "alert-1"]

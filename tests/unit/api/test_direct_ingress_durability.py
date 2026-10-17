@@ -1,4 +1,4 @@
-"""Unit tests for direct API ingress durability, active bucket persistence, and graceful shutdown."""
+"""Unit test durabilitas ingress API langsung, persistensi bucket aktif, dan shutdown yang rapi."""
 
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -42,7 +42,7 @@ def setup_test_model(reg_dir: Path, version: str = "dur-v1") -> None:
 
 
 def test_direct_ingress_persists_active_bucket_and_seen_id_before_http_return(tmp_path: Path):
-    """When alert is accepted via HTTP ingress, active bucket and seen ID are immediately durable on disk."""
+    """Saat alert diterima lewat ingress HTTP, bucket aktif dan ID seen langsung durable di disk."""
     reg_dir = tmp_path / "models"
     state_file = tmp_path / "runtime" / "state.json"
     setup_test_model(reg_dir, "dur-v1")
@@ -54,7 +54,7 @@ def test_direct_ingress_persists_active_bucket_and_seen_id_before_http_return(tm
         "RBTA_RAW_EVIDENCE_DB": str(tmp_path / "evidence.sqlite3"),
     }
 
-    # 1. Ingest alert A via HTTP API
+    # Ingest alert A lewat HTTP API.
     app1 = create_production_app(env=env)
     client1 = TestClient(app1)
 
@@ -75,22 +75,22 @@ def test_direct_ingress_persists_active_bucket_and_seen_id_before_http_return(tm
         "is_duplicate": False,
     }
 
-    # 2. Simulate process crash by creating app2 / service2 from the exact same state file
-    # Simulated restart: the OS releases the state lock on process exit.
+    # Simulasikan crash proses dengan membuat app2 / service2 dari file state yang sama persis.
+    # Restart simulasi: OS melepas lock state saat proses berhenti.
     from src.runtime.live_worker import release_state_lock
 
     release_state_lock(str(state_file))
     app2 = create_production_app(env=env)
     client2 = TestClient(app2)
 
-    # 3. Check stats on new instance: seen_alerts_count must be 1, active_buckets_count must be 1
+    # Cek statistik instance baru: seen_alerts_count harus 1, active_buckets_count harus 1.
     stats_resp = client2.get("/runtime/stats")
     assert stats_resp.status_code == 200
     stats_data = stats_resp.json()
     assert stats_data["seen_alerts_count"] == 1
     assert stats_data["active_buckets_count"] == 1
 
-    # 4. Re-ingesting alert A must be recognized as duplicate no-op
+    # Ingest ulang alert A harus dikenali sebagai duplikat no-op.
     resp2 = client2.post("/api/v1/alerts/ingest", json=payload)
     assert resp2.status_code == 200
     assert resp2.json() == {
@@ -101,7 +101,7 @@ def test_direct_ingress_persists_active_bucket_and_seen_id_before_http_return(tm
 
 
 def test_graceful_shutdown_drain_false_preserves_active_bucket_without_forced_finalization(tmp_path: Path):
-    """Graceful shutdown (drain=False) persists active bucket without artificially generating MetaAlerts."""
+    """Shutdown rapi (drain=False) menyimpan bucket aktif tanpa membuat MetaAlert buatan."""
     reg_dir = tmp_path / "models"
     state_file = tmp_path / "runtime" / "state.json"
     setup_test_model(reg_dir, "dur-v1")
@@ -122,14 +122,14 @@ def test_graceful_shutdown_drain_false_preserves_active_bucket_without_forced_fi
     a1 = make_raw_alert(1, t0)
     service1.ingest_alert(a1)
 
-    # Active bucket exists
+    # Bucket aktif ada.
     assert len(service1.engine._active_buckets) == 1
     assert len(service1.get_history()) == 0
 
-    # Shutdown with drain=False
+    # Shutdown dengan drain=False.
     service1.shutdown(drain=False)
 
-    # New service instance restores active bucket
+    # Instance service baru memulihkan bucket aktif.
     service2 = LiveRBTAService(
         scoring_pipeline=scoring_pipe,
         state_manager=DurableStateManager(state_file),

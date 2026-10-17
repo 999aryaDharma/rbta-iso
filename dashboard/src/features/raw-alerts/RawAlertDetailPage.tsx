@@ -41,7 +41,7 @@ export function RawAlertDetailPage() {
   const prevId = currentIndex > 0 ? sourceIds[currentIndex - 1] : null;
   const nextId = currentIndex >= 0 && currentIndex < sourceIds.length - 1 ? sourceIds[currentIndex + 1] : null;
 
-  // Keyboard navigation shortcuts [ and ]
+  // Shortcut keyboard [ dan ] untuk navigasi
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
@@ -79,7 +79,6 @@ export function RawAlertDetailPage() {
         description={`Wazuh Alert ID: ${alertId}`}
         actions={
           <div className="flex items-center gap-2">
-            {/* Previous / Next Navigation */}
             {metaId && sourceIds.length > 0 && (
               <div className="flex items-center gap-1 mr-2">
                 <Button
@@ -133,7 +132,6 @@ export function RawAlertDetailPage() {
       />
 
       <div className="px-6 py-8 lg:px-10 space-y-8">
-        {/* Unavailable Evidence Banner */}
         {isError && (
           <Banner
             variant="alert"
@@ -145,9 +143,7 @@ export function RawAlertDetailPage() {
 
         {data && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Left: Structured Fields */}
             <div className="space-y-6">
-              {/* Identity & Ingestion */}
               <div className="p-6 rounded-xl border border-kumo-hairline bg-kumo-canvas shadow-xs">
                 <h3 className="font-semibold text-xs uppercase tracking-wider text-kumo-strong mb-4 pb-3 border-b border-kumo-hairline">Identity & Source Origin</h3>
                 <dl className="space-y-3 text-xs">
@@ -164,7 +160,6 @@ export function RawAlertDetailPage() {
                 </dl>
               </div>
 
-              {/* Rule Details */}
               <div className="p-6 rounded-xl border border-kumo-hairline bg-kumo-canvas shadow-xs">
                 <h3 className="font-semibold text-xs uppercase tracking-wider text-kumo-strong mb-4 pb-3 border-b border-kumo-hairline">Rule & Signature Detection</h3>
                 <dl className="space-y-3 text-xs">
@@ -176,7 +171,6 @@ export function RawAlertDetailPage() {
                 </dl>
               </div>
 
-              {/* Network & MITRE */}
               <div className="p-6 rounded-xl border border-kumo-hairline bg-kumo-canvas shadow-xs">
                 <h3 className="font-semibold text-xs uppercase tracking-wider text-kumo-strong mb-4 pb-3 border-b border-kumo-hairline">Network & MITRE ATT&CK Context</h3>
                 <dl className="space-y-3 text-xs">
@@ -189,7 +183,6 @@ export function RawAlertDetailPage() {
               </div>
             </div>
 
-            {/* Right: Full Log & JSON Profile */}
             <div className="space-y-6">
               {data.full_log && (
                 <div className="p-6 rounded-xl border border-kumo-hairline bg-kumo-canvas shadow-xs">

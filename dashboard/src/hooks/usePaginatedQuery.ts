@@ -28,7 +28,7 @@ export function usePaginatedQuery<T extends { total: number }>({
 
   const totalPages = data ? Math.ceil(data.total / pageSize) || 1 : 1;
 
-  // Prefetch next page
+  // Prefetch halaman berikutnya
   useEffect(() => {
     if (data && page < totalPages) {
       const nextKey = [queryKeyBase, page + 1, pageSize, ...(extraParams ? [extraParams] : [])];

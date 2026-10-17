@@ -1,12 +1,9 @@
-"""
-01_basic_replay.py  —  Basic Alert Stream Simulation
-=====================================================
-Example paling sederhana: load CSV, replay alerts dengan logging, selesai.
+"""Contoh paling sederhana: muat CSV, replay alert dengan logging, selesai.
 
-Gunakan untuk:
-  - Understand dataset
-  - Quick validation
-  - Generate replay log untuk dokumentasi
+Berguna untuk:
+  - Memahami dataset
+  - Validasi cepat
+  - Menghasilkan log replay untuk dokumentasi
 """
 
 import sys
@@ -21,27 +18,27 @@ def main():
     print("EXAMPLE 1: Basic Alert Stream Replay")
     print("="*80 + "\n")
     
-    # Initialize simulator
+    # Siapkan simulator.
     sim = AlertStreamSimulator(
         csv_path="data/raw/rbta_ready_all.csv",
-        speed_factor=100,  # 100x acceleration
+        speed_factor=100,  # dipercepat 100x
         log_file="output/01_replay.log",
         log_level="INFO",
-        log_frequency=5000,  # Log every 5000 alerts
+        log_frequency=5000,  # log setiap 5000 alert
     )
     
-    # Register simple callback (just count)
+    # Daftarkan callback sederhana (hanya menghitung).
     count = [0]
     def count_alerts(alert):
         count[0] += 1
     
     sim.on_alert(count_alerts)
     
-    # Run simulation
+    # Jalankan simulasi.
     print("\nStarting replay...\n")
     stats = sim.replay()
     
-    # Print summary
+    # Cetak ringkasan.
     print("\n" + "="*80)
     print("SIMULATION SUMMARY")
     print("="*80)

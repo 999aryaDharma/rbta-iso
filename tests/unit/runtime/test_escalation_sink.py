@@ -1,4 +1,4 @@
-"""Unit tests for EscalationSink and DeferredTelegramFileSink."""
+"""Unit test EscalationSink dan DeferredTelegramFileSink."""
 
 from datetime import datetime, timezone
 import json
@@ -98,13 +98,13 @@ def test_deferred_telegram_sink_idempotency(tmp_path: Path):
 
     scored = _create_mock_scored_meta(meta_id=104, action="ESCALATE")
     
-    # First emit succeeds
+    # Emit pertama berhasil.
     assert sink.emit(scored, run_id="run-alpha") is True
-    # Duplicate emit inside same run is rejected
+    # Emit duplikat dalam run yang sama ditolak.
     assert sink.emit(scored, run_id="run-alpha") is False
     assert sink.get_total_count() == 1
 
-    # Same meta_id under different run_id succeeds
+    # meta_id sama di run_id berbeda berhasil.
     assert sink.emit(scored, run_id="run-beta") is True
     assert sink.get_total_count() == 2
 
@@ -119,11 +119,11 @@ def test_deferred_telegram_sink_reload_preserves_keys(tmp_path: Path):
     scored1 = _create_mock_scored_meta(meta_id=201, action="ESCALATE")
     sink1.emit(scored1, run_id="run-1")
 
-    # Second instance pointing to same file
+    # Instance kedua yang menunjuk ke file yang sama.
     sink2 = DeferredTelegramFileSink(sink_file)
     assert sink2.get_total_count() == 1
     
-    # Re-emitting scored1 to sink2 must be deduplicated
+    # Emit ulang scored1 ke sink2 harus di-dedup.
     assert sink2.emit(scored1, run_id="run-1") is False
 
     scored2 = _create_mock_scored_meta(meta_id=202, action="ESCALATE")

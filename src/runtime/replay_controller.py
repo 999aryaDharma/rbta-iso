@@ -30,7 +30,7 @@ ReplayStatus = Literal["IDLE", "RUNNING", "PAUSED", "STOPPED", "COMPLETED", "ERR
 ALL_DATASETS_SENTINEL = "__ALL__"
 
 class ReplayController:
-    """Manages background replay runs deterministically with session isolation, strict canonicalization, and pacing."""
+    """Mengelola replay run di latar belakang secara deterministik: sesi terisolasi, kanonisasi ketat, dan pengaturan tempo."""
 
     def __init__(
         self,
@@ -77,7 +77,7 @@ class ReplayController:
             "completed_at_utc": None,
         }
 
-        # Current active run state
+        # State run yang sedang aktif.
         self.run_id: Optional[str] = None
         self.status: ReplayStatus = "IDLE"
         self.dataset_name: Optional[str] = None
@@ -98,7 +98,7 @@ class ReplayController:
         self.current_evidence_store: Optional[RawAlertEvidenceStore] = None
         self.escalation_sink: Optional[DeferredTelegramFileSink] = None
 
-        # Telemetry, metrics, and trace ring buffer
+        # Telemetri, metrik, dan ring buffer trace.
         self._trace_buffer: deque = deque(maxlen=100)
         self.decision_counts: Dict[str, int] = {"ESCALATE": 0, "SUPPRESS": 0, "DAILY_DIGEST": 0}
         self._latest_scored_meta: Optional[Any] = None
@@ -113,11 +113,11 @@ class ReplayController:
 
 
     def list_datasets(self) -> List[Dict[str, Any]]:
-        """List replay datasets without scanning uncached alert contents."""
+        """Daftar dataset replay tanpa memindai isi alert yang belum ter-cache."""
         return self.dataset_catalog.list_fast()
 
     def get_catalog_status(self) -> Dict[str, Any]:
-        """Return progress plus the number of uncached or changed files."""
+        """Kembalikan progres beserta jumlah file yang belum ter-cache atau berubah."""
         with self._lock:
             state = dict(self._catalog_state)
         items = self.dataset_catalog.list_fast()
@@ -128,7 +128,7 @@ class ReplayController:
         return state
 
     def start_catalog_refresh(self) -> Dict[str, Any]:
-        """Start a single background scan of all supported replay datasets."""
+        """Mulai satu scan latar belakang untuk semua dataset replay yang didukung."""
         with self._lock:
             if self.status in ("RUNNING", "PAUSED"):
                 raise RuntimeError("Indeks dataset tidak dapat diperbarui ketika replay sedang berjalan")
@@ -183,18 +183,18 @@ class ReplayController:
                 self._catalog_state["last_error"] = result["errors"][-1]
 
     def wait_for_catalog_refresh(self, timeout: float = 30.0) -> Dict[str, Any]:
-        """Test/operator helper that waits for a terminal catalog state."""
+        """Helper test/operator yang menunggu sampai katalog mencapai state terminal."""
         thread = self._catalog_thread
         if thread is not None:
             thread.join(timeout=timeout)
         return self.get_catalog_status()
 
     def validate_dataset_path(self, dataset_name: str) -> Path:
-        """Validate and resolve a supported replay dataset path."""
+        """Validasi dan resolve path dataset replay yang didukung."""
         return self.dataset_catalog.resolve(dataset_name)
 
     def _init_run_workspace(self, dataset_name: str, speed_factor: SpeedFactor) -> str:
-        """Create a dedicated, isolated run directory with its own state and evidence databases."""
+        """Buat direktori run khusus yang terisolasi, lengkap dengan database state dan evidence sendiri."""
         new_run_id = str(uuid4())
         run_workspace = self.runs_dir / new_run_id
         run_workspace.mkdir(parents=True, exist_ok=True)
@@ -236,7 +236,7 @@ class ReplayController:
         self.dataset_manifest = None
         self.status = "IDLE"
 
-        # Clear/initialize live telemetry
+        # Bersihkan/siapkan telemetri live.
         self._trace_buffer.clear()
         self.decision_counts = {"ESCALATE": 0, "SUPPRESS": 0, "DAILY_DIGEST": 0}
         self._latest_scored_meta = None
@@ -248,7 +248,7 @@ class ReplayController:
         return new_run_id
 
     def _model_version(self) -> str:
-        """Extract exact model version from loaded scoring pipeline metadata fail-closed."""
+        """Ambil versi model persis dari metadata scoring pipeline yang dimuat (gagal tertutup)."""
         if self.scoring_pipeline is None:
             return "unavailable"
         if not self.scoring_pipeline.metadata:
@@ -279,7 +279,7 @@ class ReplayController:
             json.dump(data, f, indent=2)
 
     def start(self, dataset_name: str, speed_factor: SpeedFactor = "MAX") -> Dict[str, Any]:
-        """Start a new deterministic replay stream on the specified dataset(s)."""
+        """Mulai aliran replay deterministik baru pada dataset yang ditentukan."""
         with self._lock:
             if self.status in ("RUNNING", "PAUSED"):
                 raise RuntimeError(f"Cannot start replay while status is '{self.status}'")
@@ -347,7 +347,7 @@ class ReplayController:
             return self.get_status()
 
     def pause(self) -> Dict[str, Any]:
-        """Pause wall-clock streaming progression without mutating event times or state."""
+        """Jeda progres streaming wall-clock tanpa mengubah event time maupun state."""
         with self._lock:
             if self.status != "RUNNING":
                 return self.get_status()
@@ -359,7 +359,7 @@ class ReplayController:
             return self.get_status()
 
     def resume(self) -> Dict[str, Any]:
-        """Resume streaming for the active paused run."""
+        """Lanjutkan streaming untuk run aktif yang sedang dijeda."""
         with self._lock:
             if self.status != "PAUSED":
                 return self.get_status()
@@ -369,13 +369,13 @@ class ReplayController:
             return self.get_status()
 
     def stop(self) -> Dict[str, Any]:
-        """Stop replay immediately. Does NOT force-drain active buckets, preserving partial state."""
+        """Hentikan replay saat itu juga. TIDAK memaksa drain bucket aktif, state parsial dipertahankan."""
         with self._lock:
             if self.status not in ("RUNNING", "PAUSED"):
                 return self.get_status()
 
             self._stop_event.set()
-            self._pause_event.set()  # Unblock if paused
+            self._pause_event.set()  # lepaskan blokir bila sedang dijeda
             self.status = "STOPPED"
             if self.current_service:
                 self.current_service.checkpoint()
@@ -387,7 +387,7 @@ class ReplayController:
         return self.get_status()
 
     def reset(self) -> Dict[str, Any]:
-        """Reset replay controller and prepare a clean new run workspace."""
+        """Reset replay controller dan siapkan workspace run baru yang bersih."""
         with self._lock:
             if self.status in ("RUNNING", "PAUSED"):
                 self.stop()
@@ -410,7 +410,7 @@ class ReplayController:
             return self.get_status()
 
     def wait_until_complete(self, timeout: float = 10.0) -> Dict[str, Any]:
-        """Wait until active replay run reaches a terminal state (COMPLETED, STOPPED, ERROR)."""
+        """Tunggu sampai replay run aktif mencapai state terminal (COMPLETED, STOPPED, ERROR)."""
         deadline = time.time() + timeout
         while time.time() < deadline:
             with self._lock:
@@ -422,7 +422,7 @@ class ReplayController:
         return self.get_status()
 
     def _run_loop(self, dataset_paths: List[Path]) -> None:
-        """Internal replay worker thread processing canonical alerts strictly."""
+        """Thread worker replay internal yang memproses alert kanonis secara ketat."""
         last_event_ts: Optional[float] = None
         speed_multiplier = float(self.speed_factor) if self.speed_factor != "MAX" else None
         last_checkpoint_count = 0
@@ -442,11 +442,11 @@ class ReplayController:
                         if not line_str:
                             continue
 
-                        # Check stop signal
+                        # Cek sinyal stop.
                         if self._stop_event.is_set():
                             break
 
-                        # Check pause signal (blocks until resumed or stopped)
+                        # Cek sinyal pause (memblokir sampai dilanjutkan atau dihentikan).
                         while not self._pause_event.is_set():
                             if self._stop_event.is_set():
                                 break
@@ -455,16 +455,16 @@ class ReplayController:
                         if self._stop_event.is_set():
                             break
 
-                        # Parse JSON
+                        # Parse JSON.
                         try:
                             raw_data = json.loads(line_str)
                         except Exception as e:
                             raise ValueError(f"Malformed JSON on line {line_no}: {e}") from e
 
-                        # Canonicalize strictly through single canonical path
+                        # Kanonisasi ketat lewat satu-satunya jalur kanonis.
                         canonical_alert = canonicalize_wazuh_alert(raw_data)
 
-                        # Pacing if not MAX speed
+                        # Atur tempo bila bukan kecepatan MAX.
                         event_ts_sec = canonical_alert.timestamp.timestamp()
                         if speed_multiplier is not None and last_event_ts is not None:
                             dt = (event_ts_sec - last_event_ts) / speed_multiplier
@@ -488,7 +488,7 @@ class ReplayController:
 
                         last_event_ts = event_ts_sec
 
-                        # Ingest alert into isolated run service
+                        # Ingest alert ke service run yang terisolasi.
                         assert self.current_service is not None
                         scored_metas = self.current_service.ingest_alert(
                             canonical_alert,
@@ -566,7 +566,7 @@ class ReplayController:
                             if self.wall_clock_start is not None:
                                 self.wall_clock_elapsed = max(0.0, time.time() - self.wall_clock_start)
 
-                        # Periodic durable checkpoint (every 500 events or every 1.0s)
+                        # Checkpoint durable berkala (setiap 500 event atau setiap 1.0 detik).
                         now_wall = time.time()
                         if (self.processed_count - last_checkpoint_count >= 500) or (now_wall - last_checkpoint_time >= 1.0):
                             if self.current_service:
@@ -579,9 +579,9 @@ class ReplayController:
                 if self._stop_event.is_set():
                     break
 
-            # Check if finished naturally (EOF reached without manual stop)
+            # Cek apakah selesai secara alami (EOF tercapai tanpa stop manual).
             if not self._stop_event.is_set():
-                # Drain remaining active buckets at natural EOF
+                # Kuras bucket aktif yang tersisa saat EOF alami.
                 if self.current_service:
                     drained_metas = self.current_service.shutdown(drain=True)
                     if drained_metas:
@@ -641,7 +641,7 @@ class ReplayController:
                 self._persist_run_meta()
 
     def get_status(self) -> Dict[str, Any]:
-        """Return standardized status DTO with comprehensive pipeline telemetry for the replay controller."""
+        """Kembalikan DTO status standar beserta telemetri pipeline lengkap dari replay controller."""
         with self._lock:
             elapsed = self.wall_clock_elapsed
             if self.status == "RUNNING" and self.wall_clock_start is not None:
@@ -735,7 +735,7 @@ class ReplayController:
             }
 
     def start_evaluation(self, random_seed: int = 42) -> Dict[str, Any]:
-        """Start the complete post-replay evaluation for the isolated active run."""
+        """Mulai evaluasi pasca-replay lengkap untuk run aktif yang terisolasi."""
         with self._lock:
             if self.status not in ("COMPLETED", "STOPPED"):
                 raise RuntimeError(
@@ -789,7 +789,7 @@ class ReplayController:
         return path
 
     def get_telegram_payloads(self, limit: int = 50) -> Dict[str, Any]:
-        """Return latest deferred Telegram payloads and total count."""
+        """Kembalikan payload Telegram tertunda terbaru beserta jumlah totalnya."""
         with self._lock:
             if not self.escalation_sink:
                 if "RBTA_TELEGRAM_PAYLOAD_PATH" in os.environ:

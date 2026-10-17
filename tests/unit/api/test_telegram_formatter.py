@@ -1,4 +1,4 @@
-"""Unit tests for Telegram notification message formatting (Sprint 9)."""
+"""Unit test format pesan notifikasi Telegram."""
 from datetime import datetime, timezone
 
 from src.contracts.scored_meta_alert import ScoredMetaAlert

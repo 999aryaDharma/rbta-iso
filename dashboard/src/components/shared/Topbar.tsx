@@ -47,7 +47,6 @@ export function Topbar() {
   return (
     <>
       <header className="w-full h-14 min-h-[3.5rem] flex items-center justify-between px-6 lg:px-8 border-b border-kumo-line bg-kumo-canvas shrink-0 z-20 sticky top-0">
-        {/* Left: Context Breadcrumb & Runtime Status Badges */}
         <div className="flex items-center gap-3 min-w-0">
           <div className="flex items-center gap-2 text-sm font-medium text-kumo-subtle">
             <span>Security Operations</span>
@@ -57,7 +56,6 @@ export function Topbar() {
 
           <span className="h-4 w-px bg-kumo-line hidden sm:inline-block shrink-0" />
 
-          {/* Runtime Mode & Health Status */}
           <div className="flex items-center gap-2 text-xs">
             {runId ? (
               <Badge variant="warning">REPLAY: {runId.slice(0, 8)}</Badge>
@@ -73,9 +71,7 @@ export function Topbar() {
           </div>
         </div>
 
-        {/* Right: Quick Search, Theme Cycler, Shortcuts Help, User Info */}
         <div className="flex items-center gap-2.5">
-          {/* Quick Search Button */}
           <button
             type="button"
             onClick={() => setShowPalette(true)}
@@ -91,7 +87,6 @@ export function Topbar() {
             </kbd>
           </button>
 
-          {/* Theme Toggle */}
           <Button
             variant="ghost"
             size="sm"
@@ -104,7 +99,6 @@ export function Topbar() {
             {theme === 'system' && <Desktop size={17} />}
           </Button>
 
-          {/* Keyboard Shortcuts Help */}
           <Button
             variant="ghost"
             size="sm"
@@ -115,7 +109,6 @@ export function Topbar() {
             <Question size={17} />
           </Button>
 
-          {/* User Profile Pill */}
           <div className="hidden sm:flex items-center gap-2.5 pl-3 ml-1 border-l border-kumo-line">
             <div className="size-8 rounded-full bg-kumo-recessed border border-kumo-line flex items-center justify-center text-kumo-strong">
               <User size={15} />

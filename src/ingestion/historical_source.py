@@ -1,4 +1,4 @@
-"""Historical Wazuh Indexer acquisition source with PIT and checkpointing."""
+"""Sumber akuisisi historis dari Wazuh Indexer dengan PIT dan checkpoint."""
 
 import fnmatch
 import logging
@@ -13,18 +13,18 @@ logger = logging.getLogger(__name__)
 
 
 class WazuhIndexerHistoricalSource:
-    """Historical data source pulling alerts from Wazuh Indexer via daily PIT snapshots.
+    """Sumber data historis yang menarik alert dari Wazuh Indexer lewat snapshot PIT harian.
 
     Parameters
     ----------
     client : WazuhIndexerClient
-        Authenticated Wazuh Indexer client instance.
+        Instance client Wazuh Indexer yang sudah terautentikasi.
     checkpoint_manager : CheckpointManager | None
-        Persistence manager for resuming interrupted exports.
+        Pengelola persistensi untuk melanjutkan export yang terputus.
     page_size : int
-        Number of hits per search page (default 500).
+        Jumlah hit per halaman pencarian (default 500).
     keep_alive : str
-        PIT keep_alive duration (default '5m').
+        Durasi keep_alive PIT (default '5m').
     """
 
     def __init__(
@@ -40,17 +40,17 @@ class WazuhIndexerHistoricalSource:
         self.keep_alive: str = keep_alive
 
     def discover_indices(self, pattern: str = "wazuh-alerts-4.x-*") -> List[str]:
-        """Discover and sort available daily indices matching pattern.
+        """Cari dan urutkan index harian yang cocok dengan pola.
 
         Parameters
         ----------
         pattern : str
-            Glob pattern to match daily indices against.
+            Pola glob untuk mencocokkan index harian.
 
         Returns
         -------
         List[str]
-            Ascending sorted list of daily index names.
+            Daftar nama index harian, urut naik.
         """
         all_indices = self.client.list_indices(pattern=pattern)
         filtered = [idx for idx in all_indices if fnmatch.fnmatch(idx, pattern)]
@@ -61,17 +61,17 @@ class WazuhIndexerHistoricalSource:
         self,
         index_pattern: str = "wazuh-alerts-4.x-*",
     ) -> Iterator[CanonicalRawAlert]:
-        """Yield CanonicalRawAlert objects across discovered daily indices with checkpointing.
+        """Yield CanonicalRawAlert dari index harian yang ditemukan, dengan checkpoint.
 
         Parameters
         ----------
         index_pattern : str
-            Daily index discovery pattern.
+            Pola pencarian index harian.
 
         Yields
         ------
         CanonicalRawAlert
-            Normalized canonical alerts.
+            Alert kanonis yang sudah dinormalisasi.
         """
         checkpoint: HistoricalCheckpoint = self.checkpoint_manager.load()
         indices = self.discover_indices(pattern=index_pattern)
@@ -84,7 +84,7 @@ class WazuhIndexerHistoricalSource:
             logger.info("Starting historical export for index: %s", index_name)
             pit_id = self.client.create_point_in_time(index_name, keep_alive=self.keep_alive)
 
-            # Determine initial search_after cursor
+            # Tentukan cursor search_after awal.
             search_after = None
             if checkpoint.current_index == index_name and checkpoint.last_sort:
                 search_after = checkpoint.last_sort
@@ -100,7 +100,7 @@ class WazuhIndexerHistoricalSource:
                     )
 
                     if not hits:
-                        # Index exhausted
+                        # Index sudah habis.
                         checkpoint.mark_index_completed(index_name)
                         self.checkpoint_manager.save(checkpoint)
                         logger.info("Completed historical export for index: %s", index_name)
@@ -110,7 +110,7 @@ class WazuhIndexerHistoricalSource:
                         canonical_alert = canonicalize_wazuh_alert(hit)
                         yield canonical_alert
 
-                    # Update cursor to last hit's sort array
+                    # Geser cursor ke array sort milik hit terakhir.
                     last_hit = hits[-1]
                     last_sort = last_hit.get("sort")
                     last_id = (

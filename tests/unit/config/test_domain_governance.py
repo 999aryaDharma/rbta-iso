@@ -1,4 +1,4 @@
-"""Governance tests ensuring no duplicate authoritative domain constants and no hardcoded workstation paths."""
+"""Konstanta domain tidak boleh terduplikasi dan source tidak boleh berisi path workstation."""
 import re
 from pathlib import Path
 
@@ -6,7 +6,7 @@ SRC_DIR = Path(__file__).resolve().parent.parent.parent.parent / "src"
 
 
 def test_no_duplicate_authoritative_domain_declarations():
-    """Verify that domain constants are defined only in src/config/domain.py."""
+    """Konstanta domain hanya boleh didefinisikan di src/config/domain.py."""
     forbidden_declarations = [
         re.compile(r"^AGENT_CRITICALITY\s*(:\s*[^=]+)?\s*=", re.MULTILINE),
         re.compile(r"^GROUP_SEVERITY_WEIGHT\s*(:\s*[^=]+)?\s*=", re.MULTILINE),
@@ -16,7 +16,7 @@ def test_no_duplicate_authoritative_domain_declarations():
     duplicates = []
     for py_file in SRC_DIR.rglob("*.py"):
         rel_path = py_file.relative_to(SRC_DIR).as_posix()
-        # Allowed only in config/domain.py
+        # Hanya boleh di config/domain.py.
         if rel_path == "config/domain.py":
             continue
 
@@ -34,8 +34,8 @@ def test_no_duplicate_authoritative_domain_declarations():
 
 
 def test_no_workstation_specific_absolute_paths():
-    """Verify that no absolute workstation paths (e.g. D:\\KAMPUS, C:\\Users, /home/) exist in active source code."""
-    # Matches patterns like D:\ or C:\ or /home/ or /Users/
+    """Source code aktif tidak boleh berisi path absolut workstation (mis. drive D:/C:, /home/, /Users/)."""
+    # Mencocokkan pola drive Windows (D:, C:) atau /home/ dan /Users/.
     forbidden_path_pattern = re.compile(r'["\'](?:[a-zA-Z]:[\\/]|/(?:home|Users)/)[^"\']*["\']')
 
     found_paths = []

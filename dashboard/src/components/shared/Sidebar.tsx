@@ -6,7 +6,6 @@ import {
   SidebarContent,
   SidebarFooter,
   SidebarGroup,
-  SidebarGroupLabel,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
@@ -99,7 +98,6 @@ export function AppSidebar() {
 
   return (
     <Sidebar>
-      {/* 1. Header with Company/Platform switcher */}
       <SidebarHeader className="p-3 border-b border-kumo-line flex items-center justify-between">
         <div className="flex items-center gap-2.5 min-w-0 ml-4">
           <span className="font-semibold text-base text-kumo-strong truncate group-data-[state=collapsed]/sidebar:hidden">
@@ -112,9 +110,7 @@ export function AppSidebar() {
         />
       </SidebarHeader>
 
-      {/* 2. Scrollable Navigation Content */}
       <SidebarContent>
-        {/* Quick Search */}
         <div className="px-2 pt-2 pb-1 group-data-[state=collapsed]/sidebar:px-1">
           <button
             type="button"
@@ -134,7 +130,6 @@ export function AppSidebar() {
           </button>
         </div>
 
-        {/* Primary Views */}
         <SidebarGroup>
           <SidebarMenu>
             <SidebarMenuItem>
@@ -172,9 +167,7 @@ export function AppSidebar() {
           </SidebarMenu>
         </SidebarGroup>
 
-        {/* Thesis Sidang Section */}
         <SidebarGroup>
-          <SidebarGroupLabel>Sidang</SidebarGroupLabel>
           <SidebarMenu>
             <SidebarMenuItem>
               <SidebarMenuButton
@@ -199,9 +192,7 @@ export function AppSidebar() {
           </SidebarMenu>
         </SidebarGroup>
 
-        {/* Protect & Connect Section */}
         <SidebarGroup>
-          <SidebarGroupLabel>Protect & Connect</SidebarGroupLabel>
           <SidebarMenu>
             <SidebarMenuItem>
               <SidebarMenuButton
@@ -228,7 +219,6 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
 
-      {/* 3. Footer with Collapse Trigger and Version */}
       <SidebarFooter className="p-3 border-t border-kumo-line flex items-center justify-between">
         <SidebarTrigger />
         <div className="flex items-center gap-1.5 group-data-[state=collapsed]/sidebar:hidden">

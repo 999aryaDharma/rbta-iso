@@ -87,14 +87,14 @@ export function ReplayPage() {
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [activeStage, setActiveStage] = useState<PipelineStageId | null>(null);
 
-  // Set default dataset once loaded
+  // Pilih dataset default setelah daftar dimuat
   React.useEffect(() => {
     if (datasetsData?.items && datasetsData.items.length > 0 && !selectedDataset) {
       setSelectedDataset(datasetsData.items[0].name);
     }
   }, [datasetsData, selectedDataset]);
 
-  // Sync run_id with URL when replay is active
+  // Sinkronkan run_id ke URL saat replay aktif
   React.useEffect(() => {
     if (status?.run_id && searchParams.get('run_id') !== status.run_id) {
       const params = new URLSearchParams(searchParams);
@@ -171,7 +171,6 @@ export function ReplayPage() {
             disabled={!isIdle || isLoading}
             onRefresh={() => handleAction(refreshDatasetCatalog)}
           />
-          {/* Control Panel Card */}
           <div className="p-6 rounded-xl border border-kumo-hairline bg-kumo-canvas shadow-xs space-y-5">
             <div className="flex flex-wrap items-center justify-between gap-5">
               <div className="flex flex-wrap items-center gap-5">
@@ -218,7 +217,6 @@ export function ReplayPage() {
                 </div>
               </div>
 
-              {/* Action Buttons */}
               <div className="flex items-center gap-3 mt-2 sm:mt-0">
                 {isIdle && (
                   <Button
@@ -275,7 +273,6 @@ export function ReplayPage() {
               </div>
             </div>
 
-            {/* Progress Bar */}
             {status && (
               <div className="pt-4 border-t border-kumo-hairline">
                 <div className="flex justify-between text-xs mb-2 font-mono">
@@ -297,7 +294,6 @@ export function ReplayPage() {
             )}
           </div>
 
-          {/* Error Alert if replay encountered a malformed line */}
           {status?.status === 'ERROR' && status.last_error && (
             <Banner
               variant="error"
@@ -322,7 +318,6 @@ export function ReplayPage() {
             onSelectStage={setActiveStage}
           />
 
-          {/* Current Scored MetaAlert Card */}
           <CurrentMetaAlertCard
             latestMeta={latestMeta}
             rawProcessed={rawProcessed}
@@ -330,14 +325,12 @@ export function ReplayPage() {
             decisionCounts={decisionCounts}
           />
 
-          {/* Selected Pipeline Stage Deep Inspector */}
           <PipelineStageDetail
             activeStage={inspectedStage}
             telemetry={telemetry}
             status={status}
           />
 
-          {/* Live Processing Trace Ring Buffer */}
           <ProcessingTrace trace={telemetry?.trace} />
         </ZoneSection>
 
@@ -348,7 +341,6 @@ export function ReplayPage() {
           title="Bukti"
           description="Evaluasi, outbox payload, dan ringkasan bukti run."
         >
-          {/* Replay Completed Banner */}
           {status?.status === 'COMPLETED' && (
             <Banner
               variant="default"
@@ -372,10 +364,8 @@ export function ReplayPage() {
             onDownload={() => void downloadEvaluationArtifact()}
           />
 
-          {/* Deferred Telegram Payload Outbox */}
           <DeferredTelegramOutbox />
 
-          {/* Consolidated run-evidence summary (menggantikan KPI grid + Details card yang duplikatif) */}
           <div className="p-6 rounded-xl border border-kumo-hairline bg-kumo-canvas shadow-xs space-y-5">
             <h3 className="font-semibold text-xs uppercase tracking-wider text-kumo-strong pb-3 border-b border-kumo-hairline">
               Ringkasan bukti run
@@ -430,7 +420,6 @@ export function ReplayPage() {
         </ZoneSection>
       </div>
 
-      {/* Reset Confirmation Dialog */}
       <DialogRoot open={showResetConfirm} onOpenChange={(o) => { if (!o) setShowResetConfirm(false); }}>
         <Dialog className="max-w-md w-full p-6 bg-kumo-canvas border border-kumo-hairline shadow-2xl rounded-xl">
           <DialogTitle className="text-base font-bold text-kumo-strong">Siapkan run replay baru?</DialogTitle>

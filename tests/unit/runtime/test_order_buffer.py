@@ -1,4 +1,4 @@
-"""Unit tests for OrderBuffer (L4 waiting-room sorter) and its coordinator integration."""
+"""Unit test OrderBuffer dan integrasinya dengan coordinator."""
 
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -34,13 +34,13 @@ def test_release_ordered_despite_random_arrival():
         max_hold=timedelta(minutes=5),
         max_items=100,
     )
-    # Arrive shuffled around T0..T0+40s; nothing may release until watermark moves.
+    # Datang teracak di sekitar T0..T0+40 detik; tidak boleh ada yang dilepas sampai watermark bergerak.
     shuffled = [make_alert(i, T0 + timedelta(seconds=s)) for i, s in [(3, 30), (1, 10), (2, 20), (0, 0)]]
     released = buf.add(shuffled, now=T0 + timedelta(seconds=40))
-    assert released == []  # all within hold_window of max observed (T0+30s)
+    assert released == []  # semua masih dalam hold_window dari maksimum teramati (T0+30 detik)
     assert buf.status()["size"] == 4
 
-    # A newer event pushes the watermark past the older ones.
+    # Event yang lebih baru mendorong watermark melewati event yang lebih lama.
     newer = [make_alert(4, T0 + timedelta(seconds=200))]
     released = buf.add(newer, now=T0 + timedelta(seconds=200))
     keys = [(r.alert.timestamp, r.alert.wazuh_alert_id) for r in released]
@@ -61,9 +61,9 @@ def test_late_alert_never_dropped_and_flagged():
         max_items=100,
     )
     buf.add([make_alert(9, T0 + timedelta(seconds=300))], now=T0 + timedelta(seconds=300))
-    buf.flush()  # drain; watermark stays at T0+300s
+    buf.flush()  # drain; watermark tetap di T0+300 detik
 
-    latecomer = make_alert(0, T0)  # older than watermark (T0+300s - 60s)
+    latecomer = make_alert(0, T0)  # lebih tua dari watermark (T0+300 detik - 60 detik)
     released = buf.add([latecomer], now=T0 + timedelta(seconds=310))
     assert len(released) == 1
     assert isinstance(released[0], BufferedRelease)
@@ -102,7 +102,7 @@ def test_full_buffer_backpressure_without_drop():
     assert st["buffer_dropped"] == 0
     assert st["size"] == 2
 
-    # Nothing held was lost; the refused alert is handed back for retry, not dropped.
+    # Tidak ada yang ditahan yang hilang; alert yang ditolak dikembalikan untuk dicoba ulang, bukan dibuang.
     rest = buf.flush()
     assert sorted(r.alert.wazuh_alert_id for r in rest) == ["buf_001", "buf_002"]
     refused = buf.pop_refused()
@@ -140,8 +140,8 @@ def _make_coordinator(tmp_path: Path, **kwargs):
     sample = [
         make_alert(i, base_t + timedelta(minutes=i * 20)) for i in range(30)
     ]
-    # Vary severity like tests/unit/runtime/test_live_coordinator.py so the
-    # reference calibration is non-degenerate.
+    # Variasikan severity seperti di tests/unit/runtime/test_live_coordinator.py agar
+    # kalibrasi reference tidak degenerate.
     varied = [
         CanonicalRawAlert(
             wazuh_alert_id=a.wazuh_alert_id,
@@ -200,21 +200,21 @@ def test_coordinator_buffer_enabled_defers_and_releases_across_cycles(tmp_path: 
     early = [make_alert(1, t1), make_alert(2, t1 + timedelta(seconds=10))]
     coord.poller.poll_recent.return_value = early
     res1 = coord.run_cycle(current_time=t1 + timedelta(seconds=10), force_recent_reconciliation=True)
-    # Held in buffer: nothing ingested yet, nothing lost.
+    # Ditahan di buffer: belum ada yang di-ingest, tidak ada yang hilang.
     assert res1.submitted_candidates == 0
     assert not service.is_seen("buf_001")
 
     late_newer = [make_alert(9, t1 + timedelta(seconds=600))]
     coord.poller.poll_recent.return_value = late_newer
     res2 = coord.run_cycle(current_time=t1 + timedelta(seconds=600), force_recent_reconciliation=True)
-    assert res2.submitted_candidates == 2  # buf_001 + buf_002 released by watermark
+    assert res2.submitted_candidates == 2  # buf_001 + buf_002 dilepas oleh watermark
     assert service.is_seen("buf_001") and service.is_seen("buf_002")
 
 
-# --- F7 future-tolerance clamp + partition helper (TDD) ---
+# Batas toleransi masa depan + helper partisi.
 
 def test_future_alert_clamped_to_late_passthrough_with_counter():
-    """F7: event-time beyond now+future_tolerance never moves the watermark."""
+    """Event-time yang melewati now+future_tolerance tidak pernah menggeser watermark."""
     from src.runtime.order_buffer import partition_unseen
 
     buf = OrderBuffer(
@@ -230,15 +230,15 @@ def test_future_alert_clamped_to_late_passthrough_with_counter():
     st = buf.status()
     assert st["future_anomalies"] == 1
     assert st["late_total"] == 1
-    # Watermark must not have jumped: a normal alert afterwards is held, not late.
+    # Watermark tidak boleh melompat: alert normal sesudahnya ditahan, bukan dianggap terlambat.
     normal = buf.add([make_alert(1, T0)], now=T0)
     assert normal == []
     assert buf.status()["size"] == 1
-    assert partition_unseen is not None  # helper importable (defined below)
+    assert partition_unseen is not None  # helper bisa di-import (didefinisikan di bawah)
 
 
 def test_partition_unseen_splits_candidates():
-    """F7: partition_unseen(candidates, is_seen_fn) -> (unseen, seen), order kept."""
+    """partition_unseen(candidates, is_seen_fn) -> (unseen, seen), urutan dipertahankan."""
     from src.runtime.order_buffer import partition_unseen
 
     a = [make_alert(1, T0), make_alert(2, T0), make_alert(3, T0)]

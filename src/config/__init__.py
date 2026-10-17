@@ -1,4 +1,4 @@
-"""Configuration package for RBTA + Isolation Forest research pipeline."""
+"""Paket konfigurasi pipeline penelitian RBTA + Isolation Forest."""
 
 from src.config.domain import (
     AGENT_CRITICALITY,

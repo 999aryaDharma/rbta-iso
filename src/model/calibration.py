@@ -1,28 +1,28 @@
-"""Model anomaly score calibration module."""
+"""Kalibrasi skor anomali model."""
 
 from dataclasses import dataclass
 from typing import Any, Dict
 
 
 class CalibrationError(ValueError):
-    """Raised when score calibration bounds are invalid or degenerate."""
+    """Dilempar bila batas kalibrasi skor tidak valid atau degenerate."""
     pass
 
 
 @dataclass(frozen=True)
 class ScoreCalibration:
-    """Stream-safe min-max score calibration learned during reference/training runs.
+    """Kalibrasi skor min-max yang aman untuk stream, dipelajari saat run reference/training.
 
     Attributes
     ----------
     raw_min : float
-        Minimum raw anomaly score observed on reference dataset.
+        Skor anomali mentah terkecil pada dataset reference.
     raw_max : float
-        Maximum raw anomaly score observed on reference dataset.
+        Skor anomali mentah terbesar pada dataset reference.
     higher_is_more_anomalous : bool
-        Whether higher raw score corresponds to greater anomaly (default True).
+        Apakah skor mentah yang lebih tinggi berarti lebih anomali (default True).
     version : str
-        Calibration policy identifier.
+        ID kebijakan kalibrasi.
     """
 
     raw_min: float
@@ -37,22 +37,22 @@ class ScoreCalibration:
             )
 
     def calibrate(self, raw_score: float) -> float:
-        """Calibrate a raw anomaly score into a reference-normalized anomaly score.
+        """Kalibrasi skor anomali mentah menjadi skor yang dinormalisasi terhadap reference.
 
         Parameters
         ----------
         raw_score : float
-            Raw model anomaly score (e.g. -score_samples).
+            Skor anomali mentah model (mis. -score_samples).
 
         Returns
         -------
         float
-            Normalized anomaly score where reference baseline is ~[0.0, 1.0].
+            Skor anomali ternormalisasi; baseline reference berada di kisaran ~[0.0, 1.0].
         """
         return (raw_score - self.raw_min) / (self.raw_max - self.raw_min)
 
     def to_dict(self) -> Dict[str, Any]:
-        """Serialize calibration parameters to dictionary."""
+        """Serialisasi parameter kalibrasi ke dict."""
         return {
             "version": self.version,
             "raw_min": float(self.raw_min),
@@ -62,7 +62,7 @@ class ScoreCalibration:
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "ScoreCalibration":
-        """Deserialize calibration parameters from dictionary."""
+        """Deserialisasi parameter kalibrasi dari dict."""
         return cls(
             raw_min=float(data["raw_min"]),
             raw_max=float(data["raw_max"]),

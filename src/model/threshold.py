@@ -1,4 +1,4 @@
-"""Tukey IQR anomaly threshold calculation module."""
+"""Perhitungan threshold anomali Tukey IQR."""
 
 from dataclasses import dataclass
 from typing import Any, Dict, Sequence
@@ -6,26 +6,26 @@ import numpy as np
 
 
 class ThresholdError(ValueError):
-    """Raised when threshold cannot be computed from score distribution."""
+    """Dilempar bila threshold tidak bisa dihitung dari distribusi skor."""
     pass
 
 
 @dataclass(frozen=True)
 class TukeyThreshold:
-    """Tukey IQR anomaly threshold definition.
+    """Definisi threshold anomali Tukey IQR.
 
     Attributes
     ----------
     q1 : float
-        25th percentile of normalized reference scores.
+        Persentil ke-25 skor reference ternormalisasi.
     q3 : float
-        75th percentile of normalized reference scores.
+        Persentil ke-75 skor reference ternormalisasi.
     iqr : float
         Interquartile range (q3 - q1).
     threshold : float
-        Outlier fence threshold (q3 + 1.5 * iqr).
+        Batas outlier (q3 + 1.5 * iqr).
     method : str
-        Methodology identifier.
+        ID metodologi.
     """
 
     q1: float
@@ -35,7 +35,7 @@ class TukeyThreshold:
     method: str = "tukey_iqr"
 
     def to_dict(self) -> Dict[str, Any]:
-        """Serialize threshold to dictionary."""
+        """Serialisasi threshold ke dict."""
         return {
             "method": self.method,
             "q1": float(self.q1),
@@ -46,7 +46,7 @@ class TukeyThreshold:
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "TukeyThreshold":
-        """Deserialize threshold from dictionary."""
+        """Deserialisasi threshold dari dict."""
         return cls(
             q1=float(data["q1"]),
             q3=float(data["q3"]),
@@ -57,30 +57,30 @@ class TukeyThreshold:
 
 
 def compute_tukey_threshold(scores: Sequence[float]) -> TukeyThreshold:
-    """Compute Tukey IQR threshold on a sequence of reference anomaly scores.
+    """Hitung threshold Tukey IQR dari sekumpulan skor anomali reference.
 
-    Formula:
-        Q1 = percentile 25
-        Q3 = percentile 75
+    Rumus:
+        Q1 = persentil 25
+        Q3 = persentil 75
         IQR = Q3 - Q1
         threshold = Q3 + 1.5 * IQR
 
-    Note: The threshold is NOT clamped to <= 1.0.
+    Catatan: threshold TIDAK dibatasi <= 1.0.
 
     Parameters
     ----------
     scores : Sequence[float]
-        Reference normalized anomaly scores.
+        Skor anomali reference ternormalisasi.
 
     Returns
     -------
     TukeyThreshold
-        Calculated threshold dataclass.
+        Dataclass threshold hasil perhitungan.
 
     Raises
     ------
     ThresholdError
-        If fewer than 4 score samples are provided.
+        Bila sampel skor kurang dari 4.
     """
     if len(scores) < 4:
         raise ThresholdError(f"At least 4 score samples are required to compute Tukey IQR, got {len(scores)}")

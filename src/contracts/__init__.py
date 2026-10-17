@@ -1,4 +1,4 @@
-"""Canonical domain data contracts (DTOs) for RBTA + Isolation Forest research pipeline."""
+"""Kontrak data domain kanonis (DTO) untuk pipeline penelitian RBTA + Isolation Forest."""
 
 from src.contracts.immutability import freeze_value
 from src.contracts.raw_alert import CanonicalRawAlert

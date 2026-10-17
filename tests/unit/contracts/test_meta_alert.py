@@ -1,4 +1,4 @@
-"""Unit tests for MetaAlert DTO contract."""
+"""Unit test kontrak DTO MetaAlert."""
 from dataclasses import FrozenInstanceError
 from datetime import datetime, timezone
 import pytest
@@ -6,7 +6,7 @@ from src.contracts.meta_alert import MetaAlert
 
 
 def test_meta_alert_valid_instantiation():
-    """Test valid instantiation of MetaAlert."""
+    """Instansiasi MetaAlert yang valid."""
     t1 = datetime(2026, 8, 28, 5, 0, 0, tzinfo=timezone.utc)
     t2 = datetime(2026, 8, 28, 5, 15, 0, tzinfo=timezone.utc)
 
@@ -39,7 +39,7 @@ def test_meta_alert_valid_instantiation():
 
 
 def test_meta_alert_immutability():
-    """Test that MetaAlert attributes cannot be mutated after creation."""
+    """Atribut MetaAlert tidak bisa diubah setelah dibuat."""
     t1 = datetime(2026, 8, 28, 5, 0, 0, tzinfo=timezone.utc)
     meta = MetaAlert(
         meta_id=1,
@@ -62,7 +62,7 @@ def test_meta_alert_immutability():
 
 
 def test_meta_alert_nested_distribution_immutability():
-    """Test that nested distribution maps and metadata are protected from in-place mutation (FIX 7)."""
+    """Map distribusi bersarang dan metadata terlindungi dari mutasi in-place."""
     t1 = datetime(2026, 8, 28, 5, 0, 0, tzinfo=timezone.utc)
     meta = MetaAlert(
         meta_id=1,
@@ -92,7 +92,7 @@ def test_meta_alert_nested_distribution_immutability():
 
 
 def test_meta_alert_duration_non_negative():
-    """Test that end_time >= start_time is required."""
+    """end_time >= start_time wajib terpenuhi."""
     t1 = datetime(2026, 8, 28, 5, 15, 0, tzinfo=timezone.utc)
     t2 = datetime(2026, 8, 28, 5, 0, 0, tzinfo=timezone.utc)
 
@@ -116,7 +116,7 @@ def test_meta_alert_duration_non_negative():
 
 
 def test_meta_alert_count_positive():
-    """Test that alert_count must be at least 1."""
+    """alert_count minimal 1."""
     t1 = datetime(2026, 8, 28, 5, 0, 0, tzinfo=timezone.utc)
     with pytest.raises(ValueError, match="alert_count"):
         MetaAlert(

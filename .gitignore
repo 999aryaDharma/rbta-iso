@@ -1,6 +1,4 @@
-# =============================================================================
 # Python Ecosystem
-# =============================================================================
 __pycache__/
 *.py[cod]
 *$py.class
@@ -45,9 +43,7 @@ htmlcov/
 # Jupyter Notebook
 .ipynb_checkpoints/
 
-# =============================================================================
 # JavaScript / TypeScript / React (JS, TS, JSX, TSX)
-# =============================================================================
 node_modules/
 */node_modules/
 dashboard/node_modules/
@@ -82,9 +78,7 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-# =============================================================================
 # IDE & System Files
-# =============================================================================
 .vscode/
 .idea/
 *.swp
@@ -100,9 +94,7 @@ lerna-debug.log*
 ehthumbs.db
 Thumbs.db
 
-# =============================================================================
 # Secrets & Environment Configurations
-# =============================================================================
 .env
 .env.*
 !.env.example
@@ -112,9 +104,7 @@ Thumbs.db
 *.crt
 secrets/
 
-# =============================================================================
 # Model Staging, Local SQLite Databases & Runtime Storage
-# =============================================================================
 artifacts/models/.staging/
 *.staging/
 *.db
@@ -133,33 +123,24 @@ notebooks/*.png
 output/
 reports/
 
-# =============================================================================
 # Documentation Whitelist
-# =============================================================================
 docs/*
 !docs/research-spec/
 !docs/deployment/
 !docs/design/
-!docs/evidence/
-!docs/superpowers/
-!docs/superpowers/**
 !docs/thesis/
 !docs/thesis/**
 !docs/demo/
 !docs/demo/**
 
-# =============================================================================
 # Large Data Files & Research Run Outputs
-# =============================================================================
 data/*
 !data/.gitkeep
 artifacts/research-runs/
-.agents/
 
-# ASUS production runtime artifacts
+# Runtime state & model artifact (ditransfer manual, tidak ikut git)
 state/
 models/
-AGENTS.md
 
 # Local-only operational scratch (kredensial dev / helper lokal, jangan commit)
 scripts/run-backend.ps1

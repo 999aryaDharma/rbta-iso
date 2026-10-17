@@ -41,8 +41,6 @@ artifacts/
 *.sqlite
 *.db
 
-# Documentation & AI Agent Metadata
+# Dokumentasi dan test tidak dibutuhkan di image
 docs/
-.agents/
-.gemini/
 tests/

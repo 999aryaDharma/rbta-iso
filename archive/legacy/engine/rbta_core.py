@@ -32,9 +32,7 @@ import pandas as pd
 log = logging.getLogger(__name__)
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # Konstanta
-# ══════════════════════════════════════════════════════════════════════════════
 from src.config.domain import (
     AGENT_CRITICALITY,
     DEFAULT_AGENT_CRITICALITY as DEFAULT_CRITICALITY,
@@ -81,7 +79,7 @@ RULE_GROUP_SEVERITY_ENC: dict[str, int] = {
 }
 DEFAULT_GROUP_ENC = 2
 
-# ── 11 Fitur core (sebelum behavioral enrichment) — v2 HIDS-optimized ─────
+# 11 Fitur core (sebelum behavioral enrichment) — v2 HIDS-optimized
 # [v2] Optimization untuk HIDS:
 #   - alert_count → alert_count_log (log1p transform)
 #   - rule_firedtimes → alert_velocity (burst intensity)
@@ -102,9 +100,7 @@ FEATURE_COLS_V5 = [
 ]
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # Out-of-Order Buffer
-# ══════════════════════════════════════════════════════════════════════════════
 
 class OutOfOrderBuffer:
     def __init__(self, k: int = 50) -> None:
@@ -138,9 +134,7 @@ def _drain_with_idx(buf: OutOfOrderBuffer) -> list:
     return result
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # Elastic Time-Window
-# ══════════════════════════════════════════════════════════════════════════════
 
 class ElasticWindow:
     _WARMUP_SIZE = 100
@@ -207,9 +201,7 @@ class ElasticWindow:
             )
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # Watermark
-# ══════════════════════════════════════════════════════════════════════════════
 
 class Watermark:
     def __init__(self, max_lateness_sec: float = 10.0) -> None:
@@ -254,9 +246,7 @@ class Watermark:
         return self._max_seen - self.max_lateness
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # MetaAlert (Bucket A)
-# ══════════════════════════════════════════════════════════════════════════════
 
 @dataclass
 class MetaAlert:
@@ -315,9 +305,7 @@ class MetaAlert:
         }
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # CompoundMetaAlert (Bucket B)  —  [NEW-2]
-# ══════════════════════════════════════════════════════════════════════════════
 
 @dataclass
 class CompoundMetaAlert:
@@ -366,9 +354,7 @@ class CompoundMetaAlert:
         }
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # Builder helpers
-# ══════════════════════════════════════════════════════════════════════════════
 
 def _key_a(row: pd.Series) -> tuple:
     return (str(row["agent_id"]), str(row["rule_groups"]).strip().lower())
@@ -434,9 +420,7 @@ def _new_compound(compound_id, row, ts, win_id, window_sec, lv, ip):
     )
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # run_rbta  —  v5
-# ══════════════════════════════════════════════════════════════════════════════
 
 def run_rbta(
     df:                 pd.DataFrame,
@@ -472,7 +456,7 @@ def run_rbta(
     max_win_sec  = max_window_minutes * 60
     compound_sec = delta_t_minutes * 60
 
-    # ── Pastikan timestamp selalu datetime, bukan string ──────────────────────
+    # Pastikan timestamp selalu datetime, bukan string
     if not pd.api.types.is_datetime64_any_dtype(df["timestamp"]):
         df = df.copy()
         _t = pd.to_datetime(df["timestamp"], errors="coerce", utc=True)
@@ -526,7 +510,7 @@ def run_rbta(
         tactic_raw = str(row.get("mitre_tactic", "") or "")
         clean_rg   = str(row.get("rule_groups", "unknown")).strip().lower()
 
-        # ── Bucket A ──────────────────────────────────────────────────────────
+        # Bucket A
         if ka in act_a:
             b   = act_a[ka]
             gap = ts - b.end_time
@@ -569,7 +553,7 @@ def run_rbta(
             act_idx[ka] = [row_idx]
             mid += 1
 
-        # ── Bucket B ──────────────────────────────────────────────────────────
+        # Bucket B
         kb     = _key_b(row, ts, compound_sec)
         win_id = kb[1]
         agent  = str(row.get("agent_id", ""))
@@ -596,7 +580,7 @@ def run_rbta(
             act_b[kb] = _new_compound(cid, row, ts, win_id, compound_sec, lv, ip)
             cid += 1
 
-    # ── Main loop ─────────────────────────────────────────────────────────────
+    # Main loop
     for row_idx, row in df.iterrows():
         ts = row["timestamp"]
         if not isinstance(ts, pd.Timestamp):
@@ -644,9 +628,7 @@ def run_rbta(
     return df_meta, df_compound, fin_idx, elastic, wmark
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # Validasi mapping (Bucket A)
-# ══════════════════════════════════════════════════════════════════════════════
 
 def validate_mapping(df_raw, df_meta, alert_index_map):
     all_idx     = [i for lst in alert_index_map.values() for i in lst]
@@ -673,9 +655,7 @@ def validate_mapping(df_raw, df_meta, alert_index_map):
             "unique_mapped": unique, "overlap_count": overlap, "mismatch": mismatch}
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # add_if_features (f1-f9)
-# ══════════════════════════════════════════════════════════════════════════════
 
 def add_if_features(df_meta: pd.DataFrame) -> pd.DataFrame:
     """Validasi 9 fitur f1-f9. f10-f13 ditangani feature_engineering.py."""
@@ -724,9 +704,7 @@ def load_alerts(csv_path: str) -> pd.DataFrame:
     return df
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # Entry point
-# ══════════════════════════════════════════════════════════════════════════════
 
 if __name__ == "__main__":
     import sys

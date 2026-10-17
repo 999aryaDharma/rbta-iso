@@ -81,10 +81,10 @@ def test_replay_dataset_discovery_and_path_validation(tmp_path: Path, test_bundl
     assert datasets[1]["name"] == "valid2.jsonl"
     assert all(item["inspection_status"] == "pending" for item in datasets)
 
-    # Valid path
+    # Path valid.
     assert controller.validate_dataset_path("valid1.jsonl").name == "valid1.jsonl"
 
-    # Traversal attack attempts must fail
+    # Percobaan path traversal harus gagal.
     with pytest.raises(ValueError, match="Path traversal"):
         controller.validate_dataset_path("../outside.jsonl")
 
@@ -125,7 +125,7 @@ def test_replay_naive_timestamp_fails_canonicalization(tmp_path: Path, test_bund
     data_dir.mkdir()
 
     naive_file = data_dir / "naive.jsonl"
-    # Notice timestamp has no timezone offset -> naive!
+    # Timestamp ini tanpa offset timezone -> naive.
     naive_file.write_text("{\"id\": \"1\", \"timestamp\": \"2026-08-29T10:00:00\", \"agent\": {\"id\": \"001\"}, \"rule\": {\"id\": \"1\", \"level\": 3, \"groups\": [\"syslog\"]}}\n", encoding="utf-8")
 
     controller = ReplayController(
@@ -156,7 +156,7 @@ def test_replay_lifecycle_and_session_isolation(tmp_path: Path, test_bundle):
         replay_runs_dir=runs_dir,
     )
 
-    # Run 1
+    # Run 1.
     controller.start("sample.jsonl", speed_factor="MAX")
     controller.wait_until_complete(5.0)
 
@@ -172,12 +172,12 @@ def test_replay_lifecycle_and_session_isolation(tmp_path: Path, test_bundle):
     assert status["status"] == "COMPLETED"
     assert status["processed_count"] == 30
 
-    # Reset
+    # Reset.
     controller.reset()
     assert controller.run_id is None
     assert controller.status == "IDLE"
 
-    # Run 2 creates new workspace without overwriting run 1
+    # Run 2 membuat workspace baru tanpa menimpa run 1.
     controller.start("sample.jsonl", speed_factor="MAX")
     controller.wait_until_complete(5.0)
 
@@ -200,25 +200,25 @@ def test_replay_pause_resume_and_stop(tmp_path: Path, test_bundle):
         replay_runs_dir=runs_dir,
     )
 
-    # Start throttled at 1x
+    # Mulai dengan throttle 1x.
     controller.start("stream.jsonl", speed_factor="1")
     time.sleep(0.05)
 
-    # Pause
+    # Pause.
     controller.pause()
     assert controller.status == "PAUSED"
     paused_count = controller.processed_count
 
     time.sleep(0.1)
-    # Count must remain frozen while paused
+    # Hitungan harus tetap selama dijeda.
     assert controller.processed_count == paused_count
 
-    # Resume
+    # Resume.
     controller.resume()
     assert controller.status == "RUNNING"
     time.sleep(0.05)
 
-    # Stop manually -> must set status to STOPPED
+    # Stop manual -> status harus STOPPED.
     controller.stop()
     assert controller.status == "STOPPED"
     assert controller.processed_count < 100
@@ -237,7 +237,7 @@ def test_replay_research_determinism(tmp_path: Path, test_bundle):
         replay_runs_dir=runs_dir,
     )
 
-    # Run A
+    # Run A.
     controller.start("determinism.jsonl", speed_factor="MAX")
     controller.wait_until_complete(5.0)
     assert controller.status == "COMPLETED"
@@ -246,7 +246,7 @@ def test_replay_research_determinism(tmp_path: Path, test_bundle):
 
     controller.reset()
 
-    # Run B
+    # Run B.
     controller.start("determinism.jsonl", speed_factor="MAX")
     controller.wait_until_complete(5.0)
     assert controller.status == "COMPLETED"

@@ -1,14 +1,8 @@
-"""
-preprocessing_01.py  —  Adaptasi untuk rbta_ready_all.csv (v2)
-===============================================================
-Perubahan dari versi sebelumnya:
+"""Preprocessing rbta_ready_all.csv untuk pipeline RBTA.
 
-  [NEW-1] Kolom has_mitre dan has_critical_mitre ditambahkan ke
-      REQUIRED_COLS / OPTIONAL_COLS (pass-through dari json_orches.py).
-      Kedua kolom ini wajib ada agar RBTA v4 dapat mengakumulasi
-      mitre_hit_count per bucket.
-
-  [1..5] Tidak ada perubahan logika — hanya penambahan kolom baru.
+Kolom has_mitre dan has_critical_mitre diteruskan apa adanya dari
+json_orches.py; keduanya dibutuhkan RBTA untuk mengakumulasi konteks
+MITRE per bucket.
 """
 
 import logging
@@ -18,7 +12,7 @@ from pathlib import Path
 
 log = logging.getLogger(__name__)
 
-# ── Pemetaan kolom rbta_ready_all.csv → nama internal pipeline ───────────────
+# Pemetaan kolom rbta_ready_all.csv → nama internal pipeline.
 REQUIRED_COLS = {
     "timestamp_utc":       "timestamp",
     "agent_id":            "agent_id",
@@ -28,7 +22,7 @@ REQUIRED_COLS = {
     "srcip":               "srcip",
     "rule_id":             "rule_id",
     "criticality_score":   "criticality_score",
-    # [NEW-1] MITRE flags dari json_orches.py
+    # Flag MITRE dari json_orches.py.
     "has_mitre":           "has_mitre",
     "has_critical_mitre":  "has_critical_mitre",
 }
@@ -45,14 +39,13 @@ _HASH_TOKENS = {"md5", "sha1", "sha256", "mtime", "inode"}
 
 
 def load_and_prepare(csv_path: str | Path) -> pd.DataFrame:
-    """
-    Load rbta_ready_all.csv, filter corrupt rows, parsing tipe data.
+    """Muat rbta_ready_all.csv, buang baris rusak, dan parse tipe data.
 
-    Mengapa tidak ada sort?
-    -----------------------
-    RBTA memiliki Out-of-Order Buffer (Min-Heap, O(log k)) yang dirancang
-    khusus menangani event tidak berurutan. Pre-sort global membuat
-    buffer tidak tereksersisi. Kompleksitas tetap O(n).
+    Kenapa tidak di-sort?
+    ---------------------
+    RBTA punya Out-of-Order Buffer (min-heap, O(log k)) yang memang dirancang
+    untuk event yang datang tidak berurutan. Sort global di depan membuat buffer
+    itu tidak pernah teruji. Kompleksitas tetap O(n).
     """
     csv_path = Path(csv_path)
     if not csv_path.exists():
@@ -71,25 +64,25 @@ def load_and_prepare(csv_path: str | Path) -> pd.DataFrame:
     if missing_req:
         log.warning("Kolom wajib tidak ditemukan: %s", missing_req)
 
-    # Ensure timestamp_utc exists (renaming check)
+    # Pastikan timestamp_utc ada (cek rename).
     if "timestamp_utc" not in available_req:
         raise KeyError("Kolom 'timestamp_utc' WAJIB ada di CSV untuk RBTA pipeline")
 
     available_opt = {k: v for k, v in OPTIONAL_COLS.items() if k in df_raw.columns}
     all_available = {**available_req, **available_opt}
 
-    # Select columns and rename
+    # Pilih kolom lalu rename.
     selected_cols = [col for col in all_available.keys() if col in df_raw.columns]
     df = df_raw[selected_cols].rename(columns=all_available).copy()
 
-    # Verify timestamp column exists after rename
+    # Kolom timestamp harus ada setelah rename.
     if "timestamp" not in df.columns:
         raise KeyError(
             f"Kolom 'timestamp' tidak ditemukan setelah rename. "
             f"Available cols: {df.columns.tolist()}"
         )
 
-    # ── Parse timestamp ───────────────────────────────────────────────────────
+    # Parse timestamp.
     _ts = pd.to_datetime(df["timestamp"], errors="coerce", utc=True)
     try:
         df["timestamp"] = _ts.dt.tz_convert(None)
@@ -103,7 +96,7 @@ def load_and_prepare(csv_path: str | Path) -> pd.DataFrame:
         log.warning("%d baris dengan timestamp tidak valid → dibuang", n_bad_ts)
         df = df.dropna(subset=["timestamp"])
 
-    # ── rule_level ────────────────────────────────────────────────────────────
+    # rule_level
     if "rule_level" in df.columns:
         df["rule_level"] = (
             pd.to_numeric(df["rule_level"], errors="coerce")
@@ -118,15 +111,14 @@ def load_and_prepare(csv_path: str | Path) -> pd.DataFrame:
             )
             df.loc[invalid_level, "rule_level"] = 0
 
-    # ── srcip ─────────────────────────────────────────────────────────────────
+    # srcip
     if "srcip" in df.columns:
         df["srcip"] = df["srcip"].fillna("").astype(str).str.strip().replace("nan", "")
     else:
         df["srcip"] = ""
 
-    # ── srcip_type ────────────────────────────────────────────────────────────
-    # Pass-through dari json_orches.py. Jika tidak ada (dataset lama),
-    # set ke "none" agar RBTA v4 tidak crash saat mengakses kolom ini.
+    # srcip_type diteruskan dari json_orches.py. Bila tidak ada (dataset lama),
+    # isi "none" supaya akses kolom ini tidak error.
     if "srcip_type" not in df.columns:
         df["srcip_type"] = "none"
         log.warning(
@@ -136,19 +128,19 @@ def load_and_prepare(csv_path: str | Path) -> pd.DataFrame:
     else:
         df["srcip_type"] = df["srcip_type"].fillna("none").astype(str)
 
-    # ── agent_id ──────────────────────────────────────────────────────────────
+    # agent_id
     if "agent_id" in df.columns:
         df["agent_id"] = df["agent_id"].fillna("unknown").astype(str).str.strip()
     else:
         df["agent_id"] = "unknown"
 
-    # ── rule_id ───────────────────────────────────────────────────────────────
+    # rule_id
     if "rule_id" in df.columns:
         df["rule_id"] = pd.to_numeric(df["rule_id"], errors="coerce").fillna(0).astype(int)
     else:
         df["rule_id"] = 0
 
-    # ── criticality_score ─────────────────────────────────────────────────────
+    # criticality_score
     if "criticality_score" in df.columns:
         df["criticality_score"] = (
             pd.to_numeric(df["criticality_score"], errors="coerce")
@@ -168,7 +160,7 @@ def load_and_prepare(csv_path: str | Path) -> pd.DataFrame:
         else:
             df["criticality_score"] = 1
 
-    # ── [NEW-1] has_mitre dan has_critical_mitre ──────────────────────────────
+    # has_mitre dan has_critical_mitre
     for mitre_col in ("has_mitre", "has_critical_mitre"):
         if mitre_col in df.columns:
             df[mitre_col] = (
@@ -185,7 +177,7 @@ def load_and_prepare(csv_path: str | Path) -> pd.DataFrame:
                 mitre_col,
             )
 
-    # ── rule_groups ───────────────────────────────────────────────────────────
+    # rule_groups
     if "rule_groups" in df.columns:
         df["rule_groups"] = (
             df["rule_groups"].fillna("unknown")
@@ -199,7 +191,7 @@ def load_and_prepare(csv_path: str | Path) -> pd.DataFrame:
     df = df.reset_index(drop=True)
     log.info("[LOAD] Arrival order CSV dipertahankan — tidak ada global sort [O(n)]")
 
-    # Final validation: ensure all critical columns exist
+    # Validasi akhir: semua kolom penting harus ada.
     critical_cols = ["timestamp", "agent_id", "agent_name", "rule_groups", "rule_level"]
     missing_critical = [col for col in critical_cols if col not in df.columns]
     if missing_critical:
@@ -211,7 +203,7 @@ def load_and_prepare(csv_path: str | Path) -> pd.DataFrame:
     return df
 
 
-# ── Helper: filter corrupt rows ───────────────────────────────────────────────
+# Helper: buang baris rusak.
 
 def _drop_corrupt_rows(df: pd.DataFrame) -> tuple[pd.DataFrame, int]:
     if "agent_id" not in df.columns:
@@ -241,7 +233,7 @@ def _drop_corrupt_rows(df: pd.DataFrame) -> tuple[pd.DataFrame, int]:
     return df[~corrupt_mask].copy(), n_corrupt
 
 
-# ── Helper: ringkasan ─────────────────────────────────────────────────────────
+# Helper: ringkasan.
 
 def _print_summary(df: pd.DataFrame, n_corrupt: int = 0) -> None:
     log.info("=" * 60)
@@ -274,7 +266,6 @@ def _print_summary(df: pd.DataFrame, n_corrupt: int = 0) -> None:
     log.info("=" * 60)
 
 
-# ── Entry Point ───────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
     import sys

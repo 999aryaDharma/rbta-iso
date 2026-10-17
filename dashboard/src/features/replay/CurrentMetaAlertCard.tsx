@@ -41,7 +41,6 @@ export function CurrentMetaAlertCard({
           )}
         </div>
 
-        {/* Ringkasan tindakan yang sudah dibuat */}
         <div className="flex flex-wrap items-center gap-4 text-xs font-mono">
           <div className="flex items-center gap-1.5 text-kumo-subtle">
             <span>Pengurangan:</span>
@@ -67,7 +66,6 @@ export function CurrentMetaAlertCard({
 
       {latestMeta ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 pt-1">
-          {/* Target Metadata */}
           <div className="space-y-1.5">
             <div className="text-[11px] text-kumo-subtle uppercase tracking-wider font-semibold">Sumber alert</div>
             <div className="font-mono text-xs font-semibold text-kumo-strong truncate">
@@ -78,7 +76,6 @@ export function CurrentMetaAlertCard({
             </div>
           </div>
 
-          {/* Member alerts & Severity */}
           <div className="space-y-1.5">
             <div className="text-[11px] text-kumo-subtle uppercase tracking-wider font-semibold">Ringkasan kelompok</div>
             <div className="text-xs text-kumo-default">

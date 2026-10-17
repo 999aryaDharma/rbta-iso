@@ -1,4 +1,4 @@
-"""Unit tests for LiveWorker thread lifecycle (L2 live stream plan)."""
+"""Unit test lifecycle thread LiveWorker."""
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from types import SimpleNamespace
@@ -31,7 +31,7 @@ def make_alert(idx: int, ts: datetime) -> CanonicalRawAlert:
 
 
 class ScriptedCoordinator:
-    """Test double for LiveIngestionCoordinator with scripted cycle outcomes."""
+    """Test double untuk LiveIngestionCoordinator dengan hasil siklus yang sudah ditentukan."""
 
     def __init__(self, service: LiveRBTAService, script: List[object]) -> None:
         self.service = service
@@ -172,7 +172,7 @@ def test_worker_disabled_by_default_without_env():
     assert worker_enabled_from_env({"RBTA_LIVE_WORKER_ENABLED": " True "}) is True
 
 
-# --- F3: drain defaults to False (decommission-only) ---
+# Drain default False (hanya untuk decommission).
 
 def test_drain_defaults_to_false():
     from src.runtime.live_worker import drain_on_stop_from_env
@@ -231,8 +231,9 @@ def _install_fake_scoring(service: LiveRBTAService) -> None:
 
 
 def test_restart_without_drain_matches_uninterrupted_run(tmp_path: Path):
-    """F3 equivalence: ingest, stop (no drain), restart on same state, then
-    explicit decommission drain must equal an uninterrupted drain."""
+    """Kesetaraan: ingest, stop (tanpa drain), restart pada state yang sama, lalu drain
+    decommission eksplisit harus sama dengan drain tanpa interupsi.
+    """
     now = datetime(2026, 9, 29, tzinfo=timezone.utc)
 
     state_a = tmp_path / "a" / "state.json"
@@ -274,7 +275,7 @@ def test_restart_without_drain_matches_uninterrupted_run(tmp_path: Path):
         ref[0].agent_id, ref[0].rule_group_primary)
 
 
-# --- F9: model pin guard ---
+# Penjaga pin model.
 
 def test_pin_mismatch_rejects_start(tmp_path: Path, monkeypatch):
     monkeypatch.delenv("RBTA_LIVE_MODEL_OVERRIDE", raising=False)
@@ -335,7 +336,7 @@ def test_pin_missing_metadata_raises(tmp_path: Path):
     assert not worker.is_alive()
 
 
-# --- F2-backoff: exponential backoff + jitter via injectable sleep_fn ---
+# Exponential backoff + jitter lewat sleep_fn yang bisa di-inject.
 
 def test_backoff_second_delay_exceeds_first(tmp_path: Path):
     delays = []
@@ -357,7 +358,7 @@ def test_backoff_second_delay_exceeds_first(tmp_path: Path):
     assert worker.consecutive_failures == 0
 
 
-# --- F12: OS file lock ---
+# Lock file OS.
 
 def test_acquire_state_lock_second_holder_rejected(tmp_path: Path):
     from src.runtime.live_worker import acquire_state_lock, release_state_lock
@@ -371,7 +372,7 @@ def test_acquire_state_lock_second_holder_rejected(tmp_path: Path):
         release_state_lock(target)
 
 
-# --- Derivation hash guard (cross-agent interface, getattr-guarded) ---
+# Penjaga hash derivasi (antarmuka lintas komponen, dijaga getattr).
 
 def test_derivation_mismatch_rejects_start(tmp_path: Path, monkeypatch):
     monkeypatch.delenv("RBTA_LIVE_DERIVATION_OVERRIDE", raising=False)
@@ -429,7 +430,7 @@ def test_stop_skips_drain_when_thread_stuck(tmp_path: Path, monkeypatch, caplog)
 
 
 def test_derivation_drift_refuses_start_and_fresh_start_pins(tmp_path: Path):
-    """F6 guard is live: stale stored hash refuses, fresh start stores baseline."""
+    """Penjaga aktif: hash tersimpan yang basi ditolak, start baru menyimpan baseline."""
     from src.runtime.durable_state import compute_derivation_hash
 
     service = make_service(tmp_path)
@@ -447,7 +448,7 @@ def test_derivation_drift_refuses_start_and_fresh_start_pins(tmp_path: Path):
         worker2.stop()
 
 
-# --- N4: lock release / re-acquire ---
+# Lepas dan ambil ulang lock.
 
 def test_acquire_release_reacquire_ok(tmp_path: Path):
     from src.runtime.live_worker import acquire_state_lock, release_state_lock
@@ -463,7 +464,7 @@ def test_acquire_release_reacquire_ok(tmp_path: Path):
         release_state_lock(target)
 
 
-# --- N6-worker: override must equal the target version/hash, not "true" ---
+# Override harus sama dengan versi/hash target, bukan "true".
 
 def test_pin_override_true_value_rejected(tmp_path: Path, monkeypatch):
     monkeypatch.setenv("RBTA_LIVE_MODEL_OVERRIDE", "true")
@@ -520,7 +521,7 @@ def test_derivation_override_exact_hash_allowed(tmp_path: Path, monkeypatch):
         worker.stop()
 
 
-# --- N6-worker: explicit constructor overrides (env_map forwarded by server) ---
+# Override eksplisit lewat constructor (env_map diteruskan server).
 
 def test_constructor_explicit_model_override_without_env(tmp_path: Path, monkeypatch):
     monkeypatch.delenv("RBTA_LIVE_MODEL_OVERRIDE", raising=False)
@@ -558,7 +559,7 @@ def test_constructor_explicit_derivation_override_without_env(tmp_path: Path, mo
         worker.stop()
 
 
-# --- N6-worker: pin history ---
+# Riwayat pin.
 
 def test_pin_history_appends_new_versions_capped_at_20(tmp_path: Path, monkeypatch):
     monkeypatch.setenv("RBTA_LIVE_MODEL_OVERRIDE", "v-new")
@@ -581,7 +582,7 @@ def test_pin_history_appends_new_versions_capped_at_20(tmp_path: Path, monkeypat
     history = service.get_live_source_state().get("live_pin_history")
     assert [e["version"] for e in history] == ["v-old", "v-new"]
 
-    # Pre-fill to the cap: oldest entries are evicted, newest kept.
+    # Isi sampai batas: entri tertua dibuang, yang terbaru dipertahankan.
     service3 = make_service(tmp_path / "capped", model_version="v-cap")
     service3.update_live_source_state({
         "live_pin_history": [{"version": f"v-{i}", "at": "t"} for i in range(20)],
@@ -597,7 +598,7 @@ def test_pin_history_appends_new_versions_capped_at_20(tmp_path: Path, monkeypat
     assert history[0]["version"] == "v-1"
 
 
-# --- Ponytail _sleep: default waits on the stop event ---
+# _sleep default menunggu di stop event.
 
 def test_sleep_default_uses_stop_event(tmp_path: Path):
     service = make_service(tmp_path)
@@ -609,7 +610,7 @@ def test_sleep_default_uses_stop_event(tmp_path: Path):
     assert time.monotonic() - started < 5.0
 
 
-# --- M1-worker: live_first_started_at pinned exactly once ---
+# live_first_started_at di-pin tepat sekali.
 
 def test_first_started_at_written_once_across_restarts(tmp_path: Path):
     service = make_service(tmp_path)
@@ -630,7 +631,7 @@ def test_first_started_at_written_once_across_restarts(tmp_path: Path):
         worker.stop()
 
 
-# --- M4-worker: accepted derivation override re-pins baseline + audits ---
+# Override derivasi yang diterima mem-pin ulang baseline + dicatat di audit.
 
 def test_derivation_override_repins_baseline_and_restart_without_override_ok(
     tmp_path: Path, monkeypatch
@@ -652,7 +653,7 @@ def test_derivation_override_repins_baseline_and_restart_without_override_ok(
     assert any(
         e.get("kind") == "derivation" and e.get("value") == current for e in history
     ), f"expected derivation re-pin audit in history, got {history}"
-    # Restart WITHOUT the override now succeeds: the baseline was re-pinned.
+    # Restart TANPA override sekarang berhasil: baseline sudah di-pin ulang.
     monkeypatch.delenv("RBTA_LIVE_DERIVATION_OVERRIDE", raising=False)
     worker2 = LiveWorker(service, ScriptedCoordinator(service, []), poll_interval=3600.0)
     try:
@@ -682,7 +683,7 @@ def test_derivation_repin_history_capped_at_20(tmp_path: Path, monkeypatch):
     assert history[-1].get("value") == current
 
 
-# --- M4-worker: accepted model override re-pins + audits; restart clean ---
+# Override model yang diterima mem-pin ulang + dicatat di audit; restart bersih.
 
 def test_model_override_repin_audited_and_restart_without_override_ok(
     tmp_path: Path, monkeypatch

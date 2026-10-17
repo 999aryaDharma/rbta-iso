@@ -9,7 +9,7 @@ Demo membuktikan alur teknis yang dapat direproduksi: alert Wazuh historis dinor
 1. Bekukan exact commit, model version, dataset, dan SHA-256 dataset pada catatan sidang.
 2. Gunakan dataset berklasifikasi `golden` sebanyak 5.000–20.000 alert; jangan memakai arsip 2,5 GB.
 3. Jalankan seluruh test dan build, lalu simpan outputnya.
-4. Buka `http://HOST_ASUS:8010/dashboard/demo` dan pastikan health API hijau.
+4. Buka `http://HOST:8010/dashboard/demo` dan pastikan health API hijau.
 5. Siapkan video dan tangkapan layar hasil run yang sama sebagai cadangan.
 6. Pastikan Wazuh live, Shuffle, dan Telegram eksternal disebut `deferred`, bukan aktif.
 

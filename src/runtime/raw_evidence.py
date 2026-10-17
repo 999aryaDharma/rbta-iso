@@ -16,25 +16,25 @@ from src.runtime.json_safe import (
 
 
 class RawEvidenceConflictError(Exception):
-    """Raised when an alert with identical wazuh_alert_id has conflicting canonical evidence."""
+    """Dilempar bila alert dengan wazuh_alert_id yang sama punya bukti kanonis yang bertentangan."""
     pass
 
 
 class RawEvidenceIntegrityError(Exception):
-    """Raised when persisted raw evidence data violates schema or timestamp integrity."""
+    """Dilempar bila data raw evidence yang tersimpan melanggar integritas skema atau timestamp."""
     pass
 
 
 class RawAlertEvidenceStore:
-    """RawAlertEvidenceStore — SQLite-backed raw alert evidence persistence with WAL mode.
+    """RawAlertEvidenceStore — persistensi raw alert evidence berbasis SQLite dengan mode WAL.
 
-    Guarantees:
-    - Batched write buffer with WAL journal and FULL synchronous mode.
-    - Idempotent duplicate: identical alert fingerprint -> NO-OP (returns False).
-    - Conflicting duplicate: different alert fingerprint -> raises RawEvidenceConflictError (fail-closed).
-    - Exact source membership traceability for MetaAlerts (source_total, resolved_total, unresolved_ids).
-    - Multi-field search across alert ID, rule ID, description, IP, full log.
-    - Automatic flush on all read queries for 100% read-your-own-writes consistency.
+    Jaminan:
+    - Buffer tulis per batch dengan journal WAL dan synchronous FULL.
+    - Duplikat idempoten: fingerprint alert identik -> NO-OP (mengembalikan False).
+    - Duplikat bertentangan: fingerprint berbeda -> melempar RawEvidenceConflictError (gagal tertutup).
+    - Keanggotaan sumber MetaAlert bisa ditelusuri persis (source_total, resolved_total, unresolved_ids).
+    - Pencarian multi-field: ID alert, rule ID, deskripsi, IP, full log.
+    - Flush otomatis di setiap query baca agar konsistensi read-your-own-writes 100%.
     """
 
     def __init__(self, db_path: Optional[Union[str, Path]] = None, batch_size: int = 1000) -> None:
@@ -96,7 +96,7 @@ class RawAlertEvidenceStore:
                 )
                 """
             )
-            # Automatic schema migration for existing sqlite databases
+            # Migrasi skema otomatis untuk database sqlite yang sudah ada.
             cursor = conn.execute("PRAGMA table_info(raw_alert_evidence)")
             existing_cols = {row["name"] for row in cursor.fetchall()}
 
@@ -131,12 +131,12 @@ class RawAlertEvidenceStore:
             self._cached_count = int(row["total"]) if row else 0
 
     def flush(self) -> None:
-        """Commit any buffered raw evidence records to disk immediately."""
+        """Commit record raw evidence yang masih di buffer ke disk saat itu juga."""
         with self._lock:
             self._flush_locked()
 
     def _flush_locked(self) -> None:
-        """Flush the write buffer; caller must hold ``self._lock``."""
+        """Flush buffer tulis; pemanggil wajib memegang ``self._lock``."""
         if not self._write_buffer:
             return
         conn = self._get_conn()
@@ -168,24 +168,24 @@ class RawAlertEvidenceStore:
         source_mode: str = "LIVE",
         skip_conflict_check: bool = False,
     ) -> bool:
-        """Store a canonical raw alert with high throughput write buffering.
+        """Simpan raw alert kanonis dengan buffer tulis ber-throughput tinggi.
 
         Returns
         -------
         bool
-            True if newly inserted, False if identical duplicate.
+            True bila baru dimasukkan, False bila duplikat identik.
 
         Raises
         ------
         RawEvidenceConflictError
-            If wazuh_alert_id already exists with conflicting canonical attributes.
-            The legacy ``skip_conflict_check`` flag is retained for API
-            compatibility but never weakens this check: replay ingestion also
-            enforces full canonical conflict detection.
+            Bila wazuh_alert_id sudah ada dengan atribut kanonis yang bertentangan.
+            Flag lama ``skip_conflict_check`` dipertahankan untuk kompatibilitas API tetapi
+            tidak pernah melemahkan pengecekan ini: ingestion replay juga menjalankan deteksi
+            konflik kanonis penuh.
         """
         meta = alert.metadata if isinstance(alert.metadata, dict) else dict(alert.metadata)
 
-        # Extract audit/extended fields safely
+        # Ambil field audit/tambahan dengan aman.
         rule_desc = meta.get("rule_description", getattr(alert, "rule_description", ""))
         rule_groups_all = meta.get("rule_groups_all", [alert.rule_group_primary])
         mitre_techs = meta.get("mitre_techniques", ())
@@ -197,14 +197,14 @@ class RawAlertEvidenceStore:
             dec = deterministic_json_dumps(dec)
         flog = meta.get("full_log", "")
 
-        # Unify source index / doc id
+        # Satukan index sumber / doc id.
         source_index = meta.get("source_index", meta.get("opensearch_index", ""))
         source_doc_id = meta.get("source_document_id", meta.get("opensearch_document_id", ""))
 
-        # Replay used to hash only ID/timestamp/agent and skip duplicate checks.
-        # That optimization made the evidence count inaccurate and could hide a
-        # conflicting rule/severity payload behind the same Wazuh ID.  Keep the
-        # legacy flag for API compatibility, but never weaken evidence integrity.
+        # Dulu replay hanya meng-hash ID/timestamp/agent dan melewati cek duplikat. Optimasi itu
+        # membuat jumlah evidence tidak akurat dan bisa menyembunyikan payload rule/severity yang
+        # bertentangan di balik ID Wazuh yang sama. Flag lama dipertahankan untuk kompatibilitas
+        # API, tetapi integritas evidence tidak pernah dilemahkan.
         fingerprint = compute_canonical_fingerprint(
             wazuh_alert_id=alert.wazuh_alert_id,
             timestamp=alert.timestamp,
@@ -252,7 +252,7 @@ class RawAlertEvidenceStore:
                     fields["mitre_tactics"] = json.loads(row["mitre_tactics"])
                     if compute_canonical_fingerprint(**fields, version=1) != existing_fp:
                         raise RawEvidenceIntegrityError("Legacy evidence fingerprint does not match stored canonical content")
-                    # Compare normalized content without rewriting historical hashes.
+                    # Bandingkan isi yang sudah dinormalisasi tanpa menulis ulang hash historis.
                     existing_fp = compute_canonical_fingerprint(**fields)
                 elif row["fingerprint_version"] != 2:
                     raise RawEvidenceIntegrityError("Unsupported stored fingerprint version")
@@ -266,9 +266,9 @@ class RawAlertEvidenceStore:
                 )
 
             if len(self._recent_fingerprints) >= self._max_recent_fingerprints:
-                # F13a: buffered-but-unflushed rows are invisible to the SELECT
-                # above, so the cache must be committed to SQLite before it is
-                # cleared — otherwise conflicts against buffered rows go undetected.
+                # Baris yang masih di buffer dan belum di-flush tidak terlihat oleh SELECT di atas, jadi
+                # cache harus di-commit ke SQLite dulu sebelum dikosongkan — kalau tidak, konflik dengan
+                # baris yang masih di buffer tidak terdeteksi.
                 self._flush_locked()
                 self._recent_fingerprints.clear()
             self._recent_fingerprints[alert.wazuh_alert_id] = fingerprint
@@ -351,7 +351,7 @@ class RawAlertEvidenceStore:
         return d
 
     def get(self, wazuh_alert_id: str, redact: bool = False) -> Optional[Dict[str, Any]]:
-        """Retrieve a single raw alert evidence record by ID."""
+        """Ambil satu record raw alert evidence berdasarkan ID."""
         self.flush()
         with self._lock:
             conn = self._get_conn()
@@ -364,7 +364,7 @@ class RawAlertEvidenceStore:
             return self._row_to_dict(row, redact=redact)
 
     def get_many(self, wazuh_alert_ids: List[str], redact: bool = False) -> Dict[str, Dict[str, Any]]:
-        """Retrieve multiple raw alert evidence records mapped by ID."""
+        """Ambil beberapa record raw alert evidence, dipetakan per ID."""
         if not wazuh_alert_ids:
             return {}
 
@@ -372,7 +372,7 @@ class RawAlertEvidenceStore:
         results: Dict[str, Dict[str, Any]] = {}
         with self._lock:
             conn = self._get_conn()
-            # Batch queries in chunks of 500 to respect SQLite parameter limits
+            # Query per 500 untuk menghormati batas parameter SQLite.
             chunk_size = 500
             for i in range(0, len(wazuh_alert_ids), chunk_size):
                 chunk = wazuh_alert_ids[i:i + chunk_size]
@@ -387,12 +387,11 @@ class RawAlertEvidenceStore:
         return results
 
     def resolve_provenance_members(self, source_alert_ids: List[str]) -> Dict[str, Any]:
-        """Resolve every source member in canonical order for a MetaAlert trace.
+        """Resolusi setiap anggota sumber dengan urutan kanonis untuk penelusuran MetaAlert.
 
-        Missing evidence is deliberately represented as an unresolved member so
-        the API never turns a partial trace into an apparently complete one.
-        The selected fields are the safe audit projection; raw payloads and
-        credentials are never returned from this method.
+        Evidence yang hilang sengaja ditampilkan sebagai anggota yang belum ter-resolve agar API
+        tidak pernah menampilkan jejak parsial seolah lengkap. Field yang dipilih adalah proyeksi
+        audit yang aman; payload mentah dan kredensial tidak pernah dikembalikan dari method ini.
         """
         resolved_map = self.get_many(source_alert_ids, redact=True)
         members: List[Dict[str, Any]] = []
@@ -434,18 +433,18 @@ class RawAlertEvidenceStore:
         mitre_tactic: Optional[str] = None,
         redact: bool = True,
     ) -> Dict[str, Any]:
-        """Resolve member raw alerts for a MetaAlert with strict resolution traceability and filtering."""
+        """Resolusi raw alert anggota sebuah MetaAlert dengan penelusuran resolusi yang ketat dan filter."""
         source_total = len(source_alert_ids)
         resolved_map = self.get_many(source_alert_ids, redact=redact)
         resolved_total = len(resolved_map)
 
-        # Identify unresolved alert IDs while preserving canonical source order
+        # Kenali ID alert yang belum ter-resolve sambil menjaga urutan sumber kanonis.
         unresolved_alert_ids = [aid for aid in source_alert_ids if aid not in resolved_map]
 
-        # Gather resolved records in canonical source order
+        # Kumpulkan record yang ter-resolve dengan urutan sumber kanonis.
         resolved_items = [resolved_map[aid] for aid in source_alert_ids if aid in resolved_map]
 
-        # Apply multi-field search and filters
+        # Terapkan pencarian multi-field dan filter.
         filtered_items = []
         search_lower = search.strip().lower() if search else None
 
@@ -498,7 +497,7 @@ class RawAlertEvidenceStore:
         offset: int = 0,
         redact: bool = True,
     ) -> List[Dict[str, Any]]:
-        """Search raw alert evidence across multiple indices."""
+        """Cari raw alert evidence di beberapa index."""
         self.flush()
         conditions = []
         params: List[Any] = []
@@ -529,7 +528,7 @@ class RawAlertEvidenceStore:
             return [self._row_to_dict(r, redact=redact) for r in rows]
 
     def count(self) -> int:
-        """Return total number of stored raw alert evidence records quickly from memory cache."""
+        """Kembalikan jumlah record raw alert evidence yang tersimpan, langsung dari cache memori."""
         if hasattr(self, "_cached_count"):
             return self._cached_count
         self.flush()
@@ -540,11 +539,10 @@ class RawAlertEvidenceStore:
             return self._cached_count
 
     def latest_agent_names(self) -> Dict[str, str]:
-        """Return the latest non-placeholder canonical name for each agent.
+        """Kembalikan nama kanonis terbaru (bukan placeholder) untuk setiap agent.
 
-        This narrow projection supports legacy replay telemetry without exposing
-        raw alert payloads.  It is intentionally read-only and does not affect
-        canonical evidence or RBTA aggregation.
+        Proyeksi sempit ini mendukung telemetri replay lama tanpa membuka payload raw alert.
+        Sengaja read-only dan tidak memengaruhi evidence kanonis maupun agregasi RBTA.
         """
         self.flush()
         with self._lock:
@@ -564,7 +562,7 @@ class RawAlertEvidenceStore:
         return {str(row["agent_id"]): str(row["agent_name"]) for row in rows}
 
     def export_canonical_alerts(self) -> List[CanonicalRawAlert]:
-        """Export the isolated run evidence as canonical alerts in event-time order."""
+        """Export evidence run yang terisolasi sebagai alert kanonis berurutan menurut event-time."""
         self.flush()
         with self._lock:
             rows = self._get_conn().execute(
@@ -596,12 +594,12 @@ class RawAlertEvidenceStore:
         start_time: datetime,
         end_time: datetime,
     ) -> Dict[str, int]:
-        """Aggregate raw alert counts into UTC hourly buckets within [start_time, end_time].
+        """Agregasi jumlah raw alert ke bucket per jam UTC di dalam [start_time, end_time].
 
         Returns
         -------
         Dict[str, int]
-            Map of 'YYYY-MM-DD HH:00' -> count of raw alerts with timestamps in that hour.
+            Peta 'YYYY-MM-DD HH:00' -> jumlah raw alert dengan timestamp di jam tersebut.
         """
         self.flush()
         st_utc = start_time.astimezone(timezone.utc) if start_time.tzinfo else start_time.replace(tzinfo=timezone.utc)

@@ -1,33 +1,33 @@
-"""Evaluation metrics module for Alert Reduction Rate (ARR)."""
+"""Metrik evaluasi Alert Reduction Rate (ARR)."""
 
 
 class MetricsError(ValueError):
-    """Raised when metric calculation encounters invalid inputs."""
+    """Dilempar bila input perhitungan metrik tidak valid."""
     pass
 
 
 def compute_arr(n_raw: int, n_meta: int) -> float:
-    """Calculate Alert Reduction Rate (ARR).
+    """Hitung Alert Reduction Rate (ARR).
 
-    Formula:
+    Rumus:
     ARR = ((N_raw - N_meta) / N_raw) * 100.0%
 
     Parameters
     ----------
     n_raw : int
-        Total number of raw alerts.
+        Jumlah raw alert.
     n_meta : int
-        Total number of aggregated meta-alerts.
+        Jumlah meta-alert hasil agregasi.
 
     Returns
     -------
     float
-        Alert reduction rate as a percentage [0.0, 100.0].
+        Persentase reduksi alert [0.0, 100.0].
 
     Raises
     ------
     MetricsError
-        If n_raw <= 0, n_meta < 0, or n_meta > n_raw.
+        Bila n_raw <= 0, n_meta < 0, atau n_meta > n_raw.
     """
     if n_raw <= 0:
         raise MetricsError(f"n_raw must be positive, got {n_raw}")

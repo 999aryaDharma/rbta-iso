@@ -1,10 +1,10 @@
-"""Smoke test to verify project foundation and clean module importability."""
+"""Smoke test fondasi proyek dan kebersihan import modul."""
 import importlib
 import pytest
 
 
 def test_third_party_dependencies_import():
-    """Verify that all declared runtime and test dependencies import correctly."""
+    """Semua dependency runtime dan test yang dideklarasikan bisa di-import."""
     core_modules = [
         "numpy",
         "pandas",
@@ -19,7 +19,7 @@ def test_third_party_dependencies_import():
 
 
 def test_primary_application_modules_import():
-    """Verify that primary foundation modules can be imported cleanly without side effects."""
+    """Modul fondasi utama bisa di-import tanpa efek samping."""
     app_modules = [
         "src.config.domain",
         "src.contracts.raw_alert",
@@ -33,7 +33,7 @@ def test_primary_application_modules_import():
 
 
 def test_fixtures_available():
-    """Verify that fixture files exist and are valid JSON."""
+    """File fixture ada dan berisi JSON yang valid."""
     import json
     from pathlib import Path
 

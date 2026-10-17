@@ -1,12 +1,8 @@
-"""
-03_filtering.py  —  Replay dengan Filtering (Agents, Severity)
-==============================================================
-Simulasi hanya specific agents atau severity levels untuk focused testing.
+"""Replay dengan filter agent dan severity untuk pengujian yang terfokus.
 
-Gunakan untuk:
-  - Test specific scenarios (e.g., only high-severity dari specific agent)
-  - Reduce dataset size untuk faster iteration
-  - Focus development effort
+Berguna untuk:
+  - Menguji skenario tertentu (mis. hanya severity tinggi dari agent tertentu)
+  - Memperkecil dataset agar iterasi lebih cepat
 """
 
 import sys
@@ -17,15 +13,15 @@ from src.streaming import AlertStreamSimulator
 
 
 def test_scenario(name, **kwargs):
-    """Helper untuk run scenario dengan specific config."""
+    """Helper untuk menjalankan satu skenario dengan konfigurasi tertentu."""
     print(f"\n{'='*80}")
     print(f"Scenario: {name}")
     print(f"{'='*80}")
     
     sim = AlertStreamSimulator(
         csv_path="data/raw/rbta_ready_all.csv",
-        log_level="WARNING",  # Less verbose
-        log_frequency=50000,   # Log less frequently
+        log_level="WARNING",  # lebih ringkas
+        log_frequency=50000,   # log lebih jarang
         **kwargs
     )
     
@@ -44,7 +40,7 @@ def main():
     print("EXAMPLE 3: Alert Stream Filtering")
     print("="*80)
     
-    # Scenario 1: Only high-severity alerts
+    # Skenario 1: hanya alert severity tinggi.
     test_scenario(
         "High-severity only (level 7+)",
         speed_factor=100,
@@ -52,7 +48,7 @@ def main():
         log_file="output/03_scenario1.log",
     )
     
-    # Scenario 2: Only specific agents
+    # Skenario 2: hanya agent tertentu.
     test_scenario(
         "Only DFIR-IRIS and PusatKarir",
         speed_factor=100,
@@ -60,7 +56,7 @@ def main():
         log_file="output/03_scenario2.log",
     )
     
-    # Scenario 3: Combination: high-severity from specific agents
+    # Skenario 3: kombinasi severity tinggi dari agent tertentu.
     test_scenario(
         "High-severity (7+) from dfir-iris",
         speed_factor=100,

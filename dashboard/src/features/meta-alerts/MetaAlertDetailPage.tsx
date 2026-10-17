@@ -88,9 +88,7 @@ export function MetaAlertDetailPage() {
       />
 
       <div className="px-6 py-8 lg:px-10 space-y-8">
-        {/* Overview & Detection */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Aggregation Profile Card */}
             <div className="p-6 rounded-xl border border-kumo-hairline bg-kumo-canvas shadow-xs">
               <h3 className="font-semibold text-xs uppercase tracking-wider text-kumo-strong mb-4 pb-3 border-b border-kumo-hairline">
                 Temporal Aggregation Profile
@@ -119,7 +117,6 @@ export function MetaAlertDetailPage() {
               </dl>
             </div>
 
-            {/* Isolation Forest Evaluation Card */}
             <div className="p-6 rounded-xl border border-kumo-hairline bg-kumo-canvas shadow-xs">
               <h3 className="font-semibold text-xs uppercase tracking-wider text-kumo-strong mb-4 pb-3 border-b border-kumo-hairline">
                 Isolation Forest Evaluation & Scoring

@@ -1,4 +1,4 @@
-"""Unit tests for ReplayClock speed factors and delays (Sprint 6)."""
+"""Unit test faktor kecepatan dan jeda ReplayClock."""
 from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 import pytest
@@ -7,25 +7,25 @@ from src.runners.clock import ClockError, ReplayClock
 
 
 def test_replay_clock_speed_factors():
-    """Clock computes wall delay as event gap divided by speed factor."""
+    """Clock menghitung jeda wall-clock sebagai gap event dibagi faktor kecepatan."""
     base_t = datetime(2026, 8, 28, 10, 0, 0, tzinfo=timezone.utc)
     next_t = base_t + timedelta(seconds=100)
 
-    # 1x speed: 100s gap -> 100s delay
+    # Kecepatan 1x: gap 100 detik -> jeda 100 detik.
     c1 = ReplayClock(speed_factor=1.0)
     with patch("time.sleep") as mock_sleep:
         delay = c1.wait(base_t, next_t)
         assert delay == pytest.approx(100.0)
         mock_sleep.assert_called_once_with(pytest.approx(100.0))
 
-    # 10x speed: 100s gap -> 10s delay
+    # Kecepatan 10x: gap 100 detik -> jeda 10 detik.
     c10 = ReplayClock(speed_factor=10.0)
     with patch("time.sleep") as mock_sleep:
         delay = c10.wait(base_t, next_t)
         assert delay == pytest.approx(10.0)
         mock_sleep.assert_called_once_with(pytest.approx(10.0))
 
-    # 100x speed: 100s gap -> 1.0s delay
+    # Kecepatan 100x: gap 100 detik -> jeda 1.0 detik.
     c100 = ReplayClock(speed_factor=100.0)
     with patch("time.sleep") as mock_sleep:
         delay = c100.wait(base_t, next_t)
@@ -34,7 +34,7 @@ def test_replay_clock_speed_factors():
 
 
 def test_replay_clock_max_speed_does_not_sleep():
-    """MAX speed does not sleep (delay=0.0) and never calls time.sleep."""
+    """Kecepatan MAX tidak tidur (delay=0.0) dan tidak pernah memanggil time.sleep."""
     base_t = datetime(2026, 8, 28, 10, 0, 0, tzinfo=timezone.utc)
     next_t = base_t + timedelta(hours=5)
 
@@ -46,7 +46,7 @@ def test_replay_clock_max_speed_does_not_sleep():
 
 
 def test_replay_clock_retrograde_or_same_timestamp_does_not_sleep():
-    """If next timestamp is <= previous timestamp, delay is 0.0."""
+    """Bila timestamp berikutnya <= timestamp sebelumnya, jedanya 0.0."""
     base_t = datetime(2026, 8, 28, 10, 0, 0, tzinfo=timezone.utc)
     prev_t = base_t - timedelta(seconds=50)
 
@@ -58,7 +58,7 @@ def test_replay_clock_retrograde_or_same_timestamp_does_not_sleep():
 
 
 def test_replay_clock_invalid_speed_factor():
-    """Invalid speed factor raises ClockError."""
+    """Faktor kecepatan tidak valid melempar ClockError."""
     with pytest.raises(ClockError, match="Invalid speed factor"):
         ReplayClock(speed_factor=0.0)
 

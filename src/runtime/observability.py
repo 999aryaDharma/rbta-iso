@@ -8,7 +8,7 @@ from src.runtime.service import LiveRBTAService
 
 
 def derive_system_status(service: Optional[LiveRBTAService]) -> Tuple[str, List[str]]:
-    """Derive operational system status and diagnostics based on runtime truth."""
+    """Turunkan status sistem operasional dan diagnostik dari kondisi runtime yang sebenarnya."""
     if service is None:
         return "DEGRADED", ["Live service instance is uninitialized"]
 
@@ -46,7 +46,7 @@ def get_dashboard_summary(
     service: LiveRBTAService,
     evidence_store: RawAlertEvidenceStore,
 ) -> Dict[str, Any]:
-    """Build pure read-only dashboard summary KPIs using canonical research metrics."""
+    """Susun KPI ringkasan dashboard (murni read-only) memakai metrik penelitian kanonis."""
     raw_count = evidence_store.count()
     history = list(service.finalized_history)
     meta_count = len(history)
@@ -82,7 +82,7 @@ def get_dashboard_agents(
     service: LiveRBTAService,
     evidence_store: Optional[RawAlertEvidenceStore] = None,
 ) -> List[Dict[str, Any]]:
-    """Build a temporal-state snapshot with canonical names for legacy runs."""
+    """Susun snapshot state temporal dengan nama kanonis untuk run lama."""
     agents = service.engine.snapshot_agents()
     if evidence_store is None:
         return agents
@@ -97,12 +97,12 @@ def get_dashboard_agents(
 
 
 def get_dashboard_buckets(service: LiveRBTAService) -> List[Dict[str, Any]]:
-    """Build pure snapshot of currently open RBTA buckets."""
+    """Susun snapshot bucket RBTA yang saat ini masih terbuka."""
     return service.engine.snapshot_buckets()
 
 
 class BucketNotActiveError(LookupError):
-    """Raised when no open bucket exists for the requested key."""
+    """Dilempar bila tidak ada bucket terbuka untuk kunci yang diminta."""
 
     def __init__(self, agent_id: str, rule_group_primary: str, finalized_meta_id: Optional[int] = None) -> None:
         self.agent_id = agent_id
@@ -126,11 +126,11 @@ def get_dashboard_bucket_raw_alerts(
     page: int = 1,
     page_size: int = 20,
 ) -> Dict[str, Any]:
-    """Resolve member raw alerts of one OPEN bucket, paginated and redacted.
+    """Ambil raw alert anggota satu bucket TERBUKA, dengan paginasi dan penyamaran.
 
-    Uses the same resolution envelope as the finalized MetaAlert raw-alerts
-    endpoint so the dashboard reuses one table contract. The reserved
-    ``meta_id`` is echoed for display only; the bucket is not final.
+    Memakai envelope resolusi yang sama dengan endpoint raw-alerts MetaAlert final, sehingga
+    dashboard cukup memakai satu kontrak tabel. ``meta_id`` yang dicadangkan hanya ditampilkan;
+    bucket-nya belum final.
     """
     members = service.engine.active_bucket_members(agent_id, rule_group_primary)
     if members is None:
@@ -157,15 +157,15 @@ def get_dashboard_timeseries(
     evidence_store: RawAlertEvidenceStore,
     window_hours: int = 24,
 ) -> List[Dict[str, Any]]:
-    """Build time series aggregation of raw incoming alerts vs finalized MetaAlerts.
+    """Susun deret waktu raw alert yang masuk vs MetaAlert yang sudah final.
 
-    Raw alert counts are derived strictly from raw evidence persistence (including active buckets).
-    MetaAlert counts are derived from finalized MetaAlert end_time.
+    Jumlah raw alert diambil murni dari persistensi raw evidence (termasuk bucket aktif).
+    Jumlah MetaAlert diambil dari end_time MetaAlert final.
     """
     now = datetime.now(timezone.utc)
     start_time = now - timedelta(hours=window_hours)
 
-    # 1. Initialize hourly bins
+    # Siapkan bin per jam.
     bins: Dict[str, Dict[str, Any]] = {}
     for h in range(window_hours):
         bin_dt = start_time + timedelta(hours=h)
@@ -176,13 +176,13 @@ def get_dashboard_timeseries(
             "meta_alerts": 0,
         }
 
-    # 2. Populate raw alerts directly from raw evidence store
+    # Isi raw alert langsung dari raw evidence store.
     raw_hourly = evidence_store.count_by_hour(start_time, now)
     for k, v in raw_hourly.items():
         if k in bins:
             bins[k]["raw_alerts"] = v
 
-    # 3. Populate finalized MetaAlerts
+    # Isi MetaAlert final.
     for m in service.finalized_history:
         if m.end_time and m.end_time >= start_time:
             bin_key = m.end_time.strftime("%Y-%m-%d %H:00")
@@ -193,7 +193,7 @@ def get_dashboard_timeseries(
 
 
 def get_dashboard_system(service: LiveRBTAService) -> Dict[str, Any]:
-    """Build system metadata and model configuration DTO from authoritative pipeline artifacts."""
+    """Susun DTO metadata sistem dan konfigurasi model dari artefak pipeline."""
     pipeline = getattr(service, "scoring_pipeline", None)
 
     metadata = pipeline.metadata if pipeline and isinstance(pipeline.metadata, dict) else {}
@@ -235,7 +235,7 @@ def get_dashboard_system(service: LiveRBTAService) -> Dict[str, Any]:
 
 
 def get_dashboard_integrations(service: Optional[LiveRBTAService] = None) -> Dict[str, Any]:
-    """Return backend-truth integration statuses based on runtime state."""
+    """Kembalikan status integrasi sesuai kondisi runtime backend."""
     source_mode = getattr(service, "source_mode", "DEFERRED") if service else "DEFERRED"
 
     if source_mode == "DEFERRED":

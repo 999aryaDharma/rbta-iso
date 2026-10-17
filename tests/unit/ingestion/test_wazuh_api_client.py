@@ -1,4 +1,4 @@
-"""RED: custom API client must paginate {events,total,limit,offset} into canonical alerts."""
+"""Client custom API harus mem-paginasi {events,total,limit,offset} menjadi alert kanonis."""
 
 from unittest.mock import MagicMock, patch
 

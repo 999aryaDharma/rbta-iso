@@ -31,10 +31,10 @@ export function RawAlertsPage() {
 
   const withRunId = (path: string) => (runId ? `${path}${path.includes('?') ? '&' : '?'}run_id=${encodeURIComponent(runId)}` : path);
 
-  // Sync local search from URL
+  // Sinkronkan pencarian lokal dari URL
   useEffect(() => { setLocalSearch(urlSearch); }, [urlSearch]);
 
-  // Debounce search
+  // Debounce pencarian
   useEffect(() => {
     const timer = setTimeout(() => {
       if (localSearch !== urlSearch) {
@@ -61,7 +61,7 @@ export function RawAlertsPage() {
     staleTime: 5000,
   });
 
-  // Prefetch next page
+  // Prefetch halaman berikutnya
   useEffect(() => {
     const totalPages = data ? Math.ceil(data.filtered_total / RAW_ALERT_PAGE_SIZE) || 1 : 1;
     if (data && page < totalPages) {
@@ -97,7 +97,6 @@ export function RawAlertsPage() {
       />
 
       <div className="px-6 py-8 lg:px-10 space-y-6">
-        {/* Unresolved Evidence Warning Banner */}
         {data && data.unresolved_alert_ids && data.unresolved_alert_ids.length > 0 && (
           <Banner
             variant="alert"
@@ -107,7 +106,6 @@ export function RawAlertsPage() {
           />
         )}
 
-        {/* Filter Toolbar Card */}
         <div className="p-5 rounded-xl border border-kumo-hairline bg-kumo-canvas shadow-xs flex flex-wrap items-center justify-between gap-4">
           <div className="w-full sm:w-80">
             <InputGroup>
@@ -128,7 +126,6 @@ export function RawAlertsPage() {
           </div>
         </div>
 
-        {/* Raw Alerts Table Container */}
         <div className={`rounded-xl border border-kumo-hairline bg-kumo-canvas shadow-xs overflow-hidden transition-opacity ${isPlaceholderData ? 'opacity-70' : ''}`}>
           <Table>
             <Table.Header>
@@ -178,7 +175,6 @@ export function RawAlertsPage() {
             </Table.Body>
           </Table>
 
-          {/* Pagination */}
           <div className="px-6 py-4 border-t border-kumo-hairline bg-kumo-recessed/20">
             <Pagination
               page={page}

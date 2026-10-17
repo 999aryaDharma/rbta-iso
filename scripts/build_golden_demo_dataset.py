@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build a deterministic, bounded demo subset from real Wazuh JSONL data."""
+"""Bangun subset demo yang deterministik dan terbatas dari data JSONL Wazuh asli."""
 
 import argparse
 from contextlib import contextmanager
@@ -24,7 +24,7 @@ def open_text(path: Path, mode: str) -> Iterator[TextIO]:
 
 
 def build_golden(source: Path, output: Path, sample_size: int = 10_000, seed: int = 42) -> dict:
-    """Select the lowest seeded hashes, then write them in canonical event order."""
+    """Pilih hash ber-seed terkecil, lalu tulis dengan urutan event kanonis."""
     if sample_size < 1:
         raise ValueError("sample_size must be positive")
     heap: list[tuple[int, str, str, dict]] = []

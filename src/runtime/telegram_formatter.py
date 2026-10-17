@@ -1,4 +1,4 @@
-"""Canonical, escaped Telegram HTML formatter for MetaAlert notifications."""
+"""Formatter HTML Telegram kanonis (sudah di-escape) untuk notifikasi MetaAlert."""
 
 from html import escape
 from zoneinfo import ZoneInfo
@@ -32,11 +32,10 @@ def _format_window(scored_meta: ScoredMetaAlert) -> str:
 
 
 def format_telegram_alert(scored_meta: ScoredMetaAlert, run_id: str = "live") -> str:
-    """Format a scored MetaAlert as escaped Telegram HTML; no routing logic.
+    """Format MetaAlert terskor menjadi HTML Telegram yang sudah di-escape; tanpa logika routing.
 
-    Hierarchy: verdict header, identity, single action line, plain-sentence
-    context, score sentence, provenance, claim boundary. Blank lines split
-    sections so the message scans on a phone screen.
+    Urutan: header putusan, identitas, satu baris action, konteks dalam kalimat biasa, kalimat
+    skor, provenance, batas klaim. Baris kosong memisahkan bagian agar pesan mudah dibaca di layar HP.
     """
     tactics_str = ", ".join(scored_meta.mitre_tactics) if scored_meta.mitre_tactics else "Tidak ada"
     margin = float(scored_meta.anomaly_score) - float(scored_meta.threshold_used)

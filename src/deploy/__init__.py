@@ -1,1 +1,1 @@
-"""Deployment and container runtime validation package for RBTA service."""
+"""Paket validasi deployment dan runtime container untuk service RBTA."""

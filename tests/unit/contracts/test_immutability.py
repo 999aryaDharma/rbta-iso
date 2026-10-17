@@ -1,4 +1,4 @@
-"""Unit tests for recursive immutability utility and DTO defensive isolation."""
+"""Unit test utilitas immutability rekursif dan isolasi defensif DTO."""
 from types import MappingProxyType
 import pytest
 
@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 
 
 def test_freeze_value_primitives():
-    """Primitives should remain unchanged."""
+    """Primitif tidak berubah."""
     assert freeze_value(1) == 1
     assert freeze_value("hello") == "hello"
     assert freeze_value(3.14) == 3.14
@@ -17,7 +17,7 @@ def test_freeze_value_primitives():
 
 
 def test_freeze_value_recursive_dict_and_list():
-    """Nested dicts and lists must become MappingProxyType and tuples recursively."""
+    """Dict dan list bersarang harus menjadi MappingProxyType dan tuple secara rekursif."""
     data = {
         "user": {"name": "alice", "roles": ["admin", "analyst"]},
         "flags": {1, 2, 3},
@@ -30,7 +30,7 @@ def test_freeze_value_recursive_dict_and_list():
     assert isinstance(frozen["user"]["roles"], tuple)
     assert isinstance(frozen["flags"], frozenset)
 
-    # Attempt mutations
+    # Coba lakukan mutasi.
     with pytest.raises(TypeError):
         frozen["user"]["name"] = "bob"
 
@@ -42,7 +42,7 @@ def test_freeze_value_recursive_dict_and_list():
 
 
 def test_canonical_raw_alert_nested_mutation_and_defensive_isolation():
-    """CanonicalRawAlert must resist nested mutation and external source modification."""
+    """CanonicalRawAlert harus tahan terhadap mutasi bersarang dan perubahan sumber dari luar."""
     now = datetime.now(timezone.utc)
     source_meta = {
         "data": {"srcip": "1.2.3.4", "nested_list": [1, 2, 3]},
@@ -64,18 +64,18 @@ def test_canonical_raw_alert_nested_mutation_and_defensive_isolation():
         metadata=source_meta,
     )
 
-    # 1. Direct mutation of nested mapping raises TypeError
+    # Mutasi langsung pada mapping bersarang melempar TypeError.
     with pytest.raises(TypeError):
         alert.metadata["data"]["srcip"] = "8.8.8.8"
 
-    # 2. Direct mutation of nested list/tuple raises AttributeError (no append)
+    # Mutasi langsung pada list/tuple bersarang melempar AttributeError (tidak ada append).
     with pytest.raises(AttributeError):
         alert.metadata["rule_groups_all"].append("attack")
 
     with pytest.raises(AttributeError):
         alert.metadata["source_sort"].append("extra")
 
-    # 3. Defensive isolation: mutating the source dict does not mutate the DTO
+    # Isolasi defensif: mengubah dict sumber tidak mengubah DTO.
     source_meta["data"]["srcip"] = "8.8.8.8"
     source_meta["rule_groups_all"].append("attack")
     source_meta["new_field"] = "unexpected"

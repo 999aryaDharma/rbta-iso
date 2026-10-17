@@ -1,4 +1,4 @@
-"""Tests for canonical research orchestrator (phase order, delta-t propagation, subsets, input modes)."""
+"""Test orkestrator penelitian kanonis (urutan fase, propagasi delta-t, subset, mode input)."""
 
 from pathlib import Path
 import json
@@ -14,13 +14,13 @@ from src.research.orchestrator import (
 
 
 def test_missing_input_never_falls_back_to_fixture():
-    """Verify that a missing input file raises ResearchInputError / FileNotFoundError and fails fast."""
+    """File input yang tidak ada melempar ResearchInputError / FileNotFoundError dan langsung gagal."""
     with pytest.raises((ResearchInputError, FileNotFoundError)):
         run_canonical_research_pipeline(raw_file_path=Path("non_existent_file_12345.jsonl"))
 
 
 def test_fixture_mode_explicitly_marked_non_research(tmp_path):
-    """Verify that fixture mode sets research_results_valid_for_seminar=False in metadata."""
+    """Mode fixture mengisi research_results_valid_for_seminar=False di metadata."""
     fixture_alerts = _generate_engineering_smoke_fixture(n_alerts=50, seed=42)
     summary = run_canonical_research_pipeline(
         raw_alerts=fixture_alerts,
@@ -34,7 +34,7 @@ def test_fixture_mode_explicitly_marked_non_research(tmp_path):
 
 
 def test_auto_delta_selection_drives_final_rbta(tmp_path):
-    """Verify that in auto mode, recommended elbow delta-t drives final RBTA."""
+    """Di mode auto, delta-t elbow yang direkomendasikan dipakai untuk RBTA final."""
     fixture_alerts = _generate_engineering_smoke_fixture(n_alerts=60, seed=42)
     summary = run_canonical_research_pipeline(
         raw_alerts=fixture_alerts,
@@ -50,7 +50,7 @@ def test_auto_delta_selection_drives_final_rbta(tmp_path):
 
 
 def test_manual_delta_override_is_explicit(tmp_path):
-    """Verify that manual delta override is explicitly recorded and drives final RBTA."""
+    """Override delta manual dicatat eksplisit dan dipakai untuk RBTA final."""
     fixture_alerts = _generate_engineering_smoke_fixture(n_alerts=60, seed=42)
     summary = run_canonical_research_pipeline(
         raw_alerts=fixture_alerts,
@@ -66,7 +66,7 @@ def test_manual_delta_override_is_explicit(tmp_path):
 
 
 def test_runtime_uses_exactly_eight_subsets(tmp_path):
-    """Verify that the orchestrator executes runtime complexity proof with exactly 8 subsets."""
+    """Orkestrator menjalankan bukti kompleksitas runtime dengan tepat 8 subset."""
     fixture_alerts = _generate_engineering_smoke_fixture(n_alerts=60, seed=42)
     summary = run_canonical_research_pipeline(
         raw_alerts=fixture_alerts,
@@ -134,7 +134,7 @@ def test_directory_input_records_multi_file_corpus_provenance(tmp_path):
 
 
 def test_canonical_research_phase_order(tmp_path):
-    """Verify strictly ordered execution of research phases."""
+    """Fase penelitian dieksekusi dengan urutan yang ketat."""
     call_order = []
 
     fixture_alerts = _generate_engineering_smoke_fixture(n_alerts=60, seed=42)
@@ -231,6 +231,6 @@ def test_canonical_research_phase_order(tmp_path):
     filtered_calls = [c for c in call_order if c in expected_phases]
     assert filtered_calls == expected_phases
 
-    # Verify final RBTA had adaptive == True
+    # RBTA final memakai adaptive == True.
     init_call = [c for c in call_order if c.startswith("batch_runner_init")][0]
     assert "adaptive_True" in init_call

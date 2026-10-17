@@ -1,9 +1,9 @@
-"""Rule-Based Temporal Aggregation (RBTA) Core Package.
+"""Paket inti Rule-Based Temporal Aggregation (RBTA).
 
-Authoritative implementation of:
-- Agent-local temporal state and EMA-based Elastic Time Window (ETW)
-- Lossless bounded reorder buffer
-- Single-bucket deterministic RBTA engine
+Berisi implementasi:
+- State temporal lokal per agent dan Elastic Time Window (ETW) berbasis EMA
+- Reorder buffer terbatas tanpa kehilangan alert
+- Engine RBTA single-bucket yang deterministik
 """
 
 from src.rbta.engine import RBTAEngine, RBTAInvariantError

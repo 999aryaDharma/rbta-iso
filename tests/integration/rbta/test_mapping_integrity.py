@@ -1,4 +1,4 @@
-"""Mandatory Integration Proof: Lossless Mapping Integrity and Determinism (Task 2.4)."""
+"""Integration test: integritas pemetaan tanpa kehilangan alert dan determinisme."""
 from collections import Counter
 from datetime import datetime, timedelta, timezone
 import random
@@ -11,15 +11,15 @@ from src.rbta.reorder_buffer import LosslessReorderBuffer
 
 
 def generate_synthetic_stream() -> list[CanonicalRawAlert]:
-    """Generate a rich, deterministic synthetic canonical stream covering all required edge cases."""
+    """Bangkitkan aliran kanonis sintetis yang deterministik dan mencakup semua edge case yang dibutuhkan."""
     rng = random.Random(1337)
     base_t = datetime(2026, 8, 28, 8, 0, 0, tzinfo=timezone.utc)
     stream: list[CanonicalRawAlert] = []
 
-    # Agent 001: 120 events to exercise warmup (100) + adaptive ETW (20)
+    # Agent 001: 120 event untuk menguji warmup (100) + ETW adaptif (20).
     curr_t = base_t
     for i in range(120):
-        # Add slight jitter/burst
+        # Tambahkan sedikit jitter/burst.
         step = rng.choice([2, 5, 10, 15, 20])
         curr_t += timedelta(seconds=step)
         stream.append(
@@ -37,7 +37,7 @@ def generate_synthetic_stream() -> list[CanonicalRawAlert]:
             )
         )
 
-    # Agent 002: 110 events with different frequency (high frequency burst)
+    # Agent 002: 110 event dengan frekuensi berbeda (burst frekuensi tinggi).
     curr_t2 = base_t + timedelta(minutes=5)
     for i in range(110):
         curr_t2 += timedelta(seconds=rng.choice([1, 2, 3]))
@@ -56,8 +56,8 @@ def generate_synthetic_stream() -> list[CanonicalRawAlert]:
             )
         )
 
-    # Specific Edge Cases:
-    # 1. Same timestamps (gap == 0)
+    # Edge case khusus:
+    # 1. Timestamp sama (gap == 0)
     same_ts = base_t + timedelta(hours=2)
     stream.append(
         CanonicalRawAlert(
@@ -88,7 +88,7 @@ def generate_synthetic_stream() -> list[CanonicalRawAlert]:
         )
     )
 
-    # 2. Events exactly at delta-t boundary (15m) and near 60m boundary
+    # 2. Event tepat di batas delta-t (15m) dan dekat batas 60m
     span_start = base_t + timedelta(hours=3)
     for k in range(5):  # 0, 15m, 30m, 45m, 60m
         stream.append(
@@ -106,7 +106,7 @@ def generate_synthetic_stream() -> list[CanonicalRawAlert]:
             )
         )
 
-    # 3. Strongly late residual event (5 hours in the past)
+    # 3. Event residual yang sangat terlambat (5 jam ke belakang)
     stream.append(
         CanonicalRawAlert(
             wazuh_alert_id="edge_strongly_late",
@@ -122,7 +122,7 @@ def generate_synthetic_stream() -> list[CanonicalRawAlert]:
         )
     )
 
-    # 4. Duplicate Ingress ID (duplicate of a001_0005)
+    # 4. ID ingress duplikat (duplikat a001_0005)
     dup_alert = CanonicalRawAlert(
         wazuh_alert_id="a001_0005",
         timestamp=base_t + timedelta(minutes=1),
@@ -137,7 +137,7 @@ def generate_synthetic_stream() -> list[CanonicalRawAlert]:
     )
     stream.append(dup_alert)
 
-    # Shuffle stream to introduce out-of-order arrival
+    # Acak urutan aliran agar ada kedatangan out-of-order.
     shuffled_stream = list(stream)
     rng.shuffle(shuffled_stream)
 
@@ -145,7 +145,7 @@ def generate_synthetic_stream() -> list[CanonicalRawAlert]:
 
 
 def run_pipeline(stream: list[CanonicalRawAlert]) -> tuple[list[MetaAlert], RBTAEngine]:
-    """Execute standard RBTA streaming pipeline: ReorderBuffer -> RBTAEngine -> Drain."""
+    """Jalankan pipeline streaming RBTA standar: ReorderBuffer -> RBTAEngine -> Drain."""
     buffer = LosslessReorderBuffer(capacity=50)
     engine = RBTAEngine(base_delta_t=timedelta(minutes=15), adaptive=True)
     finalized: list[MetaAlert] = []
@@ -163,27 +163,27 @@ def run_pipeline(stream: list[CanonicalRawAlert]) -> tuple[list[MetaAlert], RBTA
 
 
 def test_full_mapping_integrity_and_event_conservation():
-    """Prove that the complete RBTA pipeline satisfies 100% event conservation and mapping integrity."""
+    """Pipeline RBTA lengkap memenuhi konservasi event 100% dan integritas pemetaan."""
     stream = generate_synthetic_stream()
     ingress_count = len(stream)
     unique_input_ids = {a.wazuh_alert_id for a in stream}
     expected_unique_count = len(unique_input_ids)
     duplicate_ingress_count = ingress_count - expected_unique_count
 
-    # Verify input stream composition
+    # Verifikasi komposisi aliran input.
     assert ingress_count == 239
     assert duplicate_ingress_count == 1
     assert expected_unique_count == 238
 
     finalized_metas, engine = run_pipeline(stream)
 
-    # 1. Total Alert Count Conservation Proof
+    # Jumlah total alert tetap utuh.
     total_aggregated_count = sum(m.alert_count for m in finalized_metas)
     assert total_aggregated_count == expected_unique_count, (
         f"Event conservation failed: aggregated {total_aggregated_count} vs unique input {expected_unique_count}"
     )
 
-    # 2. Source ID Membership Integrity Proof
+    # Keanggotaan ID sumber utuh.
     all_output_source_ids = [aid for m in finalized_metas for aid in m.wazuh_alert_ids]
     output_unique_ids = set(all_output_source_ids)
     missing_ids = unique_input_ids - output_unique_ids
@@ -196,18 +196,18 @@ def test_full_mapping_integrity_and_event_conservation():
     assert len(missing_ids) == 0, f"Found missing alert IDs: {missing_ids}"
     assert len(duplicate_memberships) == 0, f"Found duplicate memberships: {duplicate_memberships}"
 
-    # 3. Maximum Duration Invariant Proof (0 <= duration <= 60 minutes)
+    # Invarian durasi maksimum (0 <= durasi <= 60 menit).
     for m in finalized_metas:
         assert 0.0 <= m.duration_sec <= 3600.0, (
             f"MetaAlert {m.meta_id} duration {m.duration_sec}s outside allowed range [0, 3600]"
         )
 
-    # 4. Single-Bucket Semantic Proof
+    # Semantik single-bucket.
     for m in finalized_metas:
         assert m.rule_group_primary in {"pam", "syslog", "web", "sql_injection", "attack"}
         assert m.agent_id in {"001", "002"}
 
-    # 5. Agent Temporal State Isolation Proof
+    # Isolasi state temporal per agent.
     state_001 = engine._temporal_states["001"]
     state_002 = engine._temporal_states["002"]
 
@@ -218,7 +218,7 @@ def test_full_mapping_integrity_and_event_conservation():
 
 
 def test_deterministic_reproducibility_proof():
-    """Prove that running the exact same stream twice through fresh component instances yields identical output."""
+    """Aliran yang sama dijalankan dua kali lewat instance komponen baru menghasilkan output identik."""
     stream = generate_synthetic_stream()
 
     metas1, _ = run_pipeline(stream)

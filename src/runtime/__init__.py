@@ -1,4 +1,4 @@
-"""Runtime execution, durable state, live polling, coordination, and ingress package."""
+"""Paket runtime: eksekusi, state durable, polling live, koordinasi, dan ingress."""
 
 from src.runtime.durable_state import DurableStateManager
 from src.runtime.ingress import CollectorIngressBoundary, IngressPayloadError, IngressResult

@@ -1,4 +1,4 @@
-"""Durable runtime state persistence and crash recovery module."""
+"""Persistensi state runtime yang durable dan pemulihan setelah crash."""
 
 from collections import Counter
 from datetime import datetime, timezone
@@ -15,25 +15,24 @@ from src.rbta.temporal_state import AgentTemporalState
 
 logger = logging.getLogger(__name__)
 
-#: Version of the Wazuh canonicalizer derivation logic covered by
-#: :func:`compute_derivation_hash`. Bump when canonicalizer semantics change
-#: so drift detection fails closed instead of silently reusing stale state.
+# Versi logika derivasi canonicalizer Wazuh yang dicakup :func:`compute_derivation_hash`.
+# Naikkan bila semantik canonicalizer berubah, supaya deteksi drift gagal secara
+# tertutup alih-alih diam-diam memakai state lama.
 CANONICALIZER_VERSION = "1.0"
 
 
 def compute_derivation_hash() -> str:
-    """Compute a stable hash of the canonicalizer derivation config.
+    """Hitung hash stabil dari konfigurasi derivasi canonicalizer.
 
-    The canonicalizer derives ``agent_criticality`` and ``rule_group_primary``
-    from the domain tables in :mod:`src.config.domain`; any change to those
-    tables silently changes fingerprints, buckets, and features.  Hashing their
-    JSON-sorted representation (plus :data:`CANONICALIZER_VERSION`) lets the
-    live worker detect config drift against the hash stored alongside durable
-    state (fail-visible, never silent).
+    Canonicalizer menurunkan ``agent_criticality`` dan ``rule_group_primary`` dari tabel
+    domain di :mod:`src.config.domain`; perubahan apa pun pada tabel itu diam-diam mengubah
+    fingerprint, bucket, dan fitur. Hash dari representasi JSON terurutnya (ditambah
+    :data:`CANONICALIZER_VERSION`) membuat live worker bisa mendeteksi drift konfigurasi
+    terhadap hash yang disimpan bersama state durable (selalu terlihat, tidak pernah diam).
 
-    Fail-closed like model pinning: when the config cannot be read the error
-    propagates — there is deliberately no constant fallback, so a broken
-    config can never masquerade as a known-good derivation.
+    Gagal tertutup seperti pinning model: bila konfigurasi tidak bisa dibaca, error
+    diteruskan — sengaja tidak ada fallback konstanta, agar konfigurasi rusak tidak
+    pernah menyamar sebagai derivasi yang sudah benar.
     """
     from src.config.domain import (
         AGENT_CRITICALITY,
@@ -56,7 +55,7 @@ def compute_derivation_hash() -> str:
 
 
 class DurableStateManager:
-    """Manages durable state serialization and crash-recovery for RBTAEngine and runtime."""
+    """Mengelola serialisasi state durable dan pemulihan crash untuk RBTAEngine dan runtime."""
 
     def __init__(self, filepath: Union[str, Path] = "state/runtime_state.json", finalized_history_db_path: Optional[Union[str, Path]] = None) -> None:
         self.filepath: Path = Path(filepath).resolve()
@@ -122,16 +121,15 @@ class DurableStateManager:
             )
 
     def _assert_no_finalized_collision(self, new_finalized_history: List[Dict[str, Any]]) -> None:
-        """Fail closed when a batch meta_id already exists in finalized_history.
+        """Gagal tertutup bila meta_id dalam batch sudah ada di finalized_history.
 
-        N8: silently ignoring (INSERT OR IGNORE) would fork the meta_id stream —
-        the batch row is dropped while the in-memory counter has already moved
-        on. Checked with a read-only SELECT (chunked at 500) before any write,
-        so commit-only-on-success is preserved.
+        Mengabaikan diam-diam (INSERT OR IGNORE) akan membuat aliran meta_id bercabang —
+        baris batch terbuang sementara counter di memori sudah maju. Dicek dengan SELECT
+        read-only (per 500) sebelum ada penulisan, sehingga commit tetap hanya terjadi saat berhasil.
 
-        Idempotency: a colliding row whose stored scored_data is identical to
-        the batch item is a retried checkpoint, not a fork — it passes without
-        raising. Any divergent content under a committed meta_id still raises.
+        Idempotensi: baris yang bertabrakan tetapi scored_data-nya identik dengan item batch
+        adalah checkpoint yang di-retry, bukan cabang — lolos tanpa error. Isi yang berbeda di
+        bawah meta_id yang sudah di-commit tetap memicu error.
         """
         ids = [int(item["meta_id"]) for item in (new_finalized_history or [])]
         if not ids:
@@ -206,7 +204,7 @@ class DurableStateManager:
         sort_by: str = "end_time",
         sort_order: str = "desc",
     ) -> Tuple[List[Dict[str, Any]], int]:
-        """Query the append-only history in SQLite without loading it into RAM."""
+        """Query history append-only di SQLite tanpa memuatnya ke RAM."""
         sort_expressions = {
             "meta_id": "meta_id",
             "start_time": "json_extract(scored_data, '$.start_time')",
@@ -238,7 +236,7 @@ class DurableStateManager:
         return [json.loads(row[0]) for row in rows], int(total_row[0]) if total_row else 0
 
     def append_seen_alert_ids(self, alert_ids: Set[str]) -> None:
-        """Persist only IDs committed since the previous checkpoint."""
+        """Simpan hanya ID yang di-commit sejak checkpoint sebelumnya."""
         if not alert_ids:
             return
         with sqlite3.connect(self.history_db_path) as conn:
@@ -271,14 +269,14 @@ class DurableStateManager:
         source_document_id: str = "",
         error_type: str = "",
     ) -> int:
-        """Record a deterministically corrupt alert in durable quarantine (upsert).
+        """Catat alert yang rusak secara deterministik ke quarantine durable (upsert).
 
-        Repeat offenses against the same ID bump ``count``/``last_seen`` while
-        ``first_seen`` is preserved, so the quarantine table stays visible in
-        status without growing per retry.
+        Pelanggaran berulang pada ID yang sama menaikkan ``count``/``last_seen`` sementara
+        ``first_seen`` dipertahankan, sehingga tabel quarantine tetap terlihat di status
+        tanpa bertambah setiap retry.
 
-        Returns the per-ID ``count`` after this offense (1 on first offense),
-        so callers can log the first quarantine as an error and repeats as debug.
+        Mengembalikan ``count`` per ID setelah pelanggaran ini (1 pada pelanggaran pertama),
+        agar pemanggil bisa mencatat quarantine pertama sebagai error dan pengulangannya sebagai debug.
         """
         counts = self.quarantine_add_many([{
             "wazuh_alert_id": wazuh_alert_id,
@@ -289,11 +287,10 @@ class DurableStateManager:
         return counts[0]
 
     def quarantine_add_many(self, entries: List[Dict[str, Any]]) -> List[int]:
-        """Record a batch of quarantine entries in a single transaction.
+        """Catat sekumpulan entri quarantine dalam satu transaksi.
 
-        One connection / one commit for the whole batch (plus one read-back
-        for the resulting counts). Returns the per-ID ``count`` after this
-        flush, in entry order.
+        Satu koneksi / satu commit untuk seluruh batch (ditambah satu kali baca balik
+        untuk jumlah akhirnya). Mengembalikan ``count`` per ID setelah flush ini, sesuai urutan entri.
         """
         if not entries:
             return []
@@ -335,7 +332,7 @@ class DurableStateManager:
         return counts
 
     def quarantine_release(self, wazuh_alert_id: str) -> int:
-        """Delete one quarantined ID; returns affected rows (1 released, 0 absent)."""
+        """Hapus satu ID yang dikarantina; kembalikan jumlah baris terdampak (1 dilepas, 0 tidak ada)."""
         with sqlite3.connect(self.history_db_path) as conn:
             cursor = conn.execute(
                 "DELETE FROM quarantined_alerts WHERE wazuh_alert_id = ?",
@@ -345,15 +342,15 @@ class DurableStateManager:
             return int(cursor.rowcount or 0)
 
     def quarantine_count(self) -> int:
-        """Return COUNT(*) of quarantined alerts (agent status uses this, not len(list))."""
+        """Kembalikan COUNT(*) alert yang dikarantina (status memakai ini, bukan len(list))."""
         with sqlite3.connect(self.history_db_path) as conn:
             row = conn.execute("SELECT COUNT(*) FROM quarantined_alerts").fetchone()
         return int(row[0]) if row else 0
 
     def suppression_add(self, meta_id: int, reason: str) -> None:
-        """Suppress notification for one finalized meta ID (idempotent, first reason wins).
+        """Tahan notifikasi untuk satu meta ID final (idempoten, alasan pertama yang dipakai).
 
-        Called by the dispatcher agent via getattr; never raises on re-suppress.
+        Dipanggil oleh dispatcher lewat getattr; tidak pernah error bila ditahan ulang.
         """
         with sqlite3.connect(self.history_db_path) as conn:
             conn.execute(
@@ -363,16 +360,16 @@ class DurableStateManager:
             conn.commit()
 
     def suppression_count(self) -> int:
-        """Return COUNT(*) of suppressed notification meta IDs."""
+        """Kembalikan COUNT(*) meta ID yang notifikasinya ditahan."""
         with sqlite3.connect(self.history_db_path) as conn:
             row = conn.execute("SELECT COUNT(*) FROM suppressed_notifications").fetchone()
         return int(row[0]) if row else 0
 
     def notification_add(self, meta_id: int, run_id: str, verdict: str) -> int:
-        """Append one dispatcher notification verdict to notification_log.
+        """Tambahkan satu putusan notifikasi dispatcher ke notification_log.
 
-        Called by the dispatcher agent via getattr; returns the AUTOINCREMENT
-        row id of the appended verdict row.
+        Dipanggil oleh dispatcher lewat getattr; mengembalikan row id AUTOINCREMENT dari
+        baris putusan yang ditambahkan.
         """
         with sqlite3.connect(self.history_db_path) as conn:
             cursor = conn.execute(
@@ -383,13 +380,13 @@ class DurableStateManager:
             return int(cursor.lastrowid or 0)
 
     def notification_count(self) -> int:
-        """Return COUNT(*) of logged dispatcher notification verdicts."""
+        """Kembalikan COUNT(*) putusan notifikasi dispatcher yang tercatat."""
         with sqlite3.connect(self.history_db_path) as conn:
             row = conn.execute("SELECT COUNT(*) FROM notification_log").fetchone()
         return int(row[0]) if row else 0
 
     def notification_verdicts(self, limit: int = 100) -> List[str]:
-        """Return recent notification verdicts, newest first (shadow-run evidence)."""
+        """Kembalikan putusan notifikasi terbaru, yang terbaru lebih dulu (bukti shadow-run)."""
         with sqlite3.connect(self.history_db_path) as conn:
             rows = conn.execute(
                 "SELECT verdict FROM notification_log ORDER BY id DESC LIMIT ?",
@@ -398,17 +395,17 @@ class DurableStateManager:
         return [str(row[0]) for row in rows]
 
     def quarantine_id_set(self) -> Set[str]:
-        """Return just quarantined IDs as a set (cheap per-cycle skip filter).
+        """Kembalikan ID yang dikarantina saja sebagai set (filter skip yang murah per siklus).
 
-        Single-column SELECT, unlike :meth:`quarantine_list` which fetches
-        display columns newest-first for operator status visibility.
+        SELECT satu kolom, berbeda dengan :meth:`quarantine_list` yang mengambil kolom
+        tampilan urut terbaru untuk ditampilkan ke operator.
         """
         with sqlite3.connect(self.history_db_path) as conn:
             rows = conn.execute("SELECT wazuh_alert_id FROM quarantined_alerts").fetchall()
         return {str(row[0]) for row in rows}
 
     def quarantine_list(self) -> List[Dict[str, Any]]:
-        """Return quarantined alerts newest-first for operator status visibility."""
+        """Kembalikan alert yang dikarantina, terbaru lebih dulu, untuk ditampilkan ke operator."""
         with sqlite3.connect(self.history_db_path) as conn:
             conn.row_factory = sqlite3.Row
             rows = conn.execute(
@@ -419,13 +416,13 @@ class DurableStateManager:
         return [dict(row) for row in rows]
 
     def get_derivation_hash(self) -> Optional[str]:
-        """Return the stored canonicalizer derivation hash, or None when unset."""
+        """Kembalikan hash derivasi canonicalizer yang tersimpan, atau None bila belum ada."""
         with sqlite3.connect(self.history_db_path) as conn:
             row = conn.execute("SELECT derivation_hash FROM derivation_state WHERE id = 1").fetchone()
         return str(row[0]) if row else None
 
     def set_derivation_hash(self, derivation_hash: str) -> None:
-        """Persist the canonicalizer derivation hash for worker drift comparison."""
+        """Simpan hash derivasi canonicalizer untuk dibandingkan worker saat cek drift."""
         with sqlite3.connect(self.history_db_path) as conn:
             conn.execute(
                 "INSERT OR REPLACE INTO derivation_state (id, derivation_hash) VALUES (1, ?)",
@@ -435,11 +432,11 @@ class DurableStateManager:
 
     @property
     def state_path(self) -> Path:
-        """Return resolved path to the state file."""
+        """Kembalikan path file state yang sudah di-resolve."""
         return self.filepath
 
     def _backup_legacy_mirror_once(self) -> None:
-        """Copy a non-1.2 JSON mirror to .pre-1.2.bak exactly once before overwrite."""
+        """Salin mirror JSON non-1.2 ke .pre-1.2.bak tepat satu kali sebelum ditimpa."""
         mirror_backup = self.filepath.with_name(self.filepath.name + ".pre-1.2.bak")
         try:
             if not self.filepath.exists() or mirror_backup.exists():
@@ -462,22 +459,22 @@ class DurableStateManager:
         new_finalized_history: Optional[List[Dict[str, Any]]] = None,
         pending_scoring: Optional[List[Dict[str, Any]]] = None,
     ) -> None:
-        """Atomically persist engine state, active buckets, seen alert IDs, pending scoring, and outbox to disk."""
+        """Simpan state engine, bucket aktif, ID alert seen, pending scoring, dan outbox ke disk secara atomik."""
         self.filepath.parent.mkdir(parents=True, exist_ok=True)
         
         tmp_file = self.filepath.with_suffix(".tmp")
 
-        # Seen IDs are append-only in SQLite so checkpoint cost is proportional
-        # to new events rather than rewriting the full replay history as JSON.
+        # ID seen disimpan append-only di SQLite sehingga biaya checkpoint sebanding dengan
+        # event baru, bukan menulis ulang seluruh riwayat replay sebagai JSON.
         new_seen_ids = set(getattr(engine, "_new_seen_alert_ids", set()))
 
-        # N8: fail closed on meta_id collision before any write in this checkpoint.
+        # Gagal tertutup bila meta_id bertabrakan, sebelum ada penulisan pada checkpoint ini.
         self._assert_no_finalized_collision(list(new_finalized_history or []))
 
-        # 1. Serialize Meta Counter
+        # Serialisasi meta counter.
         meta_id_counter = engine._meta_id_counter
 
-        # 2. Serialize Agent Temporal States
+        # Serialisasi state temporal agent.
         temporal_states_data: Dict[str, Dict[str, Any]] = {}
         for agent_id, state in engine._temporal_states.items():
             temporal_states_data[agent_id] = {
@@ -496,7 +493,7 @@ class DurableStateManager:
                 "_invalid_reason": state._invalid_reason,
             }
 
-        # 3. Serialize Active Buckets
+        # Serialisasi bucket aktif.
         active_buckets_data: List[Dict[str, Any]] = []
         for (agent_id, rule_group), bucket in engine._active_buckets.items():
             active_buckets_data.append({
@@ -527,8 +524,8 @@ class DurableStateManager:
             "outbox": outbox or [],
         }
 
-        # Serialize before any writes. A single SQLite commit is authoritative
-        # for both duplicate protection and the RBTA mutation it protects.
+        # Serialisasi dulu sebelum menulis apa pun. Satu commit SQLite menjadi acuan untuk
+        # proteksi duplikat sekaligus mutasi RBTA yang dilindunginya.
         serialized = json.dumps(payload, indent=2)
         history_rows = [(item["meta_id"], json.dumps(item)) for item in (new_finalized_history or [])]
         with sqlite3.connect(self.history_db_path) as conn:
@@ -544,10 +541,10 @@ class DurableStateManager:
         if hasattr(engine, "_new_seen_alert_ids"):
             engine._new_seen_alert_ids.difference_update(new_seen_ids)
 
-        # F13c: preserve a pre-1.2 mirror exactly once before it is overwritten.
+        # Simpan mirror pra-1.2 tepat satu kali sebelum ditimpa.
         self._backup_legacy_mirror_once()
 
-        # Compatibility/export mirror only; recovery always prefers SQLite.
+        # Hanya mirror untuk kompatibilitas/export; pemulihan selalu mengutamakan SQLite.
         try:
             tmp_file.write_text(serialized, encoding="utf-8")
             tmp_file.replace(self.filepath)
@@ -555,31 +552,29 @@ class DurableStateManager:
             logger.warning("Runtime JSON mirror could not be published; committed SQLite snapshot remains authoritative")
 
     def restore_state(self, engine: RBTAEngine, hydrate_seen_ids: bool = True) -> Dict[str, Any]:
-        """Restore internal engine structures from disk into the provided RBTAEngine instance.
+        """Pulihkan struktur internal engine dari disk ke instance RBTAEngine yang diberikan.
 
         Parameters
         ----------
         engine : RBTAEngine
-            Target engine instance to populate.
+            Instance engine tujuan yang akan diisi.
 
         Returns
         -------
         Dict[str, Any]
-            Restored metadata dictionary containing 'outbox' and 'source_checkpoint'.
+            Dict metadata hasil pemulihan berisi 'outbox' dan 'source_checkpoint'.
         """
-        # The state directory may have been removed between manager init and
-        # restore (e.g. operator cleanup). Recreate it so restore fails only
-        # on genuine corruption, not on a missing directory.
+        # Direktori state bisa saja terhapus di antara init manager dan restore (mis. dibersihkan
+        # operator). Buat ulang supaya restore hanya gagal karena korupsi sungguhan, bukan karena
+        # direktorinya tidak ada.
         self.history_db_path.parent.mkdir(parents=True, exist_ok=True)
         with sqlite3.connect(self.history_db_path) as conn:
             row = conn.execute("SELECT payload FROM runtime_snapshot WHERE id = 1").fetchone()
             if row is None:
-                # F13d fail-closed: a missing snapshot with surviving seen IDs
-                # means a partial/corrupt restore — never hydrate dedup into an
-                # empty engine, which would silently fork duplicate protection
-                # (engine without buckets/temporal state but with seen IDs).
-                # History-only state is still restorable: loading finalized
-                # history touches no dedup structures.
+                # Gagal tertutup: snapshot hilang tetapi ID seen masih ada berarti restore parsial/rusak —
+                # jangan pernah mengisi dedup ke engine kosong, karena itu diam-diam memecah proteksi duplikat
+                # (engine tanpa bucket/state temporal tetapi punya ID seen). State yang hanya berisi history
+                # tetap bisa dipulihkan: memuat finalized history tidak menyentuh struktur dedup.
                 seen_count = conn.execute("SELECT COUNT(*) FROM seen_alert_ids").fetchone()[0]
                 if int(seen_count or 0) > 0:
                     raise RuntimeError(
@@ -597,14 +592,14 @@ class DurableStateManager:
         else:
             engine._seen_alert_ids = self.load_seen_alert_ids() if hydrate_seen_ids else set()
             engine._new_seen_alert_ids = set()
-            # N8: history-only restore resumes the meta_id stream at MAX+1 so
-            # the next bucket cannot collide with already-committed history.
+            # Restore yang hanya berisi history melanjutkan aliran meta_id dari MAX+1 supaya
+            # bucket berikutnya tidak bertabrakan dengan history yang sudah di-commit.
             with sqlite3.connect(self.history_db_path) as conn:
                 max_row = conn.execute("SELECT MAX(meta_id) FROM finalized_history").fetchone()
             engine._meta_id_counter = int(max_row[0]) + 1 if max_row and max_row[0] is not None else 1
             return {"outbox": [], "source_checkpoint": {}, "finalized_history": self.load_finalized_history()}
 
-        # 1. Restore Seen IDs and Counter
+        # Pulihkan ID seen dan counter.
         legacy_seen_ids = set(data.get("seen_alert_ids", []))
         if legacy_seen_ids:
             self.append_seen_alert_ids(legacy_seen_ids)
@@ -612,7 +607,7 @@ class DurableStateManager:
         engine._new_seen_alert_ids = set()
         engine._meta_id_counter = int(data.get("meta_id_counter", 1))
 
-        # 2. Restore Temporal States
+        # Pulihkan state temporal.
         engine._temporal_states.clear()
         for agent_id, state_dict in data.get("temporal_states", {}).items():
             from datetime import timedelta
@@ -633,7 +628,7 @@ class DurableStateManager:
             state._invalid_reason = state_dict.get("_invalid_reason")
             engine._temporal_states[agent_id] = state
 
-        # 3. Restore Active Buckets
+        # Pulihkan bucket aktif.
         engine._active_buckets.clear()
         for b_dict in data.get("active_buckets", []):
             bucket = _ActiveBucket.__new__(_ActiveBucket)
@@ -655,8 +650,8 @@ class DurableStateManager:
 
             key = (bucket.agent_id, bucket.rule_group_primary)
             engine._active_buckets[key] = bucket
-            # Backward compatibility for state files created before agent_name
-            # was persisted with temporal state metadata.
+            # Kompatibilitas untuk file state yang dibuat sebelum agent_name ikut disimpan
+            # di metadata state temporal.
             state = engine._temporal_states.get(bucket.agent_id)
             if state and state.agent_name == "unknown" and bucket.agent_name:
                 state.agent_name = bucket.agent_name

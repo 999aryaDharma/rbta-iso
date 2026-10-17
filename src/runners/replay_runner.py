@@ -1,4 +1,4 @@
-"""Replay stream runner executing event-by-event inference over the shared Research Core."""
+"""Runner replay stream yang menjalankan inferensi event demi event di atas Research Core yang sama."""
 
 from datetime import datetime, timedelta
 from typing import Iterable, Iterator, List, Optional
@@ -13,20 +13,20 @@ from src.runners.clock import ReplayClock
 
 
 class ReplayStreamRunner:
-    """Replays raw alert streams with event-time wall-clock pacing and online inference.
+    """Me-replay aliran raw alert dengan tempo wall-clock event-time dan inferensi online.
 
     Parameters
     ----------
     scoring_pipeline : ScoringPipeline
-        Pre-loaded model scoring pipeline (inference only).
+        Scoring pipeline model yang sudah dimuat (hanya inferensi).
     clock : ReplayClock | None
-        Pacing clock controlling replay speed (default: MAX / non-blocking).
+        Clock yang mengatur kecepatan replay (default: MAX / non-blocking).
     base_delta_t : timedelta
-        Experiment aggregation time window.
+        Window waktu agregasi eksperimen.
     adaptive : bool
-        Whether to enable per-agent EMA adaptation after 100-event warmup.
+        Aktifkan adaptasi EMA per agent setelah warmup 100 event.
     reorder_capacity : int
-        Bounded reorder buffer capacity.
+        Kapasitas reorder buffer.
     """
 
     def __init__(
@@ -44,24 +44,24 @@ class ReplayStreamRunner:
         self.reorder_capacity: int = reorder_capacity
 
     def run(self, alerts: Iterable[CanonicalRawAlert]) -> Iterator[ScoredMetaAlert]:
-        """Stream raw canonical alerts, advance replay clock, and yield ScoredMetaAlerts on the fly.
+        """Alirkan raw alert kanonis, majukan replay clock, dan yield ScoredMetaAlert begitu terbentuk.
 
         Parameters
         ----------
         alerts : Iterable[CanonicalRawAlert]
-            Stream of raw canonical alerts.
+            Aliran raw alert kanonis.
 
         Yields
         ------
         ScoredMetaAlert
-            Scored, prioritized meta-alerts as they are finalized by RBTA.
+            Meta-alert terskor dan terprioritaskan saat difinalkan oleh RBTA.
         """
         buffer = LosslessReorderBuffer(capacity=self.reorder_capacity)
         engine = RBTAEngine(base_delta_t=self.base_delta_t, adaptive=self.adaptive)
         prev_ts: Optional[datetime] = None
 
         for alert in alerts:
-            # Advance replay clock
+            # Majukan replay clock.
             self.clock.wait(prev_ts, alert.timestamp)
             prev_ts = alert.timestamp
 
@@ -71,12 +71,12 @@ class ReplayStreamRunner:
                 for meta in finalized:
                     yield self.scoring_pipeline.score_single(meta)
 
-        # Drain reorder buffer
+        # Kuras reorder buffer.
         for ready in buffer.drain():
             finalized = engine.process(ready)
             for meta in finalized:
                 yield self.scoring_pipeline.score_single(meta)
 
-        # Drain remaining active buckets
+        # Kuras bucket aktif yang tersisa.
         for meta in engine.drain():
             yield self.scoring_pipeline.score_single(meta)

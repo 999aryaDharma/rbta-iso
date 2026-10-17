@@ -1,4 +1,4 @@
-"""Unit tests for ScoredMetaAlert DTO contract."""
+"""Unit test kontrak DTO ScoredMetaAlert."""
 from dataclasses import FrozenInstanceError
 from datetime import datetime, timezone
 import pytest
@@ -6,7 +6,7 @@ from src.contracts.scored_meta_alert import ScoredMetaAlert
 
 
 def test_scored_meta_alert_valid_instantiation():
-    """Test valid instantiation of ScoredMetaAlert."""
+    """Instansiasi ScoredMetaAlert yang valid."""
     t1 = datetime(2026, 8, 28, 5, 0, 0, tzinfo=timezone.utc)
     t2 = datetime(2026, 8, 28, 5, 15, 0, tzinfo=timezone.utc)
 
@@ -53,7 +53,7 @@ def test_scored_meta_alert_valid_instantiation():
 
 
 def test_scored_meta_alert_immutability():
-    """Test that ScoredMetaAlert attributes cannot be mutated after creation."""
+    """Atribut ScoredMetaAlert tidak bisa diubah setelah dibuat."""
     t1 = datetime(2026, 8, 28, 5, 0, 0, tzinfo=timezone.utc)
     features = {
         "max_severity": 3.0,
@@ -91,7 +91,7 @@ def test_scored_meta_alert_immutability():
 
 
 def test_scored_meta_alert_nested_features_immutability():
-    """Test that seven_features and metadata mappings cannot be mutated in place (FIX 7)."""
+    """Mapping seven_features dan metadata tidak bisa dimutasi in-place."""
     t1 = datetime(2026, 8, 28, 5, 0, 0, tzinfo=timezone.utc)
     features = {
         "max_severity": 3.0,
@@ -133,7 +133,7 @@ def test_scored_meta_alert_nested_features_immutability():
 
 
 def test_scored_meta_alert_invalid_decision_or_action():
-    """Test validation on decision and action values."""
+    """Validasi nilai decision dan action."""
     t1 = datetime(2026, 8, 28, 5, 0, 0, tzinfo=timezone.utc)
     features = {
         "max_severity": 3.0,

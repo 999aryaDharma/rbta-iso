@@ -1,4 +1,4 @@
-"""Governance tests for runners package (Sprint 6)."""
+"""Test batas tanggung jawab paket runner."""
 from pathlib import Path
 import re
 
@@ -6,7 +6,7 @@ RUNNERS_SRC = Path(__file__).resolve().parent.parent.parent.parent / "src" / "ru
 
 
 def test_no_model_fitting_in_replay_runner():
-    """Verify that ReplayStreamRunner does not call fit or train."""
+    """ReplayStreamRunner tidak boleh memanggil fit atau train."""
     replay_file = RUNNERS_SRC / "replay_runner.py"
     if replay_file.exists():
         content = replay_file.read_text(encoding="utf-8")
@@ -16,7 +16,7 @@ def test_no_model_fitting_in_replay_runner():
 
 
 def test_shared_core_usage_in_runners():
-    """Verify that batch and replay runners import and use the canonical RBTAEngine and SevenFeatureExtractor."""
+    """Batch runner dan replay runner harus meng-import dan memakai RBTAEngine serta SevenFeatureExtractor kanonis."""
     for py_file in RUNNERS_SRC.glob("*.py"):
         if py_file.name in ("__init__.py", "clock.py"):
             continue

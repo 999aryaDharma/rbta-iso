@@ -1,4 +1,4 @@
-"""Unit tests for single-bucket deterministic RBTAEngine (Task 2.3)."""
+"""Unit test RBTAEngine single-bucket yang deterministik."""
 from datetime import datetime, timedelta, timezone
 import pytest
 
@@ -18,7 +18,7 @@ def make_alert(
     mitre: tuple[str, ...] = (),
     crit: int = 1,
 ) -> CanonicalRawAlert:
-    """Helper to create CanonicalRawAlert with specific fields."""
+    """Helper untuk membuat CanonicalRawAlert dengan field tertentu."""
     return CanonicalRawAlert(
         wazuh_alert_id=alert_id,
         timestamp=ts,
@@ -33,10 +33,10 @@ def make_alert(
     )
 
 
-# ── Bucket Key Tests ─────────────────────────────────────────────────────────
+# Kunci bucket
 
 def test_same_agent_same_group_aggregates_into_same_bucket():
-    """Alerts for same agent and same rule group within delta_t merge into one bucket."""
+    """Alert dari agent dan rule group yang sama dalam delta_t digabung ke satu bucket."""
     engine = RBTAEngine(base_delta_t=timedelta(minutes=15))
     base_t = datetime(2026, 8, 28, 10, 0, 0, tzinfo=timezone.utc)
 
@@ -58,7 +58,7 @@ def test_same_agent_same_group_aggregates_into_same_bucket():
 
 
 def test_same_agent_different_group_creates_different_buckets():
-    """Alerts for same agent but different rule groups create separate active buckets."""
+    """Alert dari agent sama tetapi rule group berbeda membentuk bucket aktif terpisah."""
     engine = RBTAEngine(base_delta_t=timedelta(minutes=15))
     base_t = datetime(2026, 8, 28, 10, 0, 0, tzinfo=timezone.utc)
 
@@ -75,7 +75,7 @@ def test_same_agent_different_group_creates_different_buckets():
 
 
 def test_different_agent_same_group_creates_different_buckets():
-    """Alerts for different agents with same rule group create separate active buckets."""
+    """Alert dari agent berbeda dengan rule group sama membentuk bucket aktif terpisah."""
     engine = RBTAEngine(base_delta_t=timedelta(minutes=15))
     base_t = datetime(2026, 8, 28, 10, 0, 0, tzinfo=timezone.utc)
 
@@ -91,16 +91,16 @@ def test_different_agent_same_group_creates_different_buckets():
     assert agent_ids == {"001", "002"}
 
 
-# ── Merge / Split Boundary Semantics Tests ───────────────────────────────────
+# Semantik batas merge / split
 
 def test_gap_equal_to_delta_t_merges():
-    """Inclusive boundary: gap == delta_t MUST merge."""
+    """Batas inklusif: gap == delta_t HARUS di-merge."""
     base_dt = timedelta(minutes=10)
     engine = RBTAEngine(base_delta_t=base_dt)
     base_t = datetime(2026, 8, 28, 10, 0, 0, tzinfo=timezone.utc)
 
     a1 = make_alert("1", base_t)
-    # Exactly 10 minutes gap
+    # Gap tepat 10 menit.
     a2 = make_alert("2", base_t + timedelta(minutes=10))
 
     out1 = engine.process(a1)
@@ -114,13 +114,13 @@ def test_gap_equal_to_delta_t_merges():
 
 
 def test_gap_greater_than_delta_t_splits():
-    """gap > delta_t MUST split (finalize previous bucket and create new one)."""
+    """gap > delta_t HARUS split (finalkan bucket sebelumnya dan buat yang baru)."""
     base_dt = timedelta(minutes=10)
     engine = RBTAEngine(base_delta_t=base_dt)
     base_t = datetime(2026, 8, 28, 10, 0, 0, tzinfo=timezone.utc)
 
     a1 = make_alert("1", base_t)
-    # 10 minutes + 1 second -> split
+    # 10 menit + 1 detik -> split.
     a2 = make_alert("2", base_t + timedelta(minutes=10, seconds=1))
 
     out1 = engine.process(a1)
@@ -135,16 +135,16 @@ def test_gap_greater_than_delta_t_splits():
 
 
 def test_max_duration_60_minutes_boundary():
-    """Prospective duration <= 60 minutes merges; duration > 60 minutes splits."""
+    """Durasi prospektif <= 60 menit di-merge; durasi > 60 menit di-split."""
     engine = RBTAEngine(base_delta_t=timedelta(minutes=15))
     base_t = datetime(2026, 8, 28, 10, 0, 0, tzinfo=timezone.utc)
 
-    # Alerts arrive every 15 minutes (gap == delta_t)
+    # Alert datang setiap 15 menit (gap == delta_t).
     a1 = make_alert("1", base_t)
     a2 = make_alert("2", base_t + timedelta(minutes=15))
     a3 = make_alert("3", base_t + timedelta(minutes=30))
     a4 = make_alert("4", base_t + timedelta(minutes=45))
-    # Exactly 60 minutes from start_time -> duration == 60m (eligible)
+    # Tepat 60 menit dari start_time -> durasi == 60m (masih boleh).
     a5 = make_alert("5", base_t + timedelta(minutes=60))
 
     assert engine.process(a1) == []
@@ -154,7 +154,7 @@ def test_max_duration_60_minutes_boundary():
     out5 = engine.process(a5)
     assert out5 == []
 
-    # 60m + 1 second (gap 1s <= 15m, but prospective duration > 60m) -> splits!
+    # 60m + 1 detik (gap 1 detik <= 15m, tetapi durasi prospektif > 60m) -> split.
     a6 = make_alert("6", base_t + timedelta(minutes=60, seconds=1))
     out6 = engine.process(a6)
     assert len(out6) == 1
@@ -167,17 +167,17 @@ def test_max_duration_60_minutes_boundary():
     assert drained[0].wazuh_alert_ids == ("6",)
 
 
-# ── Residual Out-of-Order Semantics Tests ─────────────────────────────────────
+# Semantik residual out-of-order
 
 def test_earlier_residual_event_within_delta_t_expands_start_time():
-    """An earlier event within delta_t from bucket.start_time expands start_time safely."""
+    """Event yang lebih awal tetapi masih dalam delta_t dari bucket.start_time memperluas start_time dengan aman."""
     engine = RBTAEngine(base_delta_t=timedelta(minutes=10))
     base_t = datetime(2026, 8, 28, 10, 10, 0, tzinfo=timezone.utc)
 
     a1 = make_alert("1", base_t)
     engine.process(a1)
 
-    # a0 arrives with timestamp 5 minutes earlier than start_time
+    # a0 datang dengan timestamp 5 menit lebih awal dari start_time.
     a0 = make_alert("0", base_t - timedelta(minutes=5))
     out0 = engine.process(a0)
     assert out0 == []
@@ -192,33 +192,33 @@ def test_earlier_residual_event_within_delta_t_expands_start_time():
 
 
 def test_extremely_late_non_mergeable_event_creates_immediate_singleton():
-    """An extremely late event that cannot merge creates an immediate singleton without corrupting active bucket."""
+    """Event yang sangat terlambat dan tidak bisa di-merge langsung menjadi singleton tanpa merusak bucket aktif."""
     engine = RBTAEngine(base_delta_t=timedelta(minutes=10))
     base_t = datetime(2026, 8, 28, 10, 0, 0, tzinfo=timezone.utc)
 
-    # Active bucket at 10:00
+    # Bucket aktif pukul 10:00.
     a1 = make_alert("1", base_t)
     engine.process(a1)
 
-    # Late event 5 hours in the past
+    # Event terlambat 5 jam ke belakang.
     a_late = make_alert("LATE", base_t - timedelta(hours=5))
     out_late = engine.process(a_late)
 
-    # Immediately finalized singleton
+    # Singleton yang langsung difinalkan.
     assert len(out_late) == 1
     assert out_late[0].wazuh_alert_ids == ("LATE",)
     assert out_late[0].alert_count == 1
 
-    # Active bucket a1 remains intact
+    # Bucket aktif a1 tetap utuh.
     drained = engine.drain()
     assert len(drained) == 1
     assert drained[0].wazuh_alert_ids == ("1",)
 
 
-# ── Aggregation & Field Correctness Tests ──────────────────────────────────────
+# Kebenaran agregasi & field
 
 def test_aggregation_distributions_max_severity_and_mitre():
-    """Engine must accumulate distributions, max severity, case-insensitive MITRE tactics, and critical flag."""
+    """Engine harus mengakumulasi distribusi, severity maksimum, taktik MITRE tanpa membedakan huruf, dan flag kritis."""
     engine = RBTAEngine(base_delta_t=timedelta(minutes=15))
     base_t = datetime(2026, 8, 28, 10, 0, 0, tzinfo=timezone.utc)
 
@@ -240,7 +240,7 @@ def test_aggregation_distributions_max_severity_and_mitre():
 
 
 def test_contradictory_agent_criticality_raises_error():
-    """Contradictory agent_criticality for the same agent/bucket must fail fast."""
+    """agent_criticality yang bertentangan untuk agent/bucket yang sama harus langsung gagal."""
     engine = RBTAEngine(base_delta_t=timedelta(minutes=15))
     base_t = datetime(2026, 8, 28, 10, 0, 0, tzinfo=timezone.utc)
 
@@ -253,15 +253,15 @@ def test_contradictory_agent_criticality_raises_error():
 
 
 def test_failed_process_does_not_poison_seen_id_and_can_be_retried():
-    """A failed process() call must be failure-atomic: zero state mutation, ID not marked seen, and can be retried."""
+    """process() yang gagal harus atomik: tidak ada mutasi state, ID tidak ditandai seen, dan bisa dicoba ulang."""
     engine = RBTAEngine(base_delta_t=timedelta(minutes=15))
     base_t = datetime(2026, 8, 28, 10, 0, 0, tzinfo=timezone.utc)
 
-    # 1. Process Alert A successfully
+    # Proses alert A dengan sukses.
     alert_a = make_alert("alert_A", base_t, agent_id="001", crit=1)
     engine.process(alert_a)
 
-    # Snapshot baseline state before failure
+    # Snapshot state sebelum kegagalan.
     seen_before = set(engine._seen_alert_ids)
     temp_state = engine._temporal_states["001"]
     warmup_count_before = temp_state.warmup_event_count
@@ -273,12 +273,12 @@ def test_failed_process_does_not_poison_seen_id_and_can_be_retried():
     bucket_count_before = active_bucket.alert_count
     bucket_ids_before = list(active_bucket.wazuh_alert_ids)
 
-    # 2. Process Alert B with contradictory criticality -> must raise RBTAInvariantError
+    # Proses alert B dengan kritikalitas bertentangan -> harus melempar RBTAInvariantError.
     bad_alert_b = make_alert("alert_B", base_t + timedelta(minutes=2), agent_id="001", crit=3)
     with pytest.raises(RBTAInvariantError, match="Contradictory agent_criticality"):
         engine.process(bad_alert_b)
 
-    # 3. Assert zero observable mutation occurred from failed alert_B
+    # Tidak ada mutasi yang teramati akibat alert_B yang gagal.
     assert "alert_B" not in engine._seen_alert_ids
     assert engine._seen_alert_ids == seen_before
 
@@ -290,12 +290,12 @@ def test_failed_process_does_not_poison_seen_id_and_can_be_retried():
     assert active_bucket.alert_count == bucket_count_before
     assert active_bucket.wazuh_alert_ids == bucket_ids_before
 
-    # 4. Retry corrected Alert B (with matching crit=1)
+    # Coba ulang alert B yang sudah dikoreksi (crit=1 yang cocok).
     corrected_alert_b = make_alert("alert_B", base_t + timedelta(minutes=2), agent_id="001", crit=1)
     out_b = engine.process(corrected_alert_b)
     assert out_b == []
 
-    # Retry succeeded and mutated exactly once
+    # Retry berhasil dan memutasi tepat satu kali.
     assert "alert_B" in engine._seen_alert_ids
     current_temp_state = engine._temporal_states["001"]
     assert current_temp_state.warmup_event_count == warmup_count_before + 1
@@ -306,11 +306,11 @@ def test_failed_process_does_not_poison_seen_id_and_can_be_retried():
 
 
 def test_fixed_mode_engine_aggregates_without_adaptive_baseline_dependency():
-    """RBTAEngine in fixed mode (adaptive=False) aggregates correctly without requiring adaptive baseline."""
+    """RBTAEngine mode tetap (adaptive=False) mengagregasi dengan benar tanpa butuh baseline adaptif."""
     engine = RBTAEngine(base_delta_t=timedelta(minutes=15), adaptive=False)
     base_t = datetime(2026, 8, 28, 10, 0, 0, tzinfo=timezone.utc)
 
-    # Feed 150 events with identical timestamps
+    # Masukkan 150 event dengan timestamp identik.
     for i in range(150):
         alert = make_alert(f"same_{i}", base_t, agent_id="001", group="pam")
         engine.process(alert)
@@ -321,10 +321,10 @@ def test_fixed_mode_engine_aggregates_without_adaptive_baseline_dependency():
     assert drained[0].duration_sec == 0.0
 
 
-# ── Idempotency Tests ─────────────────────────────────────────────────────────
+# Idempotensi
 
 def test_duplicate_wazuh_alert_id_is_idempotent_no_op():
-    """Duplicate ingress with identical wazuh_alert_id must produce zero additional mutation."""
+    """Ingress duplikat dengan wazuh_alert_id identik tidak boleh menambah mutasi apa pun."""
     engine = RBTAEngine(base_delta_t=timedelta(minutes=15))
     base_t = datetime(2026, 8, 28, 10, 0, 0, tzinfo=timezone.utc)
 
@@ -332,7 +332,7 @@ def test_duplicate_wazuh_alert_id_is_idempotent_no_op():
     out1 = engine.process(a1)
     assert out1 == []
 
-    # Process exact same alert again
+    # Proses alert yang persis sama sekali lagi.
     out_dup = engine.process(a1)
     assert out_dup == []
 
@@ -342,10 +342,10 @@ def test_duplicate_wazuh_alert_id_is_idempotent_no_op():
     assert meta_list[0].wazuh_alert_ids == ("dup-1",)
 
 
-# ── Flush Idle Tests ──────────────────────────────────────────────────────────
+# Flush idle
 
 def test_flush_idle_strict_greater_than_delta_t():
-    """flush_idle only finalizes when idle_gap > current_delta_t (not at idle_gap == current_delta_t)."""
+    """flush_idle hanya memfinalkan saat idle_gap > current_delta_t (bukan saat idle_gap == current_delta_t)."""
     base_dt = timedelta(minutes=10)
     engine = RBTAEngine(base_delta_t=base_dt)
     base_t = datetime(2026, 8, 28, 10, 0, 0, tzinfo=timezone.utc)
@@ -353,23 +353,23 @@ def test_flush_idle_strict_greater_than_delta_t():
     a1 = make_alert("1", base_t)
     engine.process(a1)
 
-    # Exactly 10 minutes idle -> idle_gap == delta_t -> still merge eligible -> DO NOT FLUSH
+    # Idle tepat 10 menit -> idle_gap == delta_t -> masih boleh merge -> JANGAN flush.
     flush_exact = engine.flush_idle(base_t + timedelta(minutes=10))
     assert flush_exact == []
 
-    # 10 minutes + 1 second idle -> idle_gap > delta_t -> FLUSH
+    # Idle 10 menit + 1 detik -> idle_gap > delta_t -> flush.
     flush_over = engine.flush_idle(base_t + timedelta(minutes=10, seconds=1))
     assert len(flush_over) == 1
     assert flush_over[0].wazuh_alert_ids == ("1",)
 
-    # Subsequent flush returns empty
+    # Flush berikutnya mengembalikan list kosong.
     assert engine.flush_idle(base_t + timedelta(minutes=20)) == []
 
 
-# ── Drain and Determinism Tests ───────────────────────────────────────────────
+# Drain dan determinisme
 
 def test_drain_is_idempotent():
-    """drain() finalizes all active buckets and clears state; subsequent drains return empty."""
+    """drain() memfinalkan semua bucket aktif dan membersihkan state; drain berikutnya mengembalikan list kosong."""
     engine = RBTAEngine(base_delta_t=timedelta(minutes=15))
     base_t = datetime(2026, 8, 28, 10, 0, 0, tzinfo=timezone.utc)
 
@@ -384,7 +384,7 @@ def test_drain_is_idempotent():
 
 
 def test_deterministic_meta_ids_and_repeated_runs():
-    """Identical input sequence through fresh engines produces identical MetaAlert objects and IDs."""
+    """Urutan input identik lewat engine baru menghasilkan objek MetaAlert dan ID yang identik."""
     base_t = datetime(2026, 8, 28, 10, 0, 0, tzinfo=timezone.utc)
     alerts = [
         make_alert("1", base_t, group="pam"),
@@ -415,7 +415,7 @@ def test_deterministic_meta_ids_and_repeated_runs():
 
 
 def test_engine_public_seen_accessors():
-    """Verify seen_alert_count property and has_seen_alert accessor operate cleanly."""
+    """Property seen_alert_count dan accessor has_seen_alert bekerja dengan benar."""
     engine = RBTAEngine(base_delta_t=timedelta(minutes=15))
     base_t = datetime(2026, 8, 28, 10, 0, 0, tzinfo=timezone.utc)
 
@@ -427,7 +427,7 @@ def test_engine_public_seen_accessors():
     assert engine.has_seen_alert("alt-1")
     assert not engine.has_seen_alert("alt-2")
 
-    # Duplicate alert is idempotent and does not increment seen count
+    # Alert duplikat bersifat idempoten dan tidak menambah jumlah seen.
     engine.process(make_alert("alt-1", base_t + timedelta(minutes=1), group="pam"))
     assert engine.seen_alert_count == 1
 

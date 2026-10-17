@@ -1,4 +1,4 @@
-"""RED: indexer client must accept the CA_BUNDLE alias used in campus .env files."""
+"""Client indexer harus menerima alias CA_BUNDLE yang dipakai di file .env kampus."""
 
 from src.ingestion.wazuh_client import WazuhIndexerClient
 

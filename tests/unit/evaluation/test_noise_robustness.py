@@ -1,4 +1,4 @@
-"""Unit tests for Noise Robustness Evaluation (Sprint 8)."""
+"""Unit test evaluasi ketahanan noise."""
 from datetime import datetime, timedelta, timezone
 import pytest
 import pandas as pd
@@ -23,7 +23,7 @@ def make_alert(idx: int, ts: datetime, agent_id: str = "001", group: str = "pam"
 
 
 def test_noise_robustness_evaluates_exact_five_noise_rates():
-    """Noise robustness tests exactly [0.0, 0.05, 0.10, 0.20, 0.30]."""
+    """Uji ketahanan noise memakai tepat [0.0, 0.05, 0.10, 0.20, 0.30]."""
     assert NOISE_RATES == (0.0, 0.05, 0.10, 0.20, 0.30)
 
     base_t = datetime(2026, 8, 28, 10, 0, 0, tzinfo=timezone.utc)
@@ -39,7 +39,7 @@ def test_noise_robustness_evaluates_exact_five_noise_rates():
     assert sorted(result.summary_df["noise_rate"].unique()) == [0.0, 0.05, 0.10, 0.20, 0.30]
     assert result.summary_df.groupby("noise_rate")["injected_stream_sha256"].nunique().eq(1).all()
 
-    # Required output columns
+    # Kolom output wajib.
     required_cols = [
         "noise_rate",
         "variant",
@@ -57,14 +57,14 @@ def test_noise_robustness_evaluates_exact_five_noise_rates():
     for col in required_cols:
         assert col in result.summary_df.columns
 
-    # Baseline 0% noise has zero degradation
+    # Baseline noise 0% tidak mengalami degradasi.
     rows_0 = result.summary_df[result.summary_df["noise_rate"] == 0.0]
     assert rows_0["n_noise"].eq(0).all()
     assert rows_0["arr_degradation"].eq(0.0).all()
 
 
 def test_noise_absorption_traceability():
-    """Verify that noise absorption is computed via actual MetaAlert.wazuh_alert_ids."""
+    """Penyerapan noise dihitung dari MetaAlert.wazuh_alert_ids yang sebenarnya."""
     base_t = datetime(2026, 8, 28, 10, 0, 0, tzinfo=timezone.utc)
     alerts = [make_alert(i, base_t + timedelta(seconds=i * 10)) for i in range(50)]
 

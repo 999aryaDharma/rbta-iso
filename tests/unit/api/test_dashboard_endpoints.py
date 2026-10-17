@@ -78,11 +78,11 @@ def test_setup(tmp_path: Path):
 def test_auth_check_endpoint(test_setup):
     client, headers, _, _, _, _ = test_setup
 
-    # Without key -> 401
+    # Tanpa key -> 401
     resp_unauth = client.get("/api/v1/auth/check")
     assert resp_unauth.status_code == 401
 
-    # With key -> 200
+    # Dengan key -> 200
     resp_auth = client.get("/api/v1/auth/check", headers=headers)
     assert resp_auth.status_code == 200
     assert resp_auth.json()["authenticated"] is True
@@ -91,7 +91,7 @@ def test_auth_check_endpoint(test_setup):
 def test_dashboard_summary_and_verbatim_arr(test_setup):
     client, headers, service, evidence_store, _, _ = test_setup
 
-    # Insert 2 raw alerts
+    # Masukkan 2 raw alert.
     a1 = CanonicalRawAlert(
         wazuh_alert_id="aid-01",
         timestamp=datetime(2026, 8, 29, 12, 0, 0, tzinfo=timezone.utc),
@@ -145,7 +145,7 @@ def test_meta_alerts_raw_alerts_resolution_and_unresolved(test_setup):
     )
     service.ingest_alert(a1)
 
-    # Force a scored meta alert with resolved ID res-1 and missing ID res-unresolved
+    # Paksa satu meta-alert terskor dengan ID ter-resolve res-1 dan ID hilang res-unresolved.
     assert len(service.finalized_history) > 0 or len(service.engine.snapshot_buckets()) >= 0
     flushed = service.engine.flush_idle(datetime(2026, 8, 29, 14, 0, 0, tzinfo=timezone.utc))
     if flushed:
@@ -235,7 +235,7 @@ def test_meta_alert_trace_uses_evidence_resolution_contract(test_setup):
     flushed = service.engine.flush_idle(datetime(2026, 8, 29, 14, 0, tzinfo=timezone.utc))
     service.pending_scoring.extend(flushed)
     scored = service._drain_pending_scoring()[0]
-    # Preserve a missing source reference to ensure it is visible, not dropped.
+    # Pertahankan referensi sumber yang hilang agar tetap terlihat, bukan dibuang.
     scored = replace(scored, source_alert_ids=("trace-resolved", "trace-missing"))
     service.finalized_history[-1] = scored
 
@@ -278,10 +278,10 @@ def test_raw_alert_detail_redaction(test_setup):
 def test_replay_start_contract_and_datasets(test_setup):
     client, headers, _, _, replay_ctrl, datasets_dir = test_setup
 
-    # Create dummy dataset
+    # Buat dataset dummy.
     (datasets_dir / "demo.jsonl").write_text("{\"id\": \"1\", \"timestamp\": \"2026-08-29T10:00:00Z\", \"agent\": {\"id\": \"001\"}, \"rule\": {\"id\": \"1\", \"level\": 3, \"groups\": [\"syslog\"]}}\n", encoding="utf-8")
 
-    # List datasets
+    # Daftar dataset.
     resp_ds = client.get("/api/v1/replay/datasets", headers=headers)
     assert resp_ds.status_code == 200
     assert len(resp_ds.json()["items"]) == 1
@@ -296,7 +296,7 @@ def test_replay_start_contract_and_datasets(test_setup):
     assert catalog_status.json()["status"] == "COMPLETED"
     assert catalog_status.json()["pending_files"] == 0
 
-    # Start with Pydantic JSON body
+    # Mulai dengan body JSON Pydantic.
     resp_start = client.post(
         "/api/v1/replay/start",
         json={"dataset_name": "demo.jsonl", "speed_factor": "MAX"},

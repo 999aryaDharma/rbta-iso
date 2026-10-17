@@ -168,7 +168,6 @@ export function ReplayPipelineVisualizer({
 
   return (
     <div className="rounded-xl border border-kumo-hairline bg-kumo-canvas p-6 shadow-xs space-y-6">
-      {/* Header & Status Indicator */}
       <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-kumo-hairline">
         <div className="space-y-1">
           <div className="flex items-center gap-3">
@@ -184,7 +183,6 @@ export function ReplayPipelineVisualizer({
           </p>
         </div>
 
-        {/* Runtime State Badge */}
         <div className="flex items-center gap-2 font-mono text-xs">
           {isRunning && (
             <span className="flex items-center gap-1.5 px-3 py-1 rounded-md bg-kumo-recessed text-kumo-strong border border-kumo-hairline font-semibold">
@@ -218,14 +216,12 @@ export function ReplayPipelineVisualizer({
         </div>
       </div>
 
-      {/* Structured Flowchart Architecture: 3 Connected Phases */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         {phases.map((phase, pIdx) => (
           <div
             key={phase.phaseName}
             className="p-4 rounded-lg border border-kumo-hairline/80 bg-kumo-recessed/20 space-y-3 relative"
           >
-            {/* Phase Header */}
             <div className="flex items-center justify-between px-1">
               <span className="text-[10px] font-bold text-kumo-subtle tracking-wider uppercase">
                 {phase.phaseName}
@@ -235,7 +231,6 @@ export function ReplayPipelineVisualizer({
               </span>
             </div>
 
-            {/* Phase Stage Cards (Connected Flowchart) */}
             <div className="space-y-2.5">
               {phase.stages.map((st, sIdx) => {
                 const isSelected = activeStage === st.id;
@@ -293,7 +288,6 @@ export function ReplayPipelineVisualizer({
                       )}
                     </button>
 
-                    {/* Flow Connector Arrow between intra-phase nodes */}
                     {sIdx < phase.stages.length - 1 && (
                       <div className="flex justify-center text-kumo-hairline py-0.5">
                         <span className="text-[10px] font-mono text-kumo-subtle flex items-center gap-1">

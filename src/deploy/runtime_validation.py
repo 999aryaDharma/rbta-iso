@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Container-side deployment runtime environment and artifact validator.
+"""Validator environment runtime dan artefak di sisi container.
 
-Validates the actual mounted runtime environment as the container user (UID 10001):
-1. UID check (assert 10001 when running on POSIX container)
-2. Model bundle registry load, metadata truth, and 7-feature schema verification
-3. Replay dataset readiness: discovers *.jsonl/*.jsonl.gz, validates non-empty, checks first event canonicalization, and proves read-only behavior
-4. State directory behavioral RW proof: write, flush, fsync, atomic rename, read, delete
+Memvalidasi environment runtime yang benar-benar ter-mount, dijalankan sebagai user container (UID 10001):
+1. Cek UID (harus 10001 bila berjalan di container POSIX)
+2. Muat registry bundle model, cocokkan metadata, dan verifikasi skema 7 fitur
+3. Kesiapan dataset replay: cari *.jsonl/*.jsonl.gz, pastikan tidak kosong, uji kanonisasi event pertama, dan buktikan mount read-only
+4. Uji perilaku RW direktori state: write, flush, fsync, atomic rename, read, delete
 """
 
 import json
@@ -21,12 +21,12 @@ from src.model.registry import ModelRegistry, ModelRegistryError
 
 
 class RuntimeValidationError(Exception):
-    """Raised when runtime environment, mounts, permissions, or artifacts fail validation."""
+    """Dilempar bila environment runtime, mount, permission, atau artefak gagal validasi."""
     pass
 
 
 def validate_user_identity(expected_uid: int = 10001, strict: bool = True) -> bool:
-    """Validate runtime effective user ID in container environments."""
+    """Validasi effective user ID di environment container."""
     if hasattr(os, "geteuid"):
         current_uid = os.geteuid()
         if current_uid != expected_uid:
@@ -42,7 +42,7 @@ def validate_model_artifacts(
     models_dir: Path,
     model_version: str,
 ) -> Dict[str, str]:
-    """Validate model bundle presence, checksums, metadata, and 7-feature schema."""
+    """Validasi keberadaan bundle model, checksum, metadata, dan skema 7 fitur."""
     if not model_version or not model_version.strip():
         raise RuntimeValidationError("RBTA_MODEL_VERSION environment variable is required and cannot be empty")
 
@@ -61,14 +61,14 @@ def validate_model_artifacts(
     except Exception as exc:
         raise RuntimeValidationError(f"Unexpected error loading model bundle '{model_version}': {exc}") from exc
 
-    # Validate metadata version truth
+    # Versi di metadata harus sesuai.
     loaded_version = bundle.metadata.get("model_version")
     if loaded_version != model_version:
         raise RuntimeValidationError(
             f"Model metadata version mismatch: loaded metadata['model_version']='{loaded_version}' != '{model_version}'"
         )
 
-    # Validate 7-feature schema
+    # Skema 7 fitur harus sesuai.
     features = bundle.schema.get("features", [])
     if len(features) != 7:
         raise RuntimeValidationError(
@@ -86,11 +86,11 @@ def validate_replay_datasets(
     replay_dir: Path,
     verify_read_only: bool = True,
 ) -> Dict[str, str]:
-    """Validate replay directory, JSONL/gzip presence, first record, and read-only mount."""
+    """Validasi direktori replay: ada JSONL/gzip, record pertama valid, dan mount read-only."""
     if not replay_dir.exists() or not replay_dir.is_dir():
         raise RuntimeValidationError(f"Replay archive directory does not exist: '{replay_dir}'")
 
-    # Discover candidate files (plain and gzip are both first-class replay formats)
+    # Cari file kandidat (plain dan gzip sama-sama format replay yang didukung).
     all_files = [p for p in replay_dir.iterdir() if p.is_file()]
     jsonl_files = [p for p in all_files if p.name.endswith((".jsonl", ".jsonl.gz"))]
     compressed_files = [
@@ -108,7 +108,7 @@ def validate_replay_datasets(
             f"Replay directory '{replay_dir}' contains zero *.jsonl datasets or *.jsonl.gz datasets. At least one is required."
         )
 
-    # Validate non-empty file and first event canonicalization
+    # File tidak boleh kosong dan event pertama harus lolos kanonisasi.
     valid_file: Optional[Path] = None
     for p in jsonl_files:
         if p.stat().st_size > 0:
@@ -120,7 +120,7 @@ def validate_replay_datasets(
             f"All discovered *.jsonl files in '{replay_dir}' are empty. At least one non-empty dataset is required."
         )
 
-    # Read and canonicalize first non-empty line
+    # Baca dan kanonisasi baris pertama yang tidak kosong.
     first_record_ok = False
     opener = gzip.open if valid_file.name.endswith(".gz") else open
     with opener(valid_file, "rt", encoding="utf-8") as f:
@@ -150,13 +150,13 @@ def validate_replay_datasets(
     if not first_record_ok:
         raise RuntimeValidationError(f"File '{valid_file.name}' contained no non-empty JSON lines.")
 
-    # Behavioral test for Read-Only mount if requested
+    # Uji perilaku mount read-only bila diminta.
     if verify_read_only and hasattr(os, "geteuid"):
         probe_path = replay_dir / f"__rbta_ro_write_probe_{uuid4()}__"
         try:
             with open(probe_path, "w", encoding="utf-8") as f:
                 f.write("illegal write on read-only mount\n")
-            # If write succeeded, fail validation
+            # Kalau penulisan berhasil, validasi gagal.
             try:
                 probe_path.unlink(missing_ok=True)
             except Exception:
@@ -165,7 +165,7 @@ def validate_replay_datasets(
                 f"Replay directory '{replay_dir}' is writable! Replay archive MUST be mounted read-only (:ro)."
             )
         except (PermissionError, OSError):
-            # Write rejection is the expected, correct behavior
+            # Penulisan memang seharusnya ditolak.
             pass
 
     return {
@@ -176,7 +176,7 @@ def validate_replay_datasets(
 
 
 def validate_state_directory_rw(state_dir: Path) -> None:
-    """Behaviorally prove that state directory supports write, flush, fsync, atomic rename, read, and delete."""
+    """Buktikan lewat perilaku bahwa direktori state mendukung write, flush, fsync, atomic rename, read, dan delete."""
     if not state_dir.exists():
         try:
             state_dir.mkdir(parents=True, exist_ok=True)
@@ -189,16 +189,16 @@ def validate_state_directory_rw(state_dir: Path) -> None:
     test_bytes = f"rbta_state_rw_proof_{probe_id}\n".encode("utf-8")
 
     try:
-        # 1. Create and write bytes
+        # Buat file dan tulis bytes.
         with open(temp_file, "wb") as f:
             f.write(test_bytes)
             f.flush()
             os.fsync(f.fileno())
 
-        # 2. Atomic rename
+        # Atomic rename.
         temp_file.replace(final_file)
 
-        # 3. Read back and verify
+        # Baca ulang dan verifikasi.
         read_back = final_file.read_bytes()
         if read_back != test_bytes:
             raise RuntimeValidationError(
@@ -209,7 +209,7 @@ def validate_state_directory_rw(state_dir: Path) -> None:
             f"State directory behavioral RW verification failed in '{state_dir}': {exc}"
         ) from exc
     finally:
-        # 4. Cleanup probe files safely
+        # Bersihkan file probe dengan aman.
         try:
             temp_file.unlink(missing_ok=True)
         except Exception:
@@ -228,7 +228,7 @@ def run_runtime_validation(
     strict_uid: bool = True,
     verify_ro: bool = True,
 ) -> Dict[str, Any]:
-    """Execute full container runtime readiness validation checklist."""
+    """Jalankan seluruh checklist validasi kesiapan runtime container."""
     models_dir = models_dir or Path(os.environ.get("RBTA_MODEL_REGISTRY_DIR", "/app/artifacts/models")).resolve()
     model_version = model_version or os.environ.get("RBTA_MODEL_VERSION", "")
     replay_dir = replay_dir or Path(os.environ.get("RBTA_REPLAY_DATA_DIR", "/app/data/replay")).resolve()
@@ -236,16 +236,12 @@ def run_runtime_validation(
     if state_dir.is_file() or state_dir.suffix == ".json":
         state_dir = state_dir.parent
 
-    # 1. User UID Check
     validate_user_identity(expected_uid=10001, strict=strict_uid)
 
-    # 2. Model Bundle Validation
     model_info = validate_model_artifacts(models_dir=models_dir, model_version=model_version)
 
-    # 3. Replay Datasets Validation
     replay_info = validate_replay_datasets(replay_dir=replay_dir, verify_read_only=verify_ro)
 
-    # 4. State Directory RW Behavioral Proof
     validate_state_directory_rw(state_dir=state_dir)
 
     return {
@@ -257,7 +253,7 @@ def run_runtime_validation(
 
 
 def main() -> int:
-    """CLI entrypoint for container execution via `python -m src.deploy.runtime_validation`."""
+    """Entrypoint CLI untuk dijalankan di container via `python -m src.deploy.runtime_validation`."""
     try:
         results = run_runtime_validation()
         print("==============================================================================")

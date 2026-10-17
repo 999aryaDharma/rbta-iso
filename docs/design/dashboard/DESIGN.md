@@ -1,7 +1,6 @@
 # RBTA + Isolation Forest Dashboard Design System
 
 **Project:** RBTA + Isolation Forest untuk Mitigasi Alert Fatigue pada Log Keamanan SIEM Wazuh
-**Sprint:** S11 — Dashboard & Demonstration Layer
 **Status:** Design System / UI Source of Truth
 **Frontend Stack:** React + TypeScript + Vite + Tailwind CSS v4 + @cloudflare/kumo + @phosphor-icons/react + TanStack Table + TanStack Query
 

@@ -1,21 +1,21 @@
-"""Unit tests for ScoreCalibration (Sprint 4)."""
+"""Unit test ScoreCalibration."""
 import pytest
 from src.model.calibration import CalibrationError, ScoreCalibration
 
 
 def test_score_calibration_valid():
-    """Score calibration correctly scales raw anomaly scores between raw_min and raw_max."""
+    """Kalibrasi skor menskalakan skor anomali mentah di antara raw_min dan raw_max dengan benar."""
     cal = ScoreCalibration(raw_min=0.30, raw_max=0.70)
     assert cal.calibrate(0.30) == pytest.approx(0.0)
     assert cal.calibrate(0.70) == pytest.approx(1.0)
     assert cal.calibrate(0.50) == pytest.approx(0.5)
-    # Extrapolation beyond reference range is preserved without arbitrary clamping
+    # Ekstrapolasi di luar rentang reference dipertahankan tanpa pembatasan sembarangan.
     assert cal.calibrate(0.90) == pytest.approx(1.5)
     assert cal.calibrate(0.10) == pytest.approx(-0.5)
 
 
 def test_score_calibration_degenerate_fails():
-    """If raw_max <= raw_min, ScoreCalibration must raise CalibrationError."""
+    """Bila raw_max <= raw_min, ScoreCalibration harus melempar CalibrationError."""
     with pytest.raises(CalibrationError, match="raw_max must be strictly greater than raw_min"):
         ScoreCalibration(raw_min=0.50, raw_max=0.50)
 
@@ -24,7 +24,7 @@ def test_score_calibration_degenerate_fails():
 
 
 def test_score_calibration_serialization_roundtrip():
-    """ScoreCalibration can serialize to/from dict/json without loss."""
+    """ScoreCalibration bisa diserialisasi ke/dari dict/json tanpa kehilangan data."""
     cal = ScoreCalibration(raw_min=0.25, raw_max=0.75, version="minmax-v1")
     data = cal.to_dict()
     assert data["raw_min"] == 0.25

@@ -1,4 +1,4 @@
-"""Unit tests for ModelArtifactRegistry and atomic staging publication (Sprint 4)."""
+"""Unit test ModelArtifactRegistry dan publikasi staging yang atomik."""
 from datetime import datetime, timezone
 from pathlib import Path
 import pytest
@@ -31,7 +31,7 @@ def make_meta(meta_id: int) -> MetaAlert:
 
 
 def test_registry_atomic_publish_and_load_roundtrip(tmp_path: Path):
-    """Registry publishes bundle atomically from staging and loads valid bundle with exact parameters."""
+    """Registry memublikasikan bundle secara atomik dari staging dan memuat bundle valid dengan parameter yang persis."""
     metas = [make_meta(i) for i in range(1, 40)]
     bundle = train_reference_pipeline(metas, random_state=42, model_version="rbta-if-test-v1")
 
@@ -46,7 +46,7 @@ def test_registry_atomic_publish_and_load_roundtrip(tmp_path: Path):
     assert (published_path / "feature_schema.json").exists()
     assert (published_path / "metadata.json").exists()
 
-    # Load bundle from registry
+    # Muat bundle dari registry.
     loaded_bundle = registry.load_bundle("rbta-if-test-v1")
     assert loaded_bundle.model.n_estimators == bundle.model.n_estimators
     assert loaded_bundle.calibration.raw_min == bundle.calibration.raw_min
@@ -56,14 +56,14 @@ def test_registry_atomic_publish_and_load_roundtrip(tmp_path: Path):
 
 
 def test_registry_missing_artifact_fails_fast(tmp_path: Path):
-    """If one of the 6 required artifact files is missing, loading fails with ModelRegistryError."""
+    """Bila salah satu dari 6 file artefak wajib hilang, pemuatan gagal dengan ModelRegistryError."""
     metas = [make_meta(i) for i in range(1, 40)]
     bundle = train_reference_pipeline(metas, random_state=42, model_version="v_incomplete")
 
     registry = ModelRegistry(base_dir=tmp_path)
     published_path = registry.publish_bundle(bundle, model_version="v_incomplete")
 
-    # Delete score_calibration.json
+    # Hapus score_calibration.json.
     (published_path / "score_calibration.json").unlink()
 
     with pytest.raises(ModelRegistryError, match="Missing required artifact"):
@@ -71,14 +71,14 @@ def test_registry_missing_artifact_fails_fast(tmp_path: Path):
 
 
 def test_registry_feature_schema_mismatch_fails(tmp_path: Path):
-    """If feature_schema.json does not match canonical FEATURE_COLUMNS, loading fails with ModelRegistryError."""
+    """Bila feature_schema.json tidak sesuai FEATURE_COLUMNS kanonis, pemuatan gagal dengan ModelRegistryError."""
     metas = [make_meta(i) for i in range(1, 40)]
     bundle = train_reference_pipeline(metas, random_state=42, model_version="v_bad_schema")
 
     registry = ModelRegistry(base_dir=tmp_path)
     published_path = registry.publish_bundle(bundle, model_version="v_bad_schema")
 
-    # Corrupt feature_schema.json
+    # Rusak feature_schema.json.
     schema_file = published_path / "feature_schema.json"
     schema_file.write_text('{"schema_version": "1.0", "features": ["bad_feature"]}', encoding="utf-8")
 
@@ -87,7 +87,7 @@ def test_registry_feature_schema_mismatch_fails(tmp_path: Path):
 
 
 def test_registry_manifest_created_and_verified(tmp_path: Path):
-    """Test that manifest.json is created with SHA-256 hashes and corrupting a file causes load to fail."""
+    """manifest.json dibuat dengan hash SHA-256 dan file yang dirusak membuat pemuatan gagal."""
     metas = [make_meta(i) for i in range(1, 40)]
     bundle = train_reference_pipeline(metas, random_state=42, model_version="v_manifest")
 
@@ -97,7 +97,7 @@ def test_registry_manifest_created_and_verified(tmp_path: Path):
     manifest_file = published_path / "manifest.json"
     assert manifest_file.exists()
 
-    # Corrupt a file to trigger checksum mismatch
+    # Rusak satu file untuk memicu checksum yang tidak cocok.
     score_file = published_path / "score_calibration.json"
     score_file.write_text('{"corrupted": true}', encoding="utf-8")
 
@@ -106,7 +106,7 @@ def test_registry_manifest_created_and_verified(tmp_path: Path):
 
 
 def test_registry_explicit_version(tmp_path: Path):
-    """Test explicit_version selection works and pointing to non-existent dir returns None."""
+    """Pemilihan explicit_version berfungsi dan menunjuk ke direktori yang tidak ada mengembalikan None."""
     metas = [make_meta(i) for i in range(1, 40)]
     bundle = train_reference_pipeline(metas, random_state=42, model_version="v_explicit_1")
 
@@ -122,7 +122,7 @@ def test_registry_explicit_version(tmp_path: Path):
 
 
 def test_registry_metadata_contains_reproducibility_fields(tmp_path: Path):
-    """Test that metadata includes git_commit, research_config_hash, feature_schema_version, training_run_id."""
+    """Metadata memuat git_commit, research_config_hash, feature_schema_version, training_run_id."""
     metas = [make_meta(i) for i in range(1, 40)]
     bundle = train_reference_pipeline(
         metas,
@@ -140,14 +140,14 @@ def test_registry_metadata_contains_reproducibility_fields(tmp_path: Path):
 
 
 def test_registry_missing_manifest_fails_load(tmp_path: Path):
-    """Loading a bundle without manifest.json must fail with ModelRegistryError."""
+    """Memuat bundle tanpa manifest.json harus gagal dengan ModelRegistryError."""
     metas = [make_meta(i) for i in range(1, 40)]
     bundle = train_reference_pipeline(metas, random_state=42, model_version="v_no_manifest")
 
     registry = ModelRegistry(base_dir=tmp_path)
     published_path = registry.publish_bundle(bundle, model_version="v_no_manifest")
 
-    # Delete manifest.json
+    # Hapus manifest.json.
     (published_path / "manifest.json").unlink()
 
     with pytest.raises(ModelRegistryError, match="Missing mandatory manifest"):
@@ -155,14 +155,14 @@ def test_registry_missing_manifest_fails_load(tmp_path: Path):
 
 
 def test_registry_incomplete_manifest_keys_fails(tmp_path: Path):
-    """Loading a bundle with incomplete manifest.json keys must fail."""
+    """Memuat bundle dengan key manifest.json yang tidak lengkap harus gagal."""
     metas = [make_meta(i) for i in range(1, 40)]
     bundle = train_reference_pipeline(metas, random_state=42, model_version="v_incomplete_manifest")
 
     registry = ModelRegistry(base_dir=tmp_path)
     published_path = registry.publish_bundle(bundle, model_version="v_incomplete_manifest")
 
-    # Write manifest missing a required file
+    # Tulis manifest yang kehilangan satu file wajib.
     manifest_file = published_path / "manifest.json"
     manifest_file.write_text('{"isolation_forest.joblib": "dummy"}', encoding="utf-8")
 
@@ -171,7 +171,7 @@ def test_registry_incomplete_manifest_keys_fails(tmp_path: Path):
 
 
 def test_registry_no_active_version_without_explicit_or_env(tmp_path: Path, monkeypatch):
-    """get_active_version() must return None when no explicit version or env var is set (no mtime fallback)."""
+    """get_active_version() harus mengembalikan None bila versi eksplisit maupun env var tidak diset (tanpa fallback mtime)."""
     monkeypatch.delenv("RBTA_MODEL_VERSION", raising=False)
     metas = [make_meta(i) for i in range(1, 40)]
     bundle = train_reference_pipeline(metas, random_state=42, model_version="v_mtime_test")
@@ -179,7 +179,7 @@ def test_registry_no_active_version_without_explicit_or_env(tmp_path: Path, monk
     registry = ModelRegistry(base_dir=tmp_path)
     registry.publish_bundle(bundle, model_version="v_mtime_test")
 
-    # Without explicit_version or env var, active version MUST be None (no mtime directory selection)
+    # Tanpa explicit_version atau env var, versi aktif HARUS None (tidak memilih direktori berdasarkan mtime).
     assert registry.get_active_version() is None
 
 

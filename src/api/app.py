@@ -27,7 +27,7 @@ def create_app(
     raw_evidence_store: Optional[RawAlertEvidenceStore] = None,
     replay_controller: Optional[ReplayController] = None,
 ) -> FastAPI:
-    """Factory creating configured FastAPI instance with dependency injection and modular routers."""
+    """Factory FastAPI: menyiapkan dependency injection dan memasang router modular."""
     app = FastAPI(
         title="RBTA Security Analytics REST Service",
         version="1.0.0",
@@ -37,7 +37,7 @@ def create_app(
     auth_key = api_key or os.getenv("RBTA_API_KEY")
     ingress_boundary = CollectorIngressBoundary(api_key=auth_key)
 
-    # Initialize runtime resolver for Live vs. Replay Run data isolation
+    # Resolver runtime memisahkan data live dari data replay run.
     scoring_pipe = service.scoring_pipeline if service else None
     if scoring_pipe is None and replay_controller:
         scoring_pipe = replay_controller.scoring_pipeline
@@ -121,12 +121,12 @@ def create_app(
 
     @app.get("/health", tags=["Monitoring"])
     def health() -> Dict[str, str]:
-        """Liveness check probe."""
+        """Liveness probe."""
         return {"status": "ok", "service": "rbta-security-analytics"}
 
     @app.get("/ready", tags=["Monitoring"])
     def ready() -> JSONResponse:
-        """Readiness probe validating model artifacts and runtime state."""
+        """Readiness probe: memeriksa artefak model dan state runtime."""
         if model_registry is not None and service is None:
             return JSONResponse(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -140,7 +140,7 @@ def create_app(
                     content={"ready": False, "reason": "No active model bundle or scoring pipeline configured"},
                 )
 
-            # Extract version from metadata or bundle
+            # Ambil versi dari metadata, kalau tidak ada dari bundle.
             version = "unknown"
             pipe = service.scoring_pipeline
             if hasattr(pipe, "metadata") and isinstance(pipe.metadata, dict):
@@ -179,7 +179,7 @@ def create_app(
 
     @app.get("/runtime/stats", tags=["Monitoring"])
     def runtime_stats(authorization: Optional[str] = Header(None)) -> Dict[str, Any]:
-        """Retrieve live runtime aggregation statistics."""
+        """Statistik agregasi runtime live."""
         verify_auth(authorization)
         if service is None:
             return {"status": "uninitialized"}
@@ -200,23 +200,22 @@ def create_app(
         }
     @app.get("/api/v1/live/status", tags=["Monitoring"])
     def live_status(authorization: Optional[str] = Header(None)) -> Dict[str, Any]:
-        """Read-only live ingestion status (L3). Never mutates service/coordinator state.
+        """Status ingestion live (read-only, tidak pernah mengubah state service/coordinator).
 
-        Honesty notes (F11):
-        * ``lag_sec`` is the *cycle age* (now - recent transport cursor), kept
-          for compatibility — it is NOT end-to-end event latency.
-        * ``buffer_size`` is None when the order buffer is disabled/absent
-          (unmeasured), never a fake 0. A real int means the buffer is
-          enabled and holding that many alerts.
-        * ``dispatcher`` / ``quarantine_total`` are null until the owning
-          agents wire those subsystems; null means "not provided", not zero.
-        * ``event_lag_sec`` is now - newest scored ``end_time`` across
-          history/outbox (public API only); null when no scored events exist.
+        Catatan makna field:
+        * ``lag_sec`` adalah *umur siklus* (now - cursor transport terakhir), dipertahankan
+          demi kompatibilitas; ini BUKAN latensi event end-to-end.
+        * ``buffer_size`` bernilai None bila order buffer nonaktif/tidak ada (tidak diukur),
+          bukan 0 palsu. Nilai int berarti buffer aktif dan sedang menahan sejumlah alert itu.
+        * ``dispatcher`` / ``quarantine_total`` bernilai null sampai subsistemnya terpasang;
+          null berarti "tidak tersedia", bukan nol.
+        * ``event_lag_sec`` = now - ``end_time`` terbaru yang sudah diskor di history/outbox
+          (hanya API publik); null bila belum ada event yang diskor.
         """
         import re as _re
 
         def _redact_host(value: Optional[str]) -> Optional[str]:
-            """Strip scheme://host (and any embedded credentials) from error text."""
+            """Buang scheme://host (beserta kredensial yang mungkin ikut) dari teks error."""
             if value is None:
                 return None
             return _re.sub(r"[a-zA-Z][a-zA-Z0-9+.-]*://[^/\s]+", "[host]", value)
@@ -231,7 +230,7 @@ def create_app(
                 worker_snapshot = {}
         alive = bool(worker_snapshot.get("alive", False)) if worker is not None else False
         last_error = worker_snapshot.get("last_error")
-        # Redacted: error as plain string only, host/credentials stripped, never response bodies.
+        # Disamarkan: error hanya berupa string, host/kredensial dibuang, response body tidak pernah ikut.
         last_error_str = _redact_host(str(last_error)) if last_error is not None else None
 
         source_state: Dict[str, Any] = {}
@@ -248,7 +247,7 @@ def create_app(
             except (ValueError, TypeError):
                 lag_sec = None
 
-        # F11: None = buffer disabled/absent (unmeasured), NOT empty.
+        # None = buffer nonaktif/tidak ada (tidak diukur), BUKAN kosong.
         buffer_size: Optional[int] = None
         buffer_stats: Optional[Dict[str, Any]] = None
         if worker is not None:
@@ -266,7 +265,7 @@ def create_app(
                 buffer_size = None
                 buffer_stats = None
 
-        # F11: dispatcher block owned by another agent; null until wired.
+        # Blok dispatcher bernilai null sampai dispatcher terpasang.
         dispatcher_status: Optional[Any] = None
         try:
             dispatcher = getattr(app.state, "telegram_dispatcher", None)
@@ -276,7 +275,7 @@ def create_app(
         except Exception:
             dispatcher_status = None
 
-        # F11: quarantine COUNT(*) preferred (no row loading); list fallback.
+        # Utamakan COUNT(*) quarantine (tanpa memuat baris); fallback ke list.
         quarantine_total: Optional[int] = None
         if service is not None:
             try:
@@ -292,10 +291,9 @@ def create_app(
             except Exception:
                 quarantine_total = None
 
-        # F11: event lag measured from the newest RAW ingested event-time
-        # (coordinator state), not from scored flush — idle-flush delay and
-        # quiet periods would otherwise false-alarm. Falls back to scored
-        # end_time when no ingest has been recorded yet.
+        # Lag event diukur dari event-time RAW terbaru yang di-ingest (state coordinator),
+        # bukan dari flush hasil skor — kalau tidak, jeda idle-flush dan periode sepi akan
+        # memicu alarm palsu. Fallback ke end_time hasil skor bila belum ada ingest.
         newest_ingested_event_time: Optional[str] = source_state.get("newest_ingested_event_time")
         newest_scored_event_time: Optional[str] = None
         event_lag_sec: Optional[float] = None
@@ -343,8 +341,8 @@ def create_app(
         if service is not None:
             outbox_pending = len(service.get_outbox())
 
-        # ingested_total: durable unique-alert count (dedup registry size).
-        # None when the counter is unavailable (unmeasured), never fake 0.
+        # ingested_total: jumlah alert unik yang durable (ukuran registry dedup).
+        # None bila counter tidak tersedia (tidak diukur), bukan 0 palsu.
         ingested_total: Optional[int] = None
         if service is not None:
             try:
@@ -381,7 +379,7 @@ def create_app(
         payload: Dict[str, Any],
         authorization: Optional[str] = Header(None),
     ) -> Dict[str, Any]:
-        """Ingest raw Wazuh log item via boundary canonicalization."""
+        """Ingest satu item log Wazuh mentah lewat kanonisasi di boundary."""
         verify_auth(authorization)
         if service is None:
             raise HTTPException(
@@ -408,7 +406,7 @@ def create_app(
         payload: Dict[str, Any],
         authorization: Optional[str] = Header(None),
     ) -> Dict[str, Any]:
-        """Ingest raw alert compatibility endpoint."""
+        """Endpoint kompatibilitas untuk ingest raw alert."""
         verify_auth(authorization)
         if service is None:
             raise HTTPException(
@@ -434,7 +432,7 @@ def create_app(
     def get_pending_outbox(
         authorization: Optional[str] = Header(None),
     ) -> Dict[str, Any]:
-        """Retrieve uncommitted scored meta-alerts waiting for external dispatch."""
+        """Ambil meta-alert terskor yang belum di-commit dan menunggu dispatch eksternal."""
         verify_auth(authorization)
         if service is None:
             return {"count": 0, "alerts": []}
@@ -446,7 +444,7 @@ def create_app(
     def get_outbox_v1(
         authorization: Optional[str] = Header(None),
     ) -> List[Dict[str, Any]]:
-        """Retrieve uncommitted outbox alerts list directly."""
+        """Ambil langsung daftar alert outbox yang belum di-commit."""
         verify_auth(authorization)
         if service is None:
             return []
@@ -457,7 +455,7 @@ def create_app(
         meta_id: int,
         authorization: Optional[str] = Header(None),
     ) -> Dict[str, Any]:
-        """Acknowledge dispatch of single meta alert."""
+        """Konfirmasi dispatch satu meta-alert."""
         verify_auth(authorization)
         if service is None:
             raise HTTPException(status_code=503, detail="Service uninitialized")
@@ -470,7 +468,7 @@ def create_app(
         meta_ids: List[int],
         authorization: Optional[str] = Header(None),
     ) -> Dict[str, Any]:
-        """Acknowledge successful dispatch of meta-alerts."""
+        """Konfirmasi dispatch meta-alert yang berhasil."""
         verify_auth(authorization)
         if service is None:
             return {"committed": 0, "remaining": 0}
@@ -483,12 +481,11 @@ def create_app(
         alert_id: str,
         authorization: Optional[str] = Header(None),
     ) -> Dict[str, Any]:
-        """Release one quarantined alert row so the next re-poll can retry ingest.
+        """Lepaskan satu baris alert yang dikarantina agar poll berikutnya bisa mencoba ingest ulang.
 
-        The row never reached ``seen`` (it failed before commit), so deleting
-        it simply un-blocks that ID — the following poll attempts a fresh
-        ingest. Returns ``{"released": 1}`` when a row was deleted,
-        ``{"released": 0}`` when the ID was absent.
+        Baris ini belum pernah masuk ``seen`` (gagal sebelum commit), jadi menghapusnya
+        hanya membuka blokir ID tersebut — poll berikutnya akan ingest ulang dari awal.
+        Mengembalikan ``{"released": 1}`` bila baris terhapus, ``{"released": 0}`` bila ID tidak ada.
         """
         verify_auth(authorization)
         state_manager = getattr(service, "state_manager", None) if service is not None else None
@@ -500,14 +497,14 @@ def create_app(
             )
         return {"released": int(release_fn(alert_id))}
 
-    # Mount Modular Dashboard APIRouters
+    # Router API dashboard.
     app.include_router(auth.router)
     app.include_router(dashboard.router)
     app.include_router(meta_alerts.router)
     app.include_router(raw_alerts.router)
     app.include_router(replay.router)
 
-    # Mount Dashboard Static Files for production serving
+    # Sajikan file statis dashboard untuk mode produksi.
     dashboard_dist_env = os.getenv("RBTA_DASHBOARD_DIST", "dashboard/dist")
     dashboard_dist_path = Path(dashboard_dist_env).resolve()
     if not dashboard_dist_path.exists():

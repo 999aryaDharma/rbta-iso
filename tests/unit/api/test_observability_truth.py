@@ -1,4 +1,4 @@
-"""Unit tests verifying observability truth, dynamic system_status derivation, truthful integrations, and raw timeseries."""
+"""Unit test: observability sesuai kenyataan, derivasi system_status dinamis, status integrasi jujur, dan timeseries raw."""
 
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -54,7 +54,7 @@ def test_scoring_pipeline(tmp_path: Path):
 
 
 def test_dashboard_system_observability_metadata_truth(tmp_path: Path, test_scoring_pipeline):
-    """Observability system metadata must reflect exact artifact fields without invented fallbacks."""
+    """Metadata sistem observability harus sama persis dengan field artefak tanpa fallback karangan."""
     state_mgr = DurableStateManager(tmp_path / "state.json")
     evidence_store = RawAlertEvidenceStore(tmp_path / "evidence.sqlite3")
 
@@ -77,7 +77,7 @@ def test_dashboard_system_observability_metadata_truth(tmp_path: Path, test_scor
 
 
 def test_system_status_derived_ready_and_degraded(tmp_path: Path, test_scoring_pipeline):
-    """system_status is dynamically derived: READY when all components intact, DEGRADED when broken."""
+    """system_status diturunkan dinamis: READY bila semua komponen utuh, DEGRADED bila ada yang rusak."""
     state_mgr = DurableStateManager(tmp_path / "state.json")
     evidence_store = RawAlertEvidenceStore(tmp_path / "evidence.sqlite3")
 
@@ -89,14 +89,14 @@ def test_system_status_derived_ready_and_degraded(tmp_path: Path, test_scoring_p
     assert get_dashboard_system(service)["system_status"] == "READY"
     assert get_dashboard_summary(service, evidence_store)["system_status"] == "READY"
 
-    # Corrupt pipeline metadata
+    # Rusak metadata pipeline.
     test_scoring_pipeline.metadata.pop("model_version", None)
     assert get_dashboard_system(service)["system_status"] == "DEGRADED"
     assert get_dashboard_summary(service, evidence_store)["system_status"] == "DEGRADED"
 
 
 def test_production_source_mode_deferred_by_default(tmp_path: Path):
-    """create_production_app defaults RBTA_SOURCE_MODE to DEFERRED and validates allowed values."""
+    """create_production_app memakai default RBTA_SOURCE_MODE = DEFERRED dan memvalidasi nilai yang diizinkan."""
     reg_dir = tmp_path / "models"
     state_file = tmp_path / "state.json"
     evidence_file = tmp_path / "evidence.sqlite3"
@@ -108,7 +108,7 @@ def test_production_source_mode_deferred_by_default(tmp_path: Path):
     registry = ModelRegistry(base_dir=reg_dir)
     registry.publish_bundle(bundle, model_version="prod-m1")
 
-    # 1. Default mode -> DEFERRED
+    # Mode default -> DEFERRED.
     env_default = {
         "RBTA_API_KEY": "test-key",
         "RBTA_MODEL_REGISTRY_DIR": str(reg_dir),
@@ -120,12 +120,12 @@ def test_production_source_mode_deferred_by_default(tmp_path: Path):
     srv1 = app1.state.runtime_resolver.live_service
     assert srv1.source_mode == "DEFERRED"
 
-    # Simulated restart: the OS releases the state lock on process exit.
+    # Restart simulasi: OS melepas lock state saat proses berhenti.
     from src.runtime.live_worker import release_state_lock
 
     release_state_lock(str(state_file))
 
-    # 2. Explicit LIVE mode
+    # Mode LIVE eksplisit.
     env_live = dict(env_default, RBTA_SOURCE_MODE="LIVE")
     app2 = create_production_app(env=env_live)
     srv2 = app2.state.runtime_resolver.live_service
@@ -133,18 +133,18 @@ def test_production_source_mode_deferred_by_default(tmp_path: Path):
 
     release_state_lock(str(state_file))
 
-    # 3. Invalid mode raises ValueError
+    # Mode tidak valid melempar ValueError.
     env_invalid = dict(env_default, RBTA_SOURCE_MODE="UNKNOWN_MODE")
     with pytest.raises(ValueError, match="RBTA_SOURCE_MODE"):
         create_production_app(env=env_invalid)
 
 
 def test_dashboard_integrations_truthful_status(tmp_path: Path, test_scoring_pipeline):
-    """get_dashboard_integrations reports truthful external statuses based on runtime context."""
+    """get_dashboard_integrations melaporkan status eksternal sesuai konteks runtime."""
     state_mgr = DurableStateManager(tmp_path / "state.json")
     evidence_store = RawAlertEvidenceStore(tmp_path / "evidence.sqlite3")
 
-    # When source_mode is DEFERRED
+    # Saat source_mode DEFERRED.
     service_def = LiveRBTAService(
         scoring_pipeline=test_scoring_pipeline,
         state_manager=state_mgr,
@@ -159,7 +159,7 @@ def test_dashboard_integrations_truthful_status(tmp_path: Path, test_scoring_pip
     assert integ_def["shuffle"]["status"] == "DEFERRED_EXTERNAL"
     assert integ_def["telegram"]["status"] == "DEFERRED_EXTERNAL"
 
-    # When source_mode is LIVE (no coordinator)
+    # Saat source_mode LIVE (tanpa coordinator).
     service_live = LiveRBTAService(
         scoring_pipeline=test_scoring_pipeline,
         state_manager=state_mgr,
@@ -171,7 +171,7 @@ def test_dashboard_integrations_truthful_status(tmp_path: Path, test_scoring_pip
 
 
 def test_timeseries_counts_active_buckets_as_raw_evidence(tmp_path: Path, test_scoring_pipeline):
-    """Raw timeseries counts come strictly from raw evidence store even while in active bucket."""
+    """Jumlah timeseries raw diambil murni dari raw evidence store, meski masih di bucket aktif."""
     state_mgr = DurableStateManager(tmp_path / "state.json")
     evidence_store = RawAlertEvidenceStore(tmp_path / "evidence.sqlite3")
 
@@ -207,12 +207,12 @@ def test_timeseries_counts_active_buckets_as_raw_evidence(tmp_path: Path, test_s
         agent_criticality=2,
     )
 
-    # Ingest 2 alerts into service -> stored in raw evidence store, active bucket created, NO finalized MetaAlert
+    # Ingest 2 alert ke service -> tersimpan di raw evidence store, bucket aktif terbentuk, BELUM ada MetaAlert final.
     service.ingest_alert(a1)
     service.ingest_alert(a2)
     assert len(service.finalized_history) == 0
 
-    # Query timeseries for window including current hour UTC
+    # Query timeseries untuk window yang mencakup jam UTC saat ini.
     ts_bins = get_dashboard_timeseries(service, evidence_store, window_hours=24)
     hour_key = base_t.strftime("%Y-%m-%d %H:00")
     target_bin = next((b for b in ts_bins if b["timestamp"] == hour_key), None)
@@ -220,12 +220,12 @@ def test_timeseries_counts_active_buckets_as_raw_evidence(tmp_path: Path, test_s
     assert target_bin["raw_alerts"] == 2
     assert target_bin["meta_alerts"] == 0
 
-    # Now drain service to finalize MetaAlert
+    # Kuras service untuk memfinalkan MetaAlert.
     scored = service.drain_and_score()
     assert len(scored) == 1
     assert len(service.finalized_history) == 1
 
-    # Query timeseries again -> raw_alerts remains 2, meta_alerts is now 1
+    # Query timeseries lagi -> raw_alerts tetap 2, meta_alerts sekarang 1.
     ts_bins_after = get_dashboard_timeseries(service, evidence_store, window_hours=24)
     target_bin_after = next((b for b in ts_bins_after if b["timestamp"] == hour_key), None)
     assert target_bin_after is not None
@@ -234,7 +234,7 @@ def test_timeseries_counts_active_buckets_as_raw_evidence(tmp_path: Path, test_s
 
 
 def test_dashboard_agents_resolves_legacy_unknown_name_from_canonical_evidence(tmp_path: Path):
-    """Completed legacy runs retain a host name even after their buckets drain."""
+    """Run lama yang sudah selesai tetap menyimpan nama host meski bucket-nya sudah dikuras."""
     from types import SimpleNamespace
     from src.rbta.engine import RBTAEngine
 
@@ -244,7 +244,7 @@ def test_dashboard_agents_resolves_legacy_unknown_name_from_canonical_evidence(t
     store.store(alert)
     engine.process(alert)
     engine.drain()
-    # Simulate a state file written before agent_name was persisted.
+    # Simulasikan file state yang ditulis sebelum agent_name ikut disimpan.
     engine._temporal_states[alert.agent_id].agent_name = "unknown"
 
     agents = get_dashboard_agents(SimpleNamespace(engine=engine), store)
@@ -252,7 +252,7 @@ def test_dashboard_agents_resolves_legacy_unknown_name_from_canonical_evidence(t
 
 
 def test_replay_run_provenance_uses_exact_model_version(tmp_path: Path, test_scoring_pipeline):
-    """ReplayController writes exact loaded model version to run.json without fallback."""
+    """ReplayController menulis versi model persis ke run.json tanpa fallback."""
     replay_data_dir = tmp_path / "replay_data"
     replay_data_dir.mkdir(parents=True)
     sample_jsonl = replay_data_dir / "test_sample.jsonl"

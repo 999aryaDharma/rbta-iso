@@ -1,9 +1,7 @@
-"""
-INTEGRATION EXAMPLE 2: Stream → RBTA → Isolation Forest (FULL PIPELINE)
-════════════════════════════════════════════════════════════════════════
+"""Contoh integrasi: stream → RBTA → Isolation Forest (pipeline lengkap).
 
-Real-time simulation with complete anomaly detection pipeline.
-This is closest to production setup.
+Simulasi real-time dengan pipeline deteksi anomali yang lengkap,
+paling mendekati setup produksi.
 """
 
 import sys
@@ -21,7 +19,7 @@ from src.engine.isolation_forest import run_pipeline as run_isolation_forest
 
 
 class FullPipelineProcessor:
-    """Stream → RBTA → IF scoring."""
+    """Stream → RBTA → scoring IF."""
     
     def __init__(self):
         self.raw_alerts = []
@@ -30,8 +28,8 @@ class FullPipelineProcessor:
         self.alert_count = 0
     
     def process_alert(self, alert):
-        """Receive alert from simulator."""
-        # Just buffer raw alerts (RBTA will handle bundling)
+        """Terima alert dari simulator."""
+        # Cukup tampung raw alert (pengelompokan dikerjakan RBTA).
         self.raw_alerts.append({
             'timestamp_utc': alert.get('timestamp_utc'),
             'agent_id': alert.get('agent_id'),
@@ -51,20 +49,20 @@ def main():
     print("INTEGRATION 2: Stream → RBTA → Isolation Forest")
     print("=" * 70)
     
-    # Step 1: Setup simulator
-    # speed_factor=100 means: real 100 seconds = 1 second simulation
-    # Dataset spans ~24 minutes → takes ~14 seconds to stream
+    # Langkah 1: siapkan simulator.
+    # speed_factor=100 berarti 100 detik nyata = 1 detik simulasi.
+    # Dataset mencakup ~24 menit → streaming selesai dalam ~14 detik.
     sim = AlertStreamSimulator(
         csv_path="data/raw/rbta_ready_all.csv",
-        speed_factor=100,           # 100x acceleration (real time / 100)
+        speed_factor=100,           # dipercepat 100x (waktu nyata / 100)
         log_file="output/06_stream_rbta_if.log",
-        log_level="INFO",            # Show progress logs
-        log_frequency=10000,         # Progress every 10k alerts
+        log_level="INFO",            # tampilkan log progres
+        log_frequency=10000,         # progres setiap 10k alert
     )
     
     processor = FullPipelineProcessor()
     
-    # Step 2: STREAMING PHASE
+    # Langkah 2: streaming.
     print("\n[STEP 1] Streaming alerts (with time-accurate replay)...")
     print("  ├─ Data spans ~24 minutes of real time")
     print("  ├─ Speed factor: 100x (real time acceleration)")
@@ -81,10 +79,10 @@ def main():
     print(f"  Rate: {len(processor.raw_alerts)/duration_stream:.0f} alerts/sec")
     print(f"  Real time span: {stats.duration_sec:.1f} sec (at 100x speed)")
     
-    # Step 3: RBTA BUCKETING
+    # Langkah 3: bucketing RBTA.
     print(f"\n[STEP 2] RBTA bucketing...")
     
-    # Convert to DataFrame
+    # Ubah ke DataFrame.
     df_alerts = pd.DataFrame(processor.raw_alerts)
     df_alerts = df_alerts.rename(columns={
         'timestamp_utc': 'timestamp',
@@ -105,17 +103,17 @@ def main():
     if len(df_meta) > 0:
         print(f"  Compression: {len(processor.raw_alerts)/len(df_meta):.1f}x")
     
-    # Step 4: ISOLATION FOREST SCORING
+    # Langkah 4: scoring Isolation Forest.
     print(f"\n[STEP 3] Isolation Forest scoring {len(df_meta):,} buckets...")
     
-    # Save RBTA buckets to temporary CSV for IF pipeline
+    # Simpan bucket RBTA ke CSV sementara untuk pipeline IF.
     temp_csv = Path("output/temp_rbta_for_if.csv")
     temp_csv.parent.mkdir(exist_ok=True)
     df_meta.to_csv(temp_csv, index=False)
     
     scored_buckets = None
     try:
-        # Call run_pipeline function
+        # Panggil fungsi run_pipeline.
         df_scored, model, scaler, theta = run_isolation_forest(
             csv_path=str(temp_csv),
             output_dir="output",
@@ -138,10 +136,10 @@ def main():
     
     print(f"✓ Scored {len(scored_buckets):,} buckets in {duration_if:.1f} sec")
     
-    # Step 5: ANALYSIS
+    # Langkah 5: analisis.
     print(f"\n[STEP 4] Pipeline Results:")
     
-    # Severity breakdown
+    # Rincian severity.
     sev_dist = {}
     for _, bucket in scored_buckets.iterrows():
         sev = int(bucket.get('rule_level', 0))
@@ -151,11 +149,11 @@ def main():
     for sev in sorted(sev_dist.keys()):
         print(f"    L{sev}: {sev_dist[sev]:,}")
     
-    # Anomaly counts
+    # Jumlah anomali.
     anomalies = scored_buckets[scored_buckets.get('escalate') == 1]
     print(f"\n  Anomalies detected: {len(anomalies):,} ({100*len(anomalies)/len(scored_buckets):.1f}%)")
     
-    # Agent breakdown
+    # Rincian agent.
     agent_anom = {}
     for _, bucket in anomalies.iterrows():
         agent = str(bucket.get('agent_name', 'unknown'))
@@ -166,7 +164,7 @@ def main():
         for agent, count in sorted(agent_anom.items(), key=lambda x: -x[1])[:5]:
             print(f"    {agent}: {count}")
     
-    # Timing summary
+    # Ringkasan waktu.
     total_time = duration_stream + duration_rbta + duration_if
     print(f"\n[STEP 5] Timing Summary:")
     print(f"  Streaming: {duration_stream:.1f}s ({100*duration_stream/total_time:.0f}%)")
@@ -174,12 +172,12 @@ def main():
     print(f"  IF:        {duration_if:.1f}s ({100*duration_if/total_time:.0f}%)")
     print(f"  TOTAL:     {total_time:.1f}s")
     
-    # Export sample anomalies
+    # Export sampel anomali.
     print(f"\n[STEP 6] Exporting results...")
     output_file = Path("output/06_stream_pipeline_anomalies.json")
     
     anomaly_export = []
-    for _, bucket in anomalies.head(100).iterrows():  # First 100
+    for _, bucket in anomalies.head(100).iterrows():  # 100 pertama
         anomaly_export.append({
             'agent_id': str(bucket.get('agent_id', '')),
             'agent_name': str(bucket.get('agent_name', '')),

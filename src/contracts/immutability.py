@@ -1,26 +1,26 @@
-"""Defensive recursive freezing utilities for canonical data contracts."""
+"""Utilitas pembekuan rekursif untuk kontrak data kanonis."""
 from types import MappingProxyType
 from typing import Any, Mapping
 
 
 def freeze_value(val: Any) -> Any:
-    """Recursively convert nested mutable data structures into immutable types.
+    """Ubah struktur data mutable bersarang menjadi tipe immutable secara rekursif.
 
-    Conversions:
-    - Mapping / dict -> MappingProxyType where all values are recursively frozen.
-    - list / tuple -> tuple where all elements are recursively frozen.
-    - set / frozenset -> frozenset where all elements are recursively frozen.
-    - Primitives and already-immutable objects are returned as-is.
+    Konversi:
+    - Mapping / dict -> MappingProxyType, semua value dibekukan rekursif.
+    - list / tuple -> tuple, semua elemen dibekukan rekursif.
+    - set / frozenset -> frozenset, semua elemen dibekukan rekursif.
+    - Primitif dan objek yang sudah immutable dikembalikan apa adanya.
 
     Parameters
     ----------
     val : Any
-        Input value to freeze recursively.
+        Nilai input yang akan dibekukan.
 
     Returns
     -------
     Any
-        Deeply immutable representation of the input.
+        Representasi input yang immutable sampai ke dalam.
     """
     if isinstance(val, Mapping):
         return MappingProxyType({k: freeze_value(v) for k, v in val.items()})

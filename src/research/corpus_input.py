@@ -1,4 +1,4 @@
-"""Deterministic loading and provenance for single-file or daily Wazuh corpora."""
+"""Pemuatan deterministik dan provenance untuk korpus Wazuh satu file atau harian."""
 
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -16,7 +16,7 @@ SUPPORTED_CORPUS_SUFFIXES = (".jsonl", ".jsonl.gz")
 
 
 class ResearchCorpusError(RuntimeError):
-    """Raised when a research corpus cannot be loaded without ambiguity."""
+    """Dilempar bila korpus penelitian tidak bisa dimuat tanpa ambiguitas."""
 
 
 @dataclass(frozen=True)
@@ -30,7 +30,7 @@ def _supported(path: Path) -> bool:
 
 
 def discover_research_inputs(source: Union[str, Path]) -> List[Path]:
-    """Return supported inputs in deterministic lexical order, excluding sidecars."""
+    """Kembalikan input yang didukung dalam urutan leksikal deterministik, tanpa file sidecar."""
     path = Path(source).expanduser()
     if not path.exists():
         raise FileNotFoundError(f"Research input not found: {path}")
@@ -72,7 +72,7 @@ def _sha256(path: Path) -> str:
 
 
 def load_research_corpus(source: Union[str, Path]) -> ResearchCorpus:
-    """Canonicalize a corpus, reject duplicate IDs, sort globally, and record provenance."""
+    """Kanonisasi korpus, tolak ID duplikat, urutkan secara global, dan catat provenance."""
     source_path = Path(source).expanduser()
     files = discover_research_inputs(source_path)
     alerts: List[CanonicalRawAlert] = []

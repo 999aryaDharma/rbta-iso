@@ -1,4 +1,4 @@
-"""Fixed tumbling time-window baseline implementation (time-only, non-contextual)."""
+"""Baseline fixed tumbling time-window (hanya waktu, tanpa konteks)."""
 
 from collections import Counter
 from dataclasses import dataclass
@@ -12,7 +12,7 @@ from src.evaluation.metrics import compute_arr
 
 @dataclass(frozen=True)
 class FixedWindowResult:
-    """Evaluation result for Fixed Tumbling Window Baseline."""
+    """Hasil evaluasi baseline Fixed Tumbling Window."""
 
     n_raw: int
     n_meta: int
@@ -24,19 +24,19 @@ def run_fixed_window_baseline(
     alerts: Iterable[CanonicalRawAlert],
     window_duration: timedelta = timedelta(minutes=15),
 ) -> FixedWindowResult:
-    """Partition incoming raw alerts strictly by tumbling calendar time windows.
+    """Partisi raw alert murni berdasarkan window waktu kalender (tumbling).
 
     Parameters
     ----------
     alerts : Iterable[CanonicalRawAlert]
-        Incoming sequence of canonical raw alerts.
+        Urutan raw alert kanonis yang masuk.
     window_duration : timedelta
-        Fixed time window slicing duration (default 15 minutes).
+        Durasi window tetap (default 15 menit).
 
     Returns
     -------
     FixedWindowResult
-        Aggregated results and computed ARR for fixed-window baseline.
+        Hasil agregasi dan ARR baseline fixed-window.
     """
     return _run_tumbling_window_baseline(alerts, window_duration, contextual=False)
 
@@ -47,7 +47,7 @@ def _run_tumbling_window_baseline(
     *,
     contextual: bool,
 ) -> FixedWindowResult:
-    """Shared calendar-window aggregator used by the two ablation baselines."""
+    """Agregator window kalender yang dipakai bersama oleh dua baseline ablation."""
     sorted_alerts = sorted(list(alerts), key=lambda a: a.timestamp)
     n_raw = len(sorted_alerts)
 
@@ -80,7 +80,7 @@ def _run_tumbling_window_baseline(
         rule_counts = Counter(a.rule_id for a in b_alerts)
         sev_counts = Counter(a.rule_level for a in b_alerts)
 
-        # Baseline combines across agents/groups
+        # Baseline ini menggabungkan lintas agent/group.
         first_a = b_alerts[0]
         agent_id = "baseline_mixed" if len(set(a.agent_id for a in b_alerts)) > 1 else first_a.agent_id
         agent_name = "baseline_mixed" if len(set(a.agent_name for a in b_alerts)) > 1 else first_a.agent_name

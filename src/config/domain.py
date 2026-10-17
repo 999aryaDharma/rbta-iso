@@ -1,6 +1,6 @@
-"""Domain configuration and authoritative constants for RBTA + Isolation Forest research.
+"""Konfigurasi domain dan konstanta acuan penelitian RBTA + Isolation Forest.
 
-Single source of truth for:
+Satu-satunya sumber untuk:
 - AGENT_CRITICALITY
 - GROUP_SEVERITY_WEIGHT
 - CRITICAL_MITRE_TACTICS
@@ -8,8 +8,8 @@ Single source of truth for:
 
 from typing import Sequence
 
-# ── Agent Criticality (Scale 1-4: Low=1, Medium=2, High=3, Critical=4) ────────
-# Domain asset criticality mapping for UPT TIK INSTIKI infrastructure.
+# Kritikalitas agent (skala 1-4: Low=1, Medium=2, High=3, Critical=4).
+# Pemetaan kritikalitas aset domain untuk infrastruktur UPT TIK INSTIKI.
 AGENT_CRITICALITY: dict[str, int] = {
     "soc-1": 1,
     "pusatkarir": 3,
@@ -41,19 +41,19 @@ CRITICALITY_SCORE_TO_LABEL: dict[int, str] = {
 
 
 def get_agent_criticality(agent_name: str | None, agent_id: str | None = None) -> int:
-    """Resolve agent criticality score (1-4) from agent name or ID.
+    """Tentukan skor kritikalitas agent (1-4) dari nama atau ID agent.
 
     Parameters
     ----------
     agent_name : str | None
-        Name of the agent (e.g. 'dfir-iris', 'pusatkarir').
+        Nama agent (mis. 'dfir-iris', 'pusatkarir').
     agent_id : str | None, optional
-        ID of the agent.
+        ID agent.
 
     Returns
     -------
     int
-        Criticality score in range [1, 4].
+        Skor kritikalitas dalam rentang [1, 4].
     """
     if agent_name:
         clean_name = str(agent_name).strip().lower()
@@ -68,8 +68,8 @@ def get_agent_criticality(agent_name: str | None, agent_id: str | None = None) -
     return DEFAULT_AGENT_CRITICALITY
 
 
-# ── Rule Group Severity Weights ───────────────────────────────────────────────
-# Semantic rule group ordering derived from average severity and domain analysis.
+# Bobot severity rule group.
+# Urutan semantik rule group diturunkan dari rata-rata severity dan analisis domain.
 GROUP_SEVERITY_WEIGHT: dict[str, int] = {
     "attack": 10,
     "sql_injection": 10,
@@ -99,20 +99,20 @@ DEFAULT_RULE_GROUP_WEIGHT: int = 2
 
 
 def resolve_primary_rule_group(groups: Sequence[str] | None) -> str:
-    """Select primary rule group using authoritative severity weights.
+    """Pilih rule group primer berdasarkan bobot severity.
 
-    If multiple groups exist, selects the group with the highest severity weight.
-    If weights are tied, preserves the first occurrence in Wazuh rule order.
+    Bila ada beberapa group, dipilih group dengan bobot severity tertinggi.
+    Bila bobotnya sama, dipertahankan kemunculan pertama sesuai urutan rule Wazuh.
 
     Parameters
     ----------
     groups : Sequence[str] | None
-        List of rule group names from Wazuh rule definition.
+        Daftar nama rule group dari definisi rule Wazuh.
 
     Returns
     -------
     str
-        Primary rule group name.
+        Nama rule group primer.
     """
     if not groups:
         return "unknown"
@@ -124,8 +124,8 @@ def resolve_primary_rule_group(groups: Sequence[str] | None) -> str:
     return max(clean_groups, key=lambda g: GROUP_SEVERITY_WEIGHT.get(g, DEFAULT_RULE_GROUP_WEIGHT))
 
 
-# ── Critical MITRE ATT&CK Tactics ─────────────────────────────────────────────
-# Authoritative set of high-risk tactics that elevate threat significance.
+# Taktik MITRE ATT&CK kritis.
+# Himpunan taktik berisiko tinggi yang menaikkan signifikansi ancaman.
 CRITICAL_MITRE_TACTICS: frozenset[str] = frozenset({
     "Execution",
     "Lateral Movement",
@@ -141,17 +141,17 @@ _CRITICAL_MITRE_TACTICS_LOWER: frozenset[str] = frozenset(
 
 
 def has_critical_mitre_tactic(tactics: Sequence[str] | None) -> bool:
-    """Check whether any tactic in the sequence belongs to CRITICAL_MITRE_TACTICS.
+    """Periksa apakah ada taktik dalam sequence yang termasuk CRITICAL_MITRE_TACTICS.
 
     Parameters
     ----------
     tactics : Sequence[str] | None
-        List or tuple of MITRE tactic names.
+        List atau tuple nama taktik MITRE.
 
     Returns
     -------
     bool
-        True if at least one critical tactic is present, False otherwise.
+        True bila minimal satu taktik kritis ada, False jika tidak.
     """
     if not tactics:
         return False

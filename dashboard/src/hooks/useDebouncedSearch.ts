@@ -6,12 +6,12 @@ export function useDebouncedSearch(paramName = 'search', delay = 300) {
   const urlValue = searchParams.get(paramName) || '';
   const [localValue, setLocalValue] = useState(urlValue);
 
-  // Sync from URL to local state when URL changes externally
+  // Sinkronkan URL ke state lokal bila URL berubah dari luar
   useEffect(() => {
     setLocalValue(urlValue);
   }, [urlValue]);
 
-  // Debounce local value to URL
+  // Debounce nilai lokal ke URL
   useEffect(() => {
     const timer = setTimeout(() => {
       if (localValue !== urlValue) {

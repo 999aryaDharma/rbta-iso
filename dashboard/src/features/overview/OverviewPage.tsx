@@ -52,7 +52,6 @@ export function OverviewPage() {
             ? `Konteks Replay: dataset historis (run ${runId}). ARR = reduksi unit triase, bukan akurasi; skor = prioritas, bukan vonis serangan.`
             : 'Konteks Live: arus alert langsung dari Indexer/API. ARR = reduksi unit triase, bukan akurasi; skor = prioritas, bukan vonis serangan.'}
         </p>
-        {/* Needs Investigation Banner */}
         {needsInvestigation.length > 0 && (
           <div className="p-6 rounded-xl bg-rose-500/5 shadow-xs space-y-5">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-rose-500/20">
@@ -118,7 +117,6 @@ export function OverviewPage() {
           </div>
         )}
 
-        {/* KPI Cards Grid */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-5">
           <MetricCard
             label="Alert Mentah Masuk"
@@ -176,7 +174,6 @@ export function OverviewPage() {
           />
         </div>
 
-        {/* Timeseries Ingestion Chart */}
         {timeseries && Array.isArray(timeseries) && timeseries.length > 0 && (
           <div className="p-6 rounded-xl border border-kumo-hairline bg-kumo-canvas shadow-xs space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-kumo-hairline">
@@ -205,7 +202,6 @@ export function OverviewPage() {
           </div>
         )}
 
-        {/* Recent MetaAlerts Table */}
         {recentMetas && recentMetas.items.length > 0 && (
           <div className="rounded-xl border border-kumo-hairline bg-kumo-canvas shadow-xs overflow-hidden">
             <div className="px-6 py-4 border-b border-kumo-hairline flex items-center justify-between">

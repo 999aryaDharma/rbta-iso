@@ -1,4 +1,4 @@
-"""Stateful live RBTA runtime service coordinating aggregation, scoring, and outbox."""
+"""Service runtime RBTA live yang stateful: mengoordinasikan agregasi, scoring, dan outbox."""
 
 from dataclasses import asdict
 from datetime import datetime, timedelta, timezone
@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 
 def _serialized(method):
-    """Serialize a complete service mutation, including its durable commit."""
+    """Serialkan satu mutasi service secara utuh, termasuk commit durable-nya."""
     @wraps(method)
     def wrapped(self, *args, **kwargs):
         with self._lock:
@@ -28,7 +28,7 @@ def _serialized(method):
 
 
 def _serialize_meta_alert(meta: MetaAlert) -> Dict[str, Any]:
-    """Convert MetaAlert to JSON-serializable dictionary."""
+    """Ubah MetaAlert menjadi dict yang bisa diserialisasi ke JSON."""
     return {
         "meta_id": meta.meta_id,
         "agent_id": meta.agent_id,
@@ -49,7 +49,7 @@ def _serialize_meta_alert(meta: MetaAlert) -> Dict[str, Any]:
 
 
 def _parse_meta_alert(item: Any) -> Optional[MetaAlert]:
-    """Parse dictionary or MetaAlert object safely."""
+    """Parse dict atau objek MetaAlert dengan aman."""
     if isinstance(item, MetaAlert):
         return item
     if isinstance(item, dict) and "meta_id" in item:
@@ -77,7 +77,7 @@ def _parse_meta_alert(item: Any) -> Optional[MetaAlert]:
 
 
 def _serialize_scored_alert(scored: ScoredMetaAlert) -> Dict[str, Any]:
-    """Convert ScoredMetaAlert to JSON-serializable dictionary."""
+    """Ubah ScoredMetaAlert menjadi dict yang bisa diserialisasi ke JSON."""
     return {
         "meta_id": scored.meta_id,
         "agent_id": scored.agent_id,
@@ -104,18 +104,18 @@ def _serialize_scored_alert(scored: ScoredMetaAlert) -> Dict[str, Any]:
 
 
 class LiveRBTAService:
-    """Live stateful operational service managing RBTA, online scoring, and outbox queueing.
+    """Service operasional live yang stateful: mengelola RBTA, scoring online, dan antrean outbox.
 
     Parameters
     ----------
     scoring_pipeline : ScoringPipeline
-        Pre-loaded model scoring pipeline.
+        Scoring pipeline model yang sudah dimuat.
     state_manager : DurableStateManager | None
-        Durable state manager for crash recovery.
+        Pengelola state durable untuk pemulihan crash.
     base_delta_t : timedelta
-        Experiment aggregation time window.
+        Window waktu agregasi eksperimen.
     adaptive : bool
-        Whether to enable per-agent EMA adaptation after 100-event warmup.
+        Aktifkan adaptasi EMA per agent setelah warmup 100 event.
     """
 
     RECENT_HISTORY_LIMIT = 1000
@@ -150,7 +150,7 @@ class LiveRBTAService:
         self.source_checkpoint: Dict[str, Any] = {}
         self._last_persisted_history_idx = 0
 
-        # Restore from durable state on startup
+        # Pulihkan dari state durable saat startup.
         self._restore_from_disk()
 
     def _parse_scored_alert(self, item: Any) -> Optional[ScoredMetaAlert]:
@@ -186,7 +186,7 @@ class LiveRBTAService:
         return None
 
     def _restore_from_disk(self) -> None:
-        """Attempt to restore engine state, pending scoring, and outbox from disk."""
+        """Coba pulihkan state engine, pending scoring, dan outbox dari disk."""
         restored = self.state_manager.restore_state(self.engine, hydrate_seen_ids=False)
         self.source_checkpoint = restored.get("source_checkpoint", {})
         raw_pending = restored.get("pending_scoring", [])
@@ -215,7 +215,7 @@ class LiveRBTAService:
 
     @_serialized
     def _persist_to_disk(self) -> None:
-        """Persist current state, pending scoring, and outbox to disk."""
+        """Simpan state saat ini, pending scoring, dan outbox ke disk."""
         if self.raw_evidence_store is not None and hasattr(self.raw_evidence_store, "flush"):
             self.raw_evidence_store.flush()
         pending_payload = [_serialize_meta_alert(item) for item in self.pending_scoring]
@@ -231,8 +231,8 @@ class LiveRBTAService:
             new_finalized_history=history_payload,
             pending_scoring=pending_payload,
         )
-        # SQLite is the authoritative duplicate index. Keep only a bounded hot
-        # set for fast repeated requests in the current process.
+        # SQLite adalah index duplikat acuan. Di memori cukup disimpan hot set terbatas
+        # untuk request berulang yang cepat di proses ini.
         if len(self.engine._seen_alert_ids) > 10_000:
             self.engine._seen_alert_ids = set(list(self.engine._seen_alert_ids)[-10_000:])
         if len(self.finalized_history) > self.RECENT_HISTORY_LIMIT:
@@ -241,16 +241,16 @@ class LiveRBTAService:
 
     @_serialized
     def checkpoint(self) -> None:
-        """Explicitly persist current durable state to disk."""
+        """Simpan state durable saat ini ke disk secara eksplisit."""
         self._persist_to_disk()
 
     @_serialized
     def _drain_pending_scoring(self, auto_persist: Optional[bool] = None) -> List[ScoredMetaAlert]:
-        """Score pending meta-alerts and safely commit them to outbox and history.
+        """Skor meta-alert yang tertunda lalu commit dengan aman ke outbox dan history.
 
-        Serialized with the service lock (reentrant RLock, so nested calls
-        from ingest/flush/shutdown are safe) so direct external calls cannot
-        race concurrent ingest/flush mutations.
+        Diserialkan dengan lock service (RLock reentrant, jadi pemanggilan bersarang dari
+        ingest/flush/shutdown aman) agar pemanggilan langsung dari luar tidak balapan dengan
+        mutasi ingest/flush yang berjalan bersamaan.
         """
         should_persist = self.auto_persist if auto_persist is None else auto_persist
         new_scored: List[ScoredMetaAlert] = []
@@ -278,26 +278,25 @@ class LiveRBTAService:
         auto_persist: Optional[bool] = None,
         original_payload: Optional[Dict[str, Any]] = None,
     ) -> List[ScoredMetaAlert]:
-        """Process an incoming canonical raw alert through RBTA and scoring.
+        """Proses raw alert kanonis yang masuk lewat RBTA dan scoring.
 
         Parameters
         ----------
         alert : CanonicalRawAlert
-            Incoming normalized alert.
+            Alert yang masuk, sudah dinormalisasi.
         auto_persist : bool | None
-            Whether to trigger synchronous state file flush on this alert.
+            Apakah alert ini memicu flush file state secara sinkron.
 
         Returns
         -------
         List[ScoredMetaAlert]
-            Any newly finalized and scored meta-alerts produced during this step.
+            Meta-alert yang baru difinalkan dan diskor pada langkah ini.
         """
         should_persist = self.auto_persist if auto_persist is None else auto_persist
         if self.raw_evidence_store is not None:
-            # We don't have original payload here directly, pass None
-            # NOTE: skip_conflict_check is a legacy no-op kept for API
-            # compatibility; the store always enforces canonical conflict
-            # detection, including for REPLAY source mode.
+            # Payload asli tidak tersedia di sini, jadi diteruskan None.
+            # CATATAN: skip_conflict_check adalah no-op lama yang dipertahankan untuk kompatibilitas
+            # API; store selalu menjalankan deteksi konflik kanonis, termasuk untuk mode sumber REPLAY.
             self.raw_evidence_store.store(
                 alert,
                 original_payload=original_payload,
@@ -320,19 +319,19 @@ class LiveRBTAService:
 
     @_serialized
     def check_idle_flush(self, current_event_time: datetime, auto_persist: Optional[bool] = None) -> List[ScoredMetaAlert]:
-        """Flush and score active buckets whose idle duration strictly exceeds delta_t.
+        """Flush dan skor bucket aktif yang lama idle-nya benar-benar melebihi delta_t.
 
         Parameters
         ----------
         current_event_time : datetime
-            Reference event timestamp.
+            Timestamp event acuan.
         auto_persist : bool | None
-            Whether to trigger synchronous state file flush.
+            Apakah memicu flush file state secara sinkron.
 
         Returns
         -------
         List[ScoredMetaAlert]
-            Any newly finalized and scored meta-alerts.
+            Meta-alert yang baru difinalkan dan diskor.
         """
         should_persist = self.auto_persist if auto_persist is None else auto_persist
         finalized_metas = self.engine.flush_idle(current_event_time)
@@ -344,18 +343,18 @@ class LiveRBTAService:
         return self._drain_pending_scoring(auto_persist=should_persist)
 
     def get_outbox(self) -> List[ScoredMetaAlert]:
-        """Retrieve unacknowledged scored meta-alerts in the outbox."""
+        """Ambil meta-alert terskor di outbox yang belum dikonfirmasi."""
         return list(self.outbox)
 
     @_serialized
     def acknowledge_outbox(self, meta_id: int) -> None:
-        """Acknowledge and remove a scored meta-alert from the outbox."""
+        """Konfirmasi dan hapus satu meta-alert terskor dari outbox."""
         self.outbox = [item for item in self.outbox if item.meta_id != meta_id]
         self._persist_to_disk()
 
     @_serialized
     def commit_outbox(self, meta_ids: List[int]) -> int:
-        """Acknowledge and remove multiple scored meta-alerts from the outbox."""
+        """Konfirmasi dan hapus beberapa meta-alert terskor dari outbox."""
         initial = len(self.outbox)
         self.outbox = [item for item in self.outbox if item.meta_id not in meta_ids]
         self._persist_to_disk()
@@ -377,13 +376,13 @@ class LiveRBTAService:
         return self._parse_scored_alert(raw) if raw else None
 
     def is_seen(self, wazuh_alert_id: str) -> bool:
-        """Check if an alert ID has already been committed in RBTAEngine."""
+        """Cek apakah ID alert sudah di-commit di RBTAEngine."""
         in_memory = self.engine.has_seen_alert(wazuh_alert_id) if hasattr(self.engine, "has_seen_alert") else (wazuh_alert_id in self.engine._seen_alert_ids)
         return in_memory or self.state_manager.has_seen_alert_id(wazuh_alert_id)
 
     @_serialized
     def drain_and_score(self) -> List[ScoredMetaAlert]:
-        """Drain all currently active engine buckets, score them, and persist."""
+        """Kuras semua bucket engine yang sedang aktif, skor, lalu simpan."""
         drained_metas = self.engine.drain()
         if drained_metas:
             self.pending_scoring.extend(drained_metas)
@@ -392,28 +391,28 @@ class LiveRBTAService:
         return []
 
     def get_live_source_state(self) -> Dict[str, Any]:
-        """Retrieve copy of durable live source transport state."""
+        """Ambil salinan state transport live source yang durable."""
         return dict(self.source_checkpoint)
 
     @_serialized
     def update_live_source_state(self, state: Dict[str, Any]) -> None:
-        """Update and atomically persist live source transport state."""
+        """Perbarui dan simpan state transport live source secara atomik."""
         self.source_checkpoint.update(state)
         self._persist_to_disk()
 
     @_serialized
     def shutdown(self, drain: bool = False) -> List[ScoredMetaAlert]:
-        """Perform a controlled shutdown, optionally draining active buckets.
+        """Shutdown terkendali, opsional dengan menguras bucket aktif.
 
         Parameters
         ----------
         drain : bool
-            Whether to finalize and flush all active buckets on shutdown.
+            Apakah semua bucket aktif difinalkan dan di-flush saat shutdown.
 
         Returns
         -------
         List[ScoredMetaAlert]
-            Any finalized meta-alerts flushed during drain.
+            Meta-alert final yang di-flush selama drain.
         """
         if drain:
             drained_metas = self.engine.drain()

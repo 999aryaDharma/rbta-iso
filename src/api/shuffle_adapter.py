@@ -1,4 +1,4 @@
-"""Shuffle SOAR webhook forwarder with retry and event idempotency header."""
+"""Forwarder webhook Shuffle SOAR dengan retry dan header idempotensi event."""
 
 import logging
 import time
@@ -21,23 +21,23 @@ class ShuffleDeliveryResult:
         return self.success
 
 class ShuffleForwarderError(RuntimeError):
-    """Raised when webhook dispatch to Shuffle fails."""
+    """Dilempar bila pengiriman webhook ke Shuffle gagal."""
     pass
 
 
 class ShuffleWebhookForwarder:
-    """Dispatches finalized and scored MetaAlerts to Shuffle SOAR workflow webhooks.
+    """Mengirim MetaAlert yang sudah final dan diskor ke webhook workflow Shuffle SOAR.
 
     Parameters
     ----------
     webhook_url : str
-        Target Shuffle webhook execution URL.
+        URL eksekusi webhook Shuffle tujuan.
     api_key : str | None
-        Optional webhook bearer token.
+        Bearer token webhook (opsional).
     timeout : Tuple[float, float]
-        (connect_timeout, read_timeout) in seconds.
+        (connect_timeout, read_timeout) dalam detik.
     max_retries : int
-        Max retry attempts on transient network errors.
+        Batas percobaan ulang saat error jaringan sementara.
     """
 
     def __init__(
@@ -56,17 +56,17 @@ class ShuffleWebhookForwarder:
         self._sleep_fn = sleep_fn
 
     def forward(self, scored_meta: ScoredMetaAlert) -> ShuffleDeliveryResult:
-        """Post scored meta-alert payload to Shuffle webhook with idempotent X-Event-ID header.
+        """Kirim payload meta-alert terskor ke webhook Shuffle dengan header X-Event-ID yang idempoten.
 
         Parameters
         ----------
         scored_meta : ScoredMetaAlert
-            Scored meta-alert to dispatch.
+            Meta-alert terskor yang akan dikirim.
 
         Returns
         -------
         bool
-            True if delivery succeeded (HTTP 200/202).
+            True bila pengiriman berhasil (HTTP 200/202).
         """
         payload: Dict[str, Any] = {
             "meta_id": scored_meta.meta_id,
@@ -112,7 +112,7 @@ class ShuffleWebhookForwarder:
                         delay = min(30.0, (2 ** (attempt - 1)) * 0.5)
                         self._sleep_fn(delay)
                         continue
-                # Non-retryable 4xx
+                # 4xx tidak perlu di-retry.
                 if 400 <= resp.status_code < 500:
                     return ShuffleDeliveryResult(success=False, status_code=resp.status_code, error=resp.text, attempts=attempt)
             except Exception as exc:

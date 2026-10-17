@@ -11,7 +11,7 @@ from src.runtime.service import LiveRBTAService
 
 
 class DashboardRuntimeResolver:
-    """Resolves operational execution context (Live vs. Replay Run) safely."""
+    """Menentukan konteks eksekusi operasional (live atau replay run) dengan aman."""
 
     def __init__(
         self,
@@ -28,12 +28,12 @@ class DashboardRuntimeResolver:
         self.replay_runs_dir = replay_runs_dir or Path("data/runtime/replay-runs").resolve()
 
     def resolve(self, run_id: Optional[str] = None) -> Tuple[LiveRBTAService, RawAlertEvidenceStore, str]:
-        """Resolve service, evidence store, and context mode ('LIVE' or 'REPLAY').
+        """Tentukan service, evidence store, dan mode konteks ('LIVE' atau 'REPLAY').
 
         Parameters
         ----------
         run_id : str | None
-            If None, returns live runtime. Otherwise, loads the specific replay run.
+            Bila None, kembalikan runtime live. Selain itu, muat replay run yang dimaksud.
 
         Returns
         -------
@@ -45,7 +45,7 @@ class DashboardRuntimeResolver:
 
         clean_id = run_id.strip()
 
-        # 1. Check if it's the currently active run in replay_controller
+        # Cek dulu apakah ini run yang sedang aktif di replay_controller.
         if self.replay_controller.run_id == clean_id and self.replay_controller.current_service:
             return (
                 self.replay_controller.current_service,
@@ -53,7 +53,7 @@ class DashboardRuntimeResolver:
                 "REPLAY",
             )
 
-        # 2. Check on-disk persisted runs
+        # Lalu cek run yang tersimpan di disk.
         run_workspace = self.replay_runs_dir / clean_id
         if not run_workspace.exists() or not run_workspace.is_dir():
             raise HTTPException(status_code=404, detail=f"Replay run '{clean_id}' not found")
@@ -67,7 +67,7 @@ class DashboardRuntimeResolver:
         state_mgr = DurableStateManager(state_file)
         evidence_store = RawAlertEvidenceStore(evidence_file)
 
-        # Reconstruct read-only service restored from disk
+        # Bangun ulang service read-only dari disk.
         service = LiveRBTAService(
             scoring_pipeline=self.scoring_pipeline,
             state_manager=state_mgr,

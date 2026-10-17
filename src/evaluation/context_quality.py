@@ -1,4 +1,4 @@
-"""Context-purity metrics preventing ARR-only baseline conclusions."""
+"""Metrik context purity, agar kesimpulan baseline tidak hanya bersandar pada ARR."""
 
 from dataclasses import dataclass
 from typing import Iterable, Sequence
@@ -20,7 +20,7 @@ def compute_context_quality(
     meta_alerts: Sequence[MetaAlert],
     raw_alerts: Iterable[CanonicalRawAlert],
 ) -> ContextQualityResult:
-    """Measure whether each meta-alert contains exactly one agent/group context."""
+    """Ukur apakah setiap meta-alert hanya berisi tepat satu konteks agent/group."""
     source_context = {
         alert.wazuh_alert_id: (alert.agent_id, alert.rule_group_primary)
         for alert in raw_alerts

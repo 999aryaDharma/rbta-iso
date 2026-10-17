@@ -1,4 +1,4 @@
-"""Noise robustness evaluation injecting realistic false-positive alerts."""
+"""Evaluasi ketahanan terhadap noise dengan menyisipkan alert mirip false positive."""
 
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -21,7 +21,7 @@ NOISE_RATES: Tuple[float, ...] = (0.0, 0.05, 0.10, 0.20, 0.30)
 
 @dataclass(frozen=True)
 class NoiseRobustnessResult:
-    """Outcome of noise robustness evaluation."""
+    """Hasil evaluasi ketahanan noise."""
 
     summary_df: pd.DataFrame
 
@@ -31,11 +31,11 @@ def _generate_noise_alerts(
     n_noise: int,
     rng: random.Random,
 ) -> List[CanonicalRawAlert]:
-    """Synthesize false-positive-like noise alerts preserving valid agent/group semantics."""
+    """Bentuk alert noise mirip false positive dengan semantik agent/group yang tetap valid."""
     if not clean_alerts or n_noise <= 0:
         return []
 
-    # Extract valid agent tuples (agent_id, agent_name, agent_criticality)
+    # Kumpulkan tuple agent yang valid (agent_id, agent_name, agent_criticality).
     agents = list({(a.agent_id, a.agent_name, a.agent_criticality) for a in clean_alerts})
     rule_groups = list({a.rule_group_primary for a in clean_alerts})
     min_ts = min(a.timestamp for a in clean_alerts)
@@ -74,23 +74,23 @@ def run_noise_robustness_evaluation(
     delta_t: timedelta = timedelta(minutes=15),
     random_seed: int = 42,
 ) -> NoiseRobustnessResult:
-    """Evaluate RBTA resilience against low-severity benign noise injection.
+    """Evaluasi ketahanan RBTA terhadap injeksi noise benign ber-severity rendah.
 
     Parameters
     ----------
     alerts : Iterable[CanonicalRawAlert]
-        Clean evaluation alerts dataset.
+        Dataset alert evaluasi yang bersih.
     noise_rates : Sequence[float]
-        Noise injection proportions to evaluate (default: 0.0, 0.05, 0.10, 0.20, 0.30).
+        Proporsi injeksi noise yang dievaluasi (default: 0.0, 0.05, 0.10, 0.20, 0.30).
     delta_t : timedelta
-        Aggregation time window.
+        Window waktu agregasi.
     random_seed : int
-        Deterministic random seed.
+        Seed acak deterministik.
 
     Returns
     -------
     NoiseRobustnessResult
-        Summary DataFrame across noise levels.
+        Ringkasan DataFrame untuk setiap level noise.
     """
     clean_list = list(alerts)
     n_clean = len(clean_list)

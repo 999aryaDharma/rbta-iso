@@ -1,4 +1,4 @@
-"""Replay clock managing accelerated event-time wall-clock pacing."""
+"""Replay clock yang mengatur tempo wall-clock event-time yang dipercepat."""
 
 from datetime import datetime
 import time
@@ -6,17 +6,17 @@ from typing import Union
 
 
 class ClockError(ValueError):
-    """Raised when replay clock parameters are invalid."""
+    """Dilempar bila parameter replay clock tidak valid."""
     pass
 
 
 class ReplayClock:
-    """Manages wall-clock pacing for historical event replay.
+    """Mengatur tempo wall-clock untuk replay event historis.
 
     Parameters
     ----------
     speed_factor : float | str
-        Replay speed multiplier (1.0, 10.0, 100.0, or "MAX").
+        Pengali kecepatan replay (1.0, 10.0, 100.0, atau "MAX").
     """
 
     def __init__(self, speed_factor: Union[float, int, str] = "MAX") -> None:
@@ -39,19 +39,19 @@ class ReplayClock:
             raise ClockError(f"Unsupported speed factor type: {type(speed_factor)}")
 
     def wait(self, previous_event_time: datetime, current_event_time: datetime) -> float:
-        """Calculate and wait for the appropriate wall-clock delay between two events.
+        """Hitung lalu tunggu jeda wall-clock yang sesuai di antara dua event.
 
         Parameters
         ----------
         previous_event_time : datetime
-            Timestamp of the previously processed event.
+            Timestamp event yang diproses sebelumnya.
         current_event_time : datetime
-            Timestamp of the current incoming event.
+            Timestamp event yang sedang masuk.
 
         Returns
         -------
         float
-            Wall-clock delay waited in seconds.
+            Jeda wall-clock yang ditunggu, dalam detik.
         """
         if self.speed_factor == float("inf"):
             return 0.0

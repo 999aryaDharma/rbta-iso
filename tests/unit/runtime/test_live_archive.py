@@ -1,4 +1,4 @@
-"""Unit tests for live JSONL archive (Design A): raw per-alert replay dataset writer + coordinator hook."""
+"""Unit test arsip JSONL live: penulis dataset replay mentah per alert + hook di coordinator."""
 
 import json
 from datetime import datetime, timedelta, timezone
@@ -167,7 +167,7 @@ def test_run_cycle_skips_archive_for_duplicates(tmp_path: Path):
 
     service = MagicMock()
     service.get_live_source_state.return_value = {}
-    service.is_seen.return_value = True  # already seen -> duplicate noop
+    service.is_seen.return_value = True  # sudah seen -> duplikat noop
     service.ingest_alert.return_value = []
     service.check_idle_flush.return_value = []
     service.state_manager.quarantine_id_set.return_value = set()

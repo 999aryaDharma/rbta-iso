@@ -28,7 +28,7 @@ export function PageHeader({
             </div>
           ) : (
             <div className="text-xs font-semibold text-kumo-subtle uppercase tracking-wider mb-1 flex items-center gap-1.5">
-              <span>Security Analytics</span>
+              <span>Analisis</span>
               <span className="text-kumo-hairline">/</span>
               <span className="text-kumo-strong font-semibold">{title}</span>
             </div>

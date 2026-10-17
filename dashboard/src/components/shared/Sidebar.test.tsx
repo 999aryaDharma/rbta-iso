@@ -27,10 +27,10 @@ function renderSidebar() {
 }
 
 describe('AppSidebar live stream', () => {
-  it('menampilkan entri Live di atas Replay', () => {
+  it('menampilkan entri Pemantauan live di atas Replay sidang', () => {
     renderSidebar();
-    const live = screen.getByText('Live');
-    const replay = screen.getByText('Replay');
+    const live = screen.getByText('Pemantauan live');
+    const replay = screen.getByText('Replay sidang');
     expect(live).toBeInTheDocument();
     expect(replay).toBeInTheDocument();
     expect(live.compareDocumentPosition(replay) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();

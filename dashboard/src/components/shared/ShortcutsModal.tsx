@@ -5,29 +5,29 @@ import { Keyboard } from '@phosphor-icons/react';
 export function ShortcutsModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const shortcutGroups = [
     {
-      category: 'GLOBAL NAVIGATION',
+      category: 'NAVIGASI',
       items: [
-        { key: 'g o', desc: 'Navigate to Overview Dashboard' },
-        { key: 'g m', desc: 'Navigate to MetaAlerts Explorer' },
-        { key: 'g r', desc: 'Navigate to RBTA Aggregation Engine' },
-        { key: 'g d', desc: 'Buka Replay Sidang' },
-        { key: 'g l', desc: 'Buka Live Stream' },
-        { key: 'g s', desc: 'Navigate to System & Pipeline Health' },
+        { key: 'g o', desc: 'Buka Ringkasan' },
+        { key: 'g m', desc: 'Buka Daftar meta-alert' },
+        { key: 'g r', desc: 'Buka Status pengelompokan' },
+        { key: 'g d', desc: 'Buka Replay sidang' },
+        { key: 'g l', desc: 'Buka Pemantauan live' },
+        { key: 'g s', desc: 'Buka Sistem' },
       ],
     },
     {
-      category: 'SEARCH & SHORTCUTS',
+      category: 'PENCARIAN & PINTASAN',
       items: [
-        { key: '/', desc: 'Open Command Palette / Fast Search' },
-        { key: '⌘ K', desc: 'Focus Quick Navigation Search' },
-        { key: '?', desc: 'Toggle Keyboard Shortcuts Modal' },
+        { key: '/', desc: 'Buka pencarian cepat' },
+        { key: '⌘ K', desc: 'Buka pencarian cepat' },
+        { key: '?', desc: 'Tampilkan/sembunyikan daftar pintasan' },
       ],
     },
     {
-      category: 'INVESTIGATION',
+      category: 'PEMERIKSAAN',
       items: [
-        { key: '[', desc: 'Previous member alert in MetaAlert' },
-        { key: ']', desc: 'Next member alert in MetaAlert' },
+        { key: '[', desc: 'Alert sebelumnya dalam meta-alert' },
+        { key: ']', desc: 'Alert berikutnya dalam meta-alert' },
       ],
     },
   ];
@@ -41,10 +41,10 @@ export function ShortcutsModal({ open, onClose }: { open: boolean; onClose: () =
           </div>
           <div>
             <DialogTitle className="text-base font-bold text-kumo-strong leading-none">
-              Keyboard Shortcuts
+              Pintasan keyboard
             </DialogTitle>
             <p className="text-xs text-kumo-subtle mt-1">
-              Press keys sequentially to trigger actions rapidly
+              Tekan tombol berurutan, mis. g lalu o
             </p>
           </div>
         </div>
@@ -74,11 +74,11 @@ export function ShortcutsModal({ open, onClose }: { open: boolean; onClose: () =
 
         <div className="pt-3 border-t border-kumo-hairline flex items-center justify-between">
           <span className="text-[11px] text-kumo-subtle font-mono">
-            RBTA v1.0 • Hotkeys Active
+            RBTA v1.0 • Pintasan aktif
           </span>
           <DialogClose>
             <Button variant="secondary" size="sm">
-              Done
+              Selesai
             </Button>
           </DialogClose>
         </div>

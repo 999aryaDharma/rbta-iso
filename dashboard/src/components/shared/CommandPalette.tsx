@@ -17,13 +17,13 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
     runId ? `${path}${path.includes('?') ? '&' : '?'}run_id=${encodeURIComponent(runId)}` : path;
 
   const navItems = [
-    { label: 'Overview Dashboard', category: 'Pages', desc: 'Real-time security analytics and live timeseries', path: withRunId('/overview'), icon: ChartBar },
-    { label: 'MetaAlerts Explorer', category: 'Pages', desc: 'Investigate clustered alerts and anomaly scores', path: withRunId('/meta-alerts'), icon: PaintBucket },
-    { label: 'RBTA Engine State', category: 'Pages', desc: 'Inspect active windows and temporal reduction', path: withRunId('/rbta'), icon: Cpu },
-    { label: 'Live Stream', category: 'Pages', desc: 'Status worker live, siklus, karantina, dan lag', path: withRunId('/live'), icon: Pulse },
-    { label: 'Replay Sidang', category: 'Pages', desc: 'Replay, evaluasi RBTA, model, dan evidence', path: withRunId('/demo'), icon: Play },
-    { label: 'Integrations & Shuffle SOAR', category: 'Operations', desc: 'Manage Shuffle webhook and deferred Telegram sink', path: withRunId('/integrations'), icon: Plugs },
-    { label: 'System Configuration', category: 'Operations', desc: 'Governance, model calibration, and environment', path: withRunId('/system'), icon: GearSix },
+    { label: 'Ringkasan', category: 'Halaman', desc: 'Kondisi alert dan beban analyst saat ini', path: withRunId('/overview'), icon: ChartBar },
+    { label: 'Daftar meta-alert', category: 'Halaman', desc: 'Telusuri kelompok alert dan skornya', path: withRunId('/meta-alerts'), icon: PaintBucket },
+    { label: 'Status pengelompokan', category: 'Halaman', desc: 'Kelompok terbuka dan jendela waktu per agen', path: withRunId('/rbta'), icon: Cpu },
+    { label: 'Pemantauan live', category: 'Halaman', desc: 'Status pemrosesan dan kesegaran data', path: withRunId('/live'), icon: Pulse },
+    { label: 'Replay sidang', category: 'Halaman', desc: 'Putar ulang data penelitian dan hasil evaluasi', path: withRunId('/demo'), icon: Play },
+    { label: 'Integrasi', category: 'Operasi', desc: 'Status Telegram dan Shuffle', path: withRunId('/integrations'), icon: Plugs },
+    { label: 'Sistem', category: 'Operasi', desc: 'Versi model dan konfigurasi', path: withRunId('/system'), icon: GearSix },
   ];
 
   const isNumericId = /^#?(\d+)$/.test(query.trim());
@@ -72,7 +72,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
           <input
             autoFocus
             type="text"
-            placeholder="Search RBTA pages or type numeric Meta ID (e.g. 42)..."
+            placeholder="Cari halaman atau ketik nomor meta-alert (mis. 42)…"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
@@ -83,7 +83,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
               onClick={() => setQuery('')}
               className="text-xs text-kumo-subtle hover:text-kumo-strong px-1.5 py-0.5 rounded cursor-pointer"
             >
-              Clear
+              Hapus
             </button>
           )}
         </div>
@@ -104,15 +104,15 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
                 </div>
                 <div>
                   <div className="font-semibold text-xs text-kumo-strong">
-                    Jump directly to MetaAlert #{numericId}
+                    Langsung ke meta-alert #{numericId}
                   </div>
                   <div className="text-[11px] text-kumo-subtle">
-                    Open detailed investigation view for MetaAlert ID {numericId}
+                    Buka detail meta-alert nomor {numericId}
                   </div>
                 </div>
               </div>
               <div className="flex items-center gap-1 text-xs text-kumo-strong font-medium">
-                <span>Jump</span>
+                <span>Buka</span>
                 <ArrowRight size={13} />
               </div>
             </button>
@@ -158,8 +158,8 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
 
           {filteredItems.length === 0 && !isNumericId && (
             <div className="py-8 text-center text-xs text-kumo-subtle space-y-1">
-              <p className="font-medium text-kumo-default">No matching results found</p>
-              <p>Type a numeric ID like <span className="font-mono text-kumo-strong font-semibold">42</span> to jump to a specific MetaAlert</p>
+              <p className="font-medium text-kumo-default">Tidak ada hasil</p>
+              <p>Ketik nomor seperti <span className="font-mono text-kumo-strong font-semibold">42</span> untuk langsung ke meta-alert tertentu</p>
             </div>
           )}
         </div>
@@ -168,20 +168,20 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
           <div className="flex items-center gap-3">
             <span className="flex items-center gap-1.5">
               <kbd className="px-1.5 py-0.5 rounded border border-kumo-hairline bg-kumo-canvas font-mono text-[10px]">↑↓</kbd>
-              Navigate
+              Navigasi
             </span>
             <span className="flex items-center gap-1.5">
               <kbd className="px-1.5 py-0.5 rounded border border-kumo-hairline bg-kumo-canvas font-mono text-[10px]">↵</kbd>
-              Select
+              Pilih
             </span>
             <span className="flex items-center gap-1.5">
               <kbd className="px-1.5 py-0.5 rounded border border-kumo-hairline bg-kumo-canvas font-mono text-[10px]">ESC</kbd>
-              Close
+              Tutup
             </span>
           </div>
           <DialogClose>
             <Button variant="ghost" size="sm" className="h-6 text-[11px]">
-              Dismiss
+              Tutup
             </Button>
           </DialogClose>
         </div>

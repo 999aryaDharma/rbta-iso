@@ -1,4 +1,4 @@
-"""Unit tests for json_orches ETL orchestrator ensuring path independence."""
+"""Unit test orkestrator ETL json_orches, memastikan tidak bergantung pada path tertentu."""
 import json
 from pathlib import Path
 import pytest
@@ -6,8 +6,8 @@ from src.etl.json_orches import main
 
 
 def test_json_orches_runs_with_custom_tmp_path(tmp_path: Path):
-    """Test that json_orches can process a directory structure inside a temporary path."""
-    # Build a mock directory structure: base_dir / 2026 / 08 / hasil_json / alert.json
+    """json_orches bisa memproses struktur direktori di dalam path sementara."""
+    # Bangun struktur direktori tiruan: base_dir / 2026 / 08 / hasil_json / alert.json
     year_dir = tmp_path / "2026"
     month_dir = year_dir / "08"
     hasil_dir = month_dir / "hasil_json"
@@ -30,10 +30,10 @@ def test_json_orches_runs_with_custom_tmp_path(tmp_path: Path):
     alert_file = hasil_dir / "sample_alert.json"
     alert_file.write_text(json.dumps(sample_alert) + "\n", encoding="utf-8")
 
-    # Run main pointing to tmp_path
+    # Jalankan main dengan tmp_path.
     main(base_dir=tmp_path)
 
-    # Check generated files in tmp_path
+    # Cek file yang dihasilkan di tmp_path.
     month_csv = month_dir / "rbta_ready_2026_08.csv"
     final_csv = tmp_path / "rbta_ready_ALL.csv"
     report_file = tmp_path / "data_quality_report.txt"

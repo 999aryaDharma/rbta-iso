@@ -1,4 +1,4 @@
-"""Root executable adapter for RBTA + Isolation Forest research orchestrator."""
+"""Entrypoint root untuk orkestrator penelitian RBTA + Isolation Forest."""
 import sys
 from src.research.orchestrator import main
 

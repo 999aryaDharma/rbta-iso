@@ -40,13 +40,13 @@ logging.basicConfig(
 )
 log = logging.getLogger(__name__)
 
-# ── Path setup ────────────────────────────────────────────────────────────────
+# Path setup
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 import pandas as pd
 
-# ── Imports ───────────────────────────────────────────────────────────────────
+# Imports
 from src.etl.preprocessing_01       import load_and_prepare
 from src.engine.rbta_core           import run_rbta, validate_mapping, add_if_features
 from src.engine.fixed_window_baseline import run_fixed_window
@@ -71,7 +71,7 @@ from src.evaluation.metrics          import (
     DELTA_T_VALUES, BUFFER_SIZE, MAX_LATENESS_SEC,
 )
 
-# ── Konfigurasi ───────────────────────────────────────────────────────────────
+# Konfigurasi
 RAW_CSV_PATH      = "data/raw/rbta_ready_ALL.csv"
 INJECTED_CSV_PATH = "data/injected/rbta_injected.csv"
 AGG_DIR           = "data/aggregated"
@@ -91,9 +91,7 @@ NOISE_RATES         = [0.0, 0.05, 0.10, 0.20, 0.30]
 RUN_RUNTIME_PROOF = True
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # Helpers
-# ══════════════════════════════════════════════════════════════════════════════
 
 def safe_step(name: str, fn, *args, **kwargs):
     log.info("=" * 70)
@@ -114,9 +112,7 @@ def _make_dirs():
         os.makedirs(d, exist_ok=True)
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # Main Pipeline
-# ══════════════════════════════════════════════════════════════════════════════
 
 def main() -> None:
     t_global = time.perf_counter()
@@ -127,9 +123,7 @@ def main() -> None:
     log.info("  INSTIKI SOC Alert Fatigue Research")
     log.info("#" * 70)
 
-    # =========================================================================
     # STEP 1: Preprocessing
-    # =========================================================================
     df_raw_original = safe_step(
         "STEP 1 — PREPROCESSING",
         load_and_prepare,
@@ -139,9 +133,7 @@ def main() -> None:
         log.error("Preprocessing gagal. Pipeline dihentikan.")
         return
 
-    # =========================================================================
     # STEP 2: [opsional] Attack Injection
-    # =========================================================================
     df_raw_injected = None
 
     if USE_INJECTED_DATA:
@@ -179,9 +171,7 @@ def main() -> None:
     # Dataset pipeline utama
     df_pipeline = df_raw_injected if df_raw_injected is not None else df_raw_original
 
-    # =========================================================================
     # STEP 3: Sensitivity Analysis (Landauer Section 6.3)
-    # =========================================================================
     sens_result = safe_step(
         "STEP 3 — SENSITIVITY ANALYSIS [Landauer Section 6.3]",
         sensitivity_analysis,
@@ -201,9 +191,7 @@ def main() -> None:
 
     log.info("Δt optimal = %d menit", optimal_dt)
 
-    # =========================================================================
     # STEP 4: RBTA dengan Δt optimal (Landauer Section 6.4-6.5)
-    # =========================================================================
     rbta_result = safe_step(
         f"STEP 4 — RBTA (Δt={optimal_dt} menit) [Landauer Section 6.4-6.5]",
         run_rbta,
@@ -224,9 +212,7 @@ def main() -> None:
         if not df_compound.empty:
             df_compound.to_csv(f"{AGG_DIR}/meta_alerts_compound.csv", index=False)
 
-        # =====================================================================
         # STEP 5: Feature Engineering
-        # =====================================================================
         for step_name, fn, kwargs in [
             ("f1-f9", add_if_features, {}),
             ("f10-f11", enrich_features, {}),  # [FIX-2] v2: hanya f11 deviation, skip_f13 default=True
@@ -235,9 +221,7 @@ def main() -> None:
             if r is not None:
                 df_meta_rbta = r
 
-        # =====================================================================
         # STEP 6: [opsional] Label Propagation
-        # =====================================================================
         if USE_INJECTED_DATA and df_raw_injected is not None:
             r = safe_step(
                 "STEP 6 — LABEL PROPAGATION",
@@ -252,9 +236,7 @@ def main() -> None:
         df_meta_rbta.to_csv(f"{AGG_DIR}/meta_alerts_rbta.csv", index=False)
         log.info("Meta-alerts RBTA disimpan: %s/meta_alerts_rbta.csv", AGG_DIR)
 
-    # =========================================================================
     # STEP 7: Fixed Window Baseline
-    # =========================================================================
     df_meta_fixed  = None
     fixed_result   = safe_step(
         f"STEP 7 — FIXED WINDOW BASELINE (Δt={optimal_dt} menit)",
@@ -265,9 +247,7 @@ def main() -> None:
         if not df_meta_fixed.empty:
             df_meta_fixed.to_csv(f"{AGG_DIR}/meta_alerts_fixed_window.csv", index=False)
 
-    # =========================================================================
     # STEP 8: ARR per Rule Group (Landauer Section 6.8)
-    # =========================================================================
     df_per_group = None
     if df_meta_rbta is not None and not df_meta_rbta.empty:
         df_per_group = safe_step(
@@ -281,9 +261,7 @@ def main() -> None:
             safe_step("  PLOT: ARR per Group",
                       plot_arr_per_group, df_per_group, FIGURES_DIR)
 
-    # =========================================================================
     # STEP 9: Isolation Forest
-    # =========================================================================
     df_scored = None
     rbta_csv  = f"{AGG_DIR}/meta_alerts_rbta.csv"
 
@@ -296,9 +274,7 @@ def main() -> None:
         if if_result is not None:
             df_scored = if_result[0]
 
-    # =========================================================================
     # FIX-3: Propagate ground_truth ke df_scored (STEP 9→10)
-    # =========================================================================
     if (df_scored is not None and df_meta_rbta is not None 
         and "ground_truth" in df_meta_rbta.columns 
         and "meta_id" in df_meta_rbta.columns):
@@ -315,9 +291,7 @@ def main() -> None:
             n_gt, len(df_scored),
         )
 
-    # =========================================================================
     # STEP 10: FPR vs Reduction Rate (Landauer Figure 12)
-    # =========================================================================
     if df_scored is not None:
         df_tradeoff = safe_step(
             "STEP 10 — FPR vs REDUCTION RATE [Landauer Figure 12]",
@@ -328,9 +302,7 @@ def main() -> None:
             safe_step("  PLOT: FPR vs Reduction",
                       plot_fpr_vs_reduction, df_tradeoff, FIGURES_DIR)
 
-    # =========================================================================
     # STEP 11: Noise Robustness Test (Landauer Section 6.9)
-    # =========================================================================
     if RUN_ROBUSTNESS_TEST:
         robust_result = safe_step(
             "STEP 11 — NOISE ROBUSTNESS TEST [Landauer Section 6.9]",
@@ -349,9 +321,7 @@ def main() -> None:
     else:
         log.info("STEP 11 — SKIP (RUN_ROBUSTNESS_TEST=False)")
 
-    # =========================================================================
     # STEP 12: Runtime Complexity Proof (Landauer Section 6.10)
-    # =========================================================================
     if RUN_RUNTIME_PROOF:
         runtime_result = safe_step(
             "STEP 12 — RUNTIME COMPLEXITY PROOF O(n log k) [Landauer Section 6.10]",
@@ -367,9 +337,7 @@ def main() -> None:
     else:
         log.info("STEP 12 — SKIP (RUN_RUNTIME_PROOF=False)")
 
-    # =========================================================================
     # STEP 13: Scenario-Based Evaluation (Two Separate Evaluation Frameworks)
-    # =========================================================================
     # Scenario A: RBTA evaluation (metrik utama untuk sidang)
     if df_meta_rbta is not None and not df_meta_rbta.empty:
         safe_step(
@@ -401,9 +369,7 @@ def main() -> None:
     else:
         log.warning("STEP 13B — SKIP (df_scored tidak tersedia)")
 
-    # =========================================================================
     # STEP 14: Detail plots per Δt (reuse cache)
-    # =========================================================================
     log.info("STEP 14 — DETAIL PLOTS (cache sensitivity)")
     for dt in DELTA_T_VALUES:
         df_dt       = meta_map.get(dt)
@@ -425,9 +391,7 @@ def main() -> None:
             except Exception as e:
                 log.warning("Enhancement plot gagal: %s", e)
 
-    # =========================================================================
     # Summary
-    # =========================================================================
     elapsed = (time.perf_counter() - t_global) / 60
     log.info("#" * 70)
     log.info("  PIPELINE SELESAI")

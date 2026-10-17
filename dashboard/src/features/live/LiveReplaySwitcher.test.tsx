@@ -29,7 +29,7 @@ describe('LiveReplaySwitcher', () => {
     expect(screen.getByRole('alert')).toHaveTextContent(/gagal memuat konteks.*putus/i);
 
     rerender(<LiveReplaySwitcher mode="live" onChange={() => {}} status="empty" />);
-    expect(screen.getByRole('status')).toHaveTextContent(/belum ada metaalert/i);
+    expect(screen.getByRole('status')).toHaveTextContent(/belum ada meta-alert/i);
   });
 
   it('menegaskan konteks aktif lewat keterangan dan gaya', () => {

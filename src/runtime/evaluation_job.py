@@ -1,4 +1,4 @@
-"""Background post-replay evaluation with atomic per-run artifacts."""
+"""Evaluasi pasca-replay di latar belakang dengan artefak per run yang atomik."""
 
 from datetime import timedelta
 import json
@@ -23,7 +23,7 @@ from src.runtime.json_safe import to_json_safe
 
 
 class EvaluationJobController:
-    """Run complete research evaluation after replay without blocking API polling."""
+    """Jalankan evaluasi penelitian lengkap setelah replay tanpa memblokir polling API."""
 
     TOTAL_PHASES = 7
 

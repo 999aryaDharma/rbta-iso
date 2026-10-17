@@ -1,4 +1,4 @@
-"""Escalation dispatch sink interface and deferred Telegram file output adapter."""
+"""Antarmuka sink dispatch eskalasi dan adapter output file Telegram yang ditunda."""
 
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
@@ -16,29 +16,29 @@ logger = logging.getLogger(__name__)
 
 
 class EscalationSink(ABC):
-    """Abstract base class for escalation alert dispatch sinks."""
+    """Base class abstrak untuk sink dispatch alert eskalasi."""
 
     @abstractmethod
     def emit(self, scored: ScoredMetaAlert, run_id: str) -> bool:
-        """Emit an escalation payload. Returns True if emitted, False if skipped/deduplicated."""
+        """Keluarkan payload eskalasi. True bila dikeluarkan, False bila dilewati/duplikat."""
         raise NotImplementedError
 
     @abstractmethod
     def get_latest_payloads(self, limit: int = 50) -> List[Dict[str, Any]]:
-        """Retrieve latest emitted payloads for auditing/inspection."""
+        """Ambil payload terbaru yang sudah dikeluarkan, untuk audit/inspeksi."""
         raise NotImplementedError
 
     @abstractmethod
     def get_total_count(self) -> int:
-        """Retrieve total count of emitted payloads."""
+        """Ambil jumlah total payload yang sudah dikeluarkan."""
         raise NotImplementedError
 
 
 class DeferredTelegramFileSink(EscalationSink):
-    """Append-only thread-safe file sink for deferred Telegram escalation payloads.
+    """Sink file append-only yang thread-safe untuk payload eskalasi Telegram yang ditunda.
 
-    Writes one JSON object per line (JSONL format) to a local audit file with
-    idempotency enforcement on (run_id, meta_id).
+    Menulis satu objek JSON per baris (JSONL) ke file audit lokal dengan idempotensi
+    berdasarkan (run_id, meta_id).
     """
 
     def __init__(self, file_path: Path) -> None:
@@ -50,7 +50,7 @@ class DeferredTelegramFileSink(EscalationSink):
         self._load_existing_keys()
 
     def _load_existing_keys(self) -> None:
-        """Scan existing file if present to populate seen idempotency keys and recent payloads."""
+        """Pindai file yang sudah ada untuk mengisi kunci idempotensi dan payload terbaru."""
         if not self.file_path.exists():
             return
         try:
@@ -71,7 +71,7 @@ class DeferredTelegramFileSink(EscalationSink):
             logger.warning("Could not read existing Telegram payload sink keys: %s", e)
 
     def emit(self, scored: ScoredMetaAlert, run_id: str) -> bool:
-        """Emit scored meta-alert to deferred Telegram file sink if action == ESCALATE."""
+        """Keluarkan meta-alert terskor ke sink file Telegram bila action == ESCALATE."""
         if scored.action != "ESCALATE":
             return False
 
@@ -121,7 +121,7 @@ class DeferredTelegramFileSink(EscalationSink):
                 raise RuntimeError(f"Deferred Telegram sink write error: {e}") from e
 
     def get_latest_payloads(self, limit: int = 50) -> List[Dict[str, Any]]:
-        """Retrieve the latest N payloads quickly from memory cache."""
+        """Ambil N payload terbaru langsung dari cache memori."""
         with self._lock:
             if not self._recent_payloads and self.file_path.exists():
                 self._load_existing_keys()
@@ -129,6 +129,6 @@ class DeferredTelegramFileSink(EscalationSink):
             return items[-limit:] if limit < len(items) else items
 
     def get_total_count(self) -> int:
-        """Return total number of recorded escalation payloads."""
+        """Kembalikan jumlah total payload eskalasi yang tercatat."""
         with self._lock:
             return len(self._seen_idempotency_keys)

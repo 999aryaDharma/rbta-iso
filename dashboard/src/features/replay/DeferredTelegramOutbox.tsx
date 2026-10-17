@@ -7,6 +7,7 @@ import { Pagination } from '@cloudflare/kumo/components/pagination';
 import { PaperPlaneRight, Copy, Check, ArrowClockwise } from '@phosphor-icons/react';
 import { DialogRoot, Dialog, DialogTitle, DialogDescription, DialogClose } from '@cloudflare/kumo/components/dialog';
 import type { TelegramPayload } from '@/api/schemas';
+import { decisionLabel } from '@/lib/labels';
 import { TelegramMessagePreview } from './TelegramMessagePreview';
 
 const PAGE_SIZE = 10;
@@ -39,22 +40,22 @@ export function DeferredTelegramOutbox() {
             <PaperPlaneRight size={14} />
           </div>
           <span className="text-xs font-semibold uppercase tracking-wider text-kumo-strong">
-            Deferred Telegram Payload Outbox
+            Pesan Telegram yang belum dikirim
           </span>
           <Badge variant="error">
-            {totalCount} ESCALATE Payloads
+            {totalCount} pesan 'perlu dicek segera'
           </Badge>
         </div>
 
         <div className="flex items-center gap-3">
           <span className="text-[11px] font-mono text-kumo-subtle">
-            File: <code className="bg-kumo-recessed px-1.5 py-0.5 rounded border border-kumo-hairline">telegram_escalate_payloads.txt</code>
+            Berkas: <code className="bg-kumo-recessed px-1.5 py-0.5 rounded border border-kumo-hairline">telegram_escalate_payloads.txt</code>
           </span>
           <button
             type="button"
             onClick={() => refetch()}
             className="p-1 rounded text-kumo-subtle hover:text-kumo-default hover:bg-kumo-recessed transition-colors"
-            title="Refresh outbox"
+            title="Muat ulang antrean pesan"
           >
             <ArrowClockwise size={14} />
           </button>
@@ -63,20 +64,20 @@ export function DeferredTelegramOutbox() {
 
       {isLoading ? (
         <div className="py-8 text-center text-xs text-kumo-subtle font-mono">
-          Loading recorded escalation payloads...
+          Memuat pesan yang tercatat…
         </div>
       ) : payloads.length > 0 ? (
         <div className="min-w-0 rounded-lg border border-kumo-hairline bg-kumo-canvas shadow-xs">
           <Table className="w-full table-fixed">
             <Table.Header>
               <Table.Row className="bg-kumo-recessed/50 text-[11px] uppercase tracking-wider">
-                <Table.Head>Timestamp</Table.Head>
-                <Table.Head>Meta ID</Table.Head>
+                <Table.Head>Waktu</Table.Head>
+                <Table.Head>Nomor</Table.Head>
                 <Table.Head>Level</Table.Head>
-                <Table.Head>Group & Endpoint</Table.Head>
-                <Table.Head>Score / Threshold</Table.Head>
-                <Table.Head>Telegram Message Payload</Table.Head>
-                <Table.Head className="text-right">Action</Table.Head>
+                <Table.Head>Kategori aturan & agen</Table.Head>
+                <Table.Head>Skor / batas skor</Table.Head>
+                <Table.Head>Isi pesan</Table.Head>
+                <Table.Head className="text-right">Aksi</Table.Head>
               </Table.Row>
             </Table.Header>
             <Table.Body>
@@ -93,7 +94,7 @@ export function DeferredTelegramOutbox() {
                     </Table.Cell>
                     <Table.Cell>
                       <Badge variant="error">
-                        {p.decision}
+                        {decisionLabel(p.decision)?.label ?? p.decision}
                       </Badge>
                     </Table.Cell>
                     <Table.Cell className="text-[11px]">
@@ -112,10 +113,10 @@ export function DeferredTelegramOutbox() {
                         type="button"
                         onClick={(event) => { event.stopPropagation(); handleCopy(p.idempotency_key, p.message); }}
                         className="inline-flex items-center gap-1 px-2.5 py-1 rounded text-[11px] font-mono border border-kumo-hairline bg-kumo-canvas text-kumo-subtle hover:text-kumo-strong hover:bg-kumo-recessed transition-colors cursor-pointer"
-                        title="Copy Telegram message"
+                        title="Salin pesan Telegram"
                       >
                         {isCopied ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />}
-                        <span>{isCopied ? 'Copied' : 'Copy'}</span>
+                        <span>{isCopied ? 'Tersalin' : 'Salin'}</span>
                       </button>
                     </Table.Cell>
                   </Table.Row>
@@ -141,7 +142,7 @@ export function DeferredTelegramOutbox() {
         </div>
       ) : (
         <div className="py-8 text-center text-xs text-kumo-subtle font-mono">
-          No ESCALATE payloads recorded yet in this replay run.
+          Belum ada pesan 'perlu dicek segera' pada sesi replay ini.
         </div>
       )}
       <DialogRoot open={Boolean(selectedPayload)} onOpenChange={(open) => { if (!open) setSelectedPayload(null); }}>

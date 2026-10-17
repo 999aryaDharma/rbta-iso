@@ -1,26 +1,16 @@
-"""
-json_orches.py  —  ETL Pipeline: Wazuh JSON → rbta_ready_ALL.csv
-=================================================================
-Revisi dari versi sebelumnya:
+"""ETL Wazuh JSON -> rbta_ready_ALL.csv.
 
-  [FIX-1] MITRE ATT&CK dipindahkan ke Layer 1 (minimal_row)
-      Versi lama menaruh mitre di Layer 2 sehingga RBTA Engine buta
-      terhadap konteks taktik serangan. Kini has_mitre dan
-      has_critical_mitre tersedia di Layer 1 sebagai flag integer (0/1)
-      sehingga RBTA dapat mengakumulasi mitre_hit_count per window
-      dan Isolation Forest mendapat sinyal taktik MITRE secara langsung.
+Arsitektur kolom:
+  Layer 1 (minimal_row) — inti RBTA + flag MITRE (9 kolom)
+  Layer 2 (full_row)    — enrichment untuk ML dan forensik
 
-  [FIX-2] criticality_score diubah skala menjadi 1-4 (bukan 0-4)
-      Nilai "unknown" di-default ke 1 (low) agar konsisten dengan
-      preprocessing_01.py dan rbta_algorithm_02.py.
+Flag has_mitre dan has_critical_mitre (0/1) ada di Layer 1 supaya RBTA bisa
+mengakumulasi konteks taktik per window dan Isolation Forest menerima sinyal
+MITRE secara langsung.
 
-  [DOCS] AGENT_CRITICALITY didokumentasikan sebagai domain assumption
-      Tabel ini spesifik untuk UPT TIK INSTIKI dan wajib dicantumkan
-      sebagai "Tabel Pemetaan Aset Kritis" di Bab 3 skripsi.
-
-Arsitektur Layer:
-  Layer 1 (minimal_row) — RBTA core + MITRE flags (9 kolom)
-  Layer 2 (full_row)    — enrichment ML + forensik
+criticality_score memakai skala 1-4; agent "unknown" di-default ke 1 (low).
+Tabel AGENT_CRITICALITY adalah asumsi domain UPT TIK INSTIKI dan dicantumkan
+sebagai "Tabel Pemetaan Aset Kritis" di Bab 3 skripsi.
 """
 
 import json
@@ -36,13 +26,13 @@ logging.basicConfig(
 )
 log = logging.getLogger(__name__)
 
-# ── Path default (relative project root) ──────────────────────────────────────
+# Path default (relatif terhadap root proyek).
 DEFAULT_DATA_DIR = Path("data")
 
-# ── Dedup key ─────────────────────────────────────────────────────────────────
+# Kunci dedup.
 DEDUP_KEY = "wazuh_alert_id"
 
-# ── Group priority, Agent criticality, and MITRE tactics from centralized config ─────────────
+# Prioritas group, kritikalitas agent, dan taktik MITRE diambil dari config terpusat.
 from src.config.domain import (
     CRITICALITY_LABEL_TO_SCORE,
     CRITICALITY_SCORE_TO_LABEL,
@@ -53,20 +43,19 @@ from src.config.domain import (
     resolve_primary_rule_group as pick_primary_group,
 )
 
-# ── srcip handling ────────────────────────────────────────────────────────────
+# Penanganan srcip.
 INTERNAL_PREFIXES: tuple[str, ...] = (
     "10.", "172.16.", "172.17.", "192.168.", "127.",
 )
 
 
 def classify_srcip(ip: Optional[str]) -> tuple[Optional[str], str]:
-    """
-    Kembalikan (raw_srcip, srcip_type) tanpa asumsi IP = attacker.
+    """Kembalikan (raw_srcip, srcip_type) tanpa mengasumsikan IP = attacker.
 
     srcip_type:
-      'internal' -- RFC1918 atau loopback (proxy, NAT, atau internal client)
+      'internal' -- RFC1918 atau loopback (proxy, NAT, atau client internal)
       'external' -- IP publik (kandidat attacker, bukan kepastian)
-      'none'     -- field tidak ada (HIDS event: syscheck, rootcheck, audit)
+      'none'     -- field tidak ada (event HIDS: syscheck, rootcheck, audit)
     """
     if not ip or pd.isna(ip):
         return None, "none"
@@ -75,10 +64,9 @@ def classify_srcip(ip: Optional[str]) -> tuple[Optional[str], str]:
     return ip, "external"
 
 
-# ── Verbose error tracking ────────────────────────────────────────────────────
 
 class ParseStats:
-    """Pelacak statistik parsing verbose per failure mode."""
+    """Pencatat statistik parsing per jenis kegagalan."""
 
     def __init__(self) -> None:
         self.total:    int = 0
@@ -100,16 +88,14 @@ class ParseStats:
                 log.debug("    baris: %s", lines)
 
 
-# ── Parser utama ──────────────────────────────────────────────────────────────
 
 def parse_jsonl(
     filepath: Path,
 ) -> tuple[list[dict], list[dict], ParseStats]:
-    """
-    Parse JSONL Wazuh. Kembalikan:
+    """Parse JSONL Wazuh. Mengembalikan:
       records_full    : Layer 1 + Layer 2 (untuk rbta_ready_ALL.csv)
       records_minimal : Layer 1 saja (untuk rbta_raw_minimal.csv)
-      stats           : ParseStats verbose
+      stats           : ParseStats
     """
     stats = ParseStats()
     records_full:    list[dict] = []
@@ -164,13 +150,12 @@ def parse_jsonl(
             criticality_score = get_agent_criticality(agent_name)
             criticality_label = CRITICALITY_SCORE_TO_LABEL.get(criticality_score, "unknown")
 
-            # ── [FIX-1] MITRE ATT&CK dipindah ke Layer 1 ─────────────────
+            # MITRE ATT&CK ada di Layer 1.
             mitre_tactics: list[str] = mitre.get("tactic", [])
             has_mitre          = 1 if len(mitre_tactics) > 0 else 0
             has_critical_mitre = 1 if has_critical_mitre_tactic(mitre_tactics) else 0
-            # ─────────────────────────────────────────────────────────────
 
-            # ── Layer 1: minimal — RBTA core (9 kolom) ───────────────────
+            # Layer 1: minimal — inti RBTA (9 kolom).
             minimal_row: dict = {
                 "wazuh_alert_id":      wazuh_id,
                 "timestamp_utc":       ts,
@@ -182,13 +167,13 @@ def parse_jsonl(
                 "srcip":               srcip,
                 "srcip_type":          srcip_type,
                 "criticality_score":   criticality_score,
-                # [FIX-1] MITRE flags — wajib untuk akumulasi RBTA & IF
+                # Flag MITRE, dibutuhkan untuk akumulasi RBTA dan IF.
                 "has_mitre":           has_mitre,
                 "has_critical_mitre":  has_critical_mitre,
             }
             records_minimal.append(minimal_row)
 
-            # ── Layer 2: enriched — ML + forensik ────────────────────────
+            # Layer 2: enrichment — ML + forensik.
             full_row: dict = {
                 **minimal_row,
                 "agent_criticality":   criticality_label,
@@ -215,10 +200,9 @@ def parse_jsonl(
     return records_full, records_minimal, stats
 
 
-# ── Build DataFrame ───────────────────────────────────────────────────────────
 
 def build_df(records: list[dict], dedup_key: str) -> pd.DataFrame:
-    """Bangun DataFrame dari records, dedup berdasarkan dedup_key, sort temporal."""
+    """Bangun DataFrame dari records, dedup berdasarkan dedup_key, lalu urutkan menurut waktu."""
     if not records:
         log.warning("build_df dipanggil dengan records kosong.")
         return pd.DataFrame()
@@ -238,10 +222,9 @@ def build_df(records: list[dict], dedup_key: str) -> pd.DataFrame:
     return df
 
 
-# ── Data quality report ───────────────────────────────────────────────────────
 
 def data_quality_report(df: pd.DataFrame) -> str:
-    """Hasilkan teks laporan kualitas data untuk logging dan file."""
+    """Susun teks laporan kualitas data untuk log dan file."""
     lines: list[str] = []
     lines.append("=" * 65)
     lines.append("  DATA QUALITY REPORT — rbta_ready_ALL.csv")
@@ -275,12 +258,12 @@ def data_quality_report(df: pd.DataFrame) -> str:
     lines.append("  CATATAN: srcip bukan proxy 'attacker' — lihat konteks srcip_type.")
 
     lines.append("\n[ BIAS ANALYSIS ]")
-    # format='ISO8601' handles mixed formats (with/without microseconds, with/without tz)
+    # format='ISO8601' menangani format campuran (dengan/tanpa mikrodetik, dengan/tanpa tz).
     try:
         ts_parsed = pd.to_datetime(df["timestamp_utc"], format="ISO8601", errors="coerce")
         dates = ts_parsed.dt.date.value_counts()
     except Exception:
-        # Fallback: parse as string
+        # Fallback: parse sebagai string.
         dates = df["timestamp_utc"].astype(str).str[:10].value_counts()
     lines.append(f"  Temporal: data dari {len(dates)} hari unik")
     if len(dates) == 1:
@@ -305,7 +288,6 @@ def data_quality_report(df: pd.DataFrame) -> str:
     return "\n".join(lines)
 
 
-# ── Entry point ───────────────────────────────────────────────────────────────
 
 def main(base_dir: Path = DEFAULT_DATA_DIR) -> None:
     log.info("=== JSON → PIPELINE (BATCH PER BULAN) ===")

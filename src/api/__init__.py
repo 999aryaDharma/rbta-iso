@@ -1,4 +1,4 @@
-"""Operational REST API, Shuffle SOAR integration, and Telegram formatting package."""
+"""Paket REST API operasional, integrasi Shuffle SOAR, dan format pesan Telegram."""
 
 __all__ = [
     "ShuffleForwarderError",
@@ -9,7 +9,7 @@ __all__ = [
 
 
 def __getattr__(name: str):
-    """Load public API helpers lazily to avoid runtime worker import cycles."""
+    """Muat helper API secara lazy agar tidak terjadi import cycle dengan worker runtime."""
     if name == "create_app":
         from src.api.app import create_app
         return create_app

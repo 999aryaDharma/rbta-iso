@@ -45,18 +45,14 @@ Dokumentasi ini menyelaraskan codebase dengan metodologi seminar proposal dan me
    - DRY/single responsibility;
    - legacy cleanup.
 
-8. [`07-IMPLEMENTATION-CHECKLIST.md`](./07-IMPLEMENTATION-CHECKLIST.md)
-   - high-level implementation gates;
-   - research and operational verification checklist.
-
-9. [`08-OPERATIONAL-INTEGRATION-SPEC.md`](./08-OPERATIONAL-INTEGRATION-SPEC.md)
+8. [`08-OPERATIONAL-INTEGRATION-SPEC.md`](./08-OPERATIONAL-INTEGRATION-SPEC.md)
    - REST operational boundary;
    - persistent per-agent runtime state;
    - Shuffle custom app;
    - Telegram routing;
    - outbox/idempotency.
 
-10. [`09-WAZUH-INDEXER-INGESTION-SPEC.md`](./09-WAZUH-INDEXER-INGESTION-SPEC.md)
+9. [`09-WAZUH-INDEXER-INGESTION-SPEC.md`](./09-WAZUH-INDEXER-INGESTION-SPEC.md)
     - historical daily-index discovery;
     - PIT + `search_after`;
     - checkpoint/resume;
@@ -65,36 +61,24 @@ Dokumentasi ini menyelaraskan codebase dengan metodologi seminar proposal dan me
     - campus collector push;
     - historical-to-live handoff.
 
-11. [`10-DUAL-MODE-RUNTIME-SPEC.md`](./10-DUAL-MODE-RUNTIME-SPEC.md)
+10. [`10-DUAL-MODE-RUNTIME-SPEC.md`](./10-DUAL-MODE-RUNTIME-SPEC.md)
     - `research-batch` dan `replay-stream`;
     - shared Research Core;
     - replay clock;
     - state recovery;
     - batch/replay equivalence.
 
-12. [`11-PRODUCTION-READINESS-AUDIT.md`](./11-PRODUCTION-READINESS-AUDIT.md)
-    - P0/P1/P2 audit current code;
-    - algorithmic blockers;
-    - ingestion/runtime gaps;
-    - target production structure.
-
-13. [`12-MODEL-ARTIFACT-LIFECYCLE-SPEC.md`](./12-MODEL-ARTIFACT-LIFECYCLE-SPEC.md)
+11. [`12-MODEL-ARTIFACT-LIFECYCLE-SPEC.md`](./12-MODEL-ARTIFACT-LIFECYCLE-SPEC.md)
     - immutable model/scaler artifacts;
     - single-event-safe score calibration;
     - threshold persistence;
     - feature/model version validation.
 
-14. [`13-ANTIGRAVITY-SPRINT-PLAN.md`](./13-ANTIGRAVITY-SPRINT-PLAN.md)
-    - task-by-task development plan;
-    - TDD gates;
-    - commits and acceptance per sprint;
-    - historical + live Wazuh implementation sequence.
-
-15. [`14-AGENT-DEFINITION-OF-DONE.md`](./14-AGENT-DEFINITION-OF-DONE.md)
-    - rules for coding-agent completion claims;
-    - mandatory evidence;
-    - stop conditions;
-    - no-shortcut production/research verification.
+12. [`15-DASHBOARD-AND-DEMONSTRATION-SPEC.md`](./15-DASHBOARD-AND-DEMONSTRATION-SPEC.md)
+    - raw alert evidence store;
+    - REST API dashboard;
+    - replay controller deterministik;
+    - dashboard React.
 
 ## Core Rule
 
@@ -133,17 +117,3 @@ Batch/Archive/API ->| Wazuh Canonicalizer     |
 ```
 
 Historical replay, live polling, REST transport, persistence, dashboard, Shuffle, dan Telegram tidak boleh mengubah formula EMA, feature schema, IF methodology, atau evaluation definition.
-
-## Development Rule for Coding Agents
-
-Coding agent harus mulai dari:
-
-```text
-00-SOURCE-OF-TRUTH.md
-13-ANTIGRAVITY-SPRINT-PLAN.md
-14-AGENT-DEFINITION-OF-DONE.md
-```
-
-Lalu membaca spec yang relevan dengan sprint aktif.
-
-Jangan menjalankan sprint berikutnya sebelum acceptance gate sprint aktif lulus dengan test evidence.

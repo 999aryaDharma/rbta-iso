@@ -1,4 +1,4 @@
-"""Unit tests for DurableStateManager and crash-recovery state restoration (Sprint 7)."""
+"""Unit test DurableStateManager dan pemulihan state setelah crash."""
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 import json
@@ -26,24 +26,24 @@ def make_alert(idx: int, ts: datetime, agent_id: str = "001", group: str = "pam"
 
 
 def test_durable_state_save_and_restore_engine(tmp_path: Path):
-    """Engine state (seen IDs, temporal state, active buckets, counter) persists to disk and restores identically."""
+    """State engine (ID seen, state temporal, bucket aktif, counter) tersimpan ke disk dan pulih secara identik."""
     state_file = tmp_path / "runtime_state.json"
     manager = DurableStateManager(state_file)
 
     engine = RBTAEngine(base_delta_t=timedelta(minutes=15))
     base_t = datetime(2026, 8, 28, 10, 0, 0, tzinfo=timezone.utc)
 
-    # Ingest 2 alerts into active bucket
+    # Ingest 2 alert ke bucket aktif.
     a1 = make_alert(1, base_t, agent_id="001", group="pam")
     a2 = make_alert(2, base_t + timedelta(minutes=5), agent_id="001", group="pam")
     engine.process(a1)
     engine.process(a2)
 
-    # Ingest 1 alert into separate agent bucket
+    # Ingest 1 alert ke bucket agent lain.
     b1 = make_alert(3, base_t + timedelta(minutes=2), agent_id="002", group="syslog")
     engine.process(b1)
 
-    # Save state
+    # Simpan state.
     manager.save_state(
         engine=engine,
         outbox=[{"item": 1, "meta_id": 100}],
@@ -51,14 +51,14 @@ def test_durable_state_save_and_restore_engine(tmp_path: Path):
     )
     assert state_file.exists()
 
-    # Create fresh empty engine and restore state from disk
+    # Buat engine kosong baru dan pulihkan state dari disk.
     restored_engine = RBTAEngine(base_delta_t=timedelta(minutes=15))
     restored_data = manager.restore_state(restored_engine)
 
     assert restored_data["source_checkpoint"] == {"mode": "live", "offset": 42}
     assert restored_data["outbox"] == [{"item": 1, "meta_id": 100}]
 
-    # Verify internal engine structures restored
+    # Struktur internal engine harus pulih.
     assert restored_engine._seen_alert_ids == {"alert_1", "alert_2", "alert_3"}
     assert ("001", "pam") in restored_engine._active_buckets
     assert ("002", "syslog") in restored_engine._active_buckets
@@ -69,11 +69,11 @@ def test_durable_state_save_and_restore_engine(tmp_path: Path):
     assert bucket_001.end_time == base_t + timedelta(minutes=5)
     assert restored_engine.snapshot_agents()[0]["agent_name"] == "soc-001"
 
-    # Processing duplicate alert_1 in restored engine is idempotent
+    # Memproses alert_1 duplikat di engine hasil pemulihan bersifat idempoten.
     assert restored_engine.process(a1) == []
     assert restored_engine._active_buckets[("001", "pam")].alert_count == 2
 
-    # Processing new alert_4 in restored engine merges into existing restored bucket
+    # Memproses alert_4 baru di engine hasil pemulihan ter-merge ke bucket yang sudah dipulihkan.
     a4 = make_alert(4, base_t + timedelta(minutes=10), agent_id="001", group="pam")
     assert restored_engine.process(a4) == []
     assert restored_engine._active_buckets[("001", "pam")].alert_count == 3
@@ -81,7 +81,7 @@ def test_durable_state_save_and_restore_engine(tmp_path: Path):
 
 
 def test_seen_alert_ids_are_persisted_in_sqlite_not_rewritten_in_json(tmp_path: Path):
-    """Checkpoint JSON stays bounded while duplicate protection survives restart."""
+    """JSON checkpoint tetap terbatas ukurannya sementara proteksi duplikat bertahan setelah restart."""
     state_file = tmp_path / "runtime_state.json"
     manager = DurableStateManager(state_file)
     engine = RBTAEngine(base_delta_t=timedelta(minutes=15))
@@ -197,7 +197,7 @@ def test_legacy_json_snapshot_migrates_without_reset(tmp_path):
     engine = RBTAEngine()
     restored = manager.restore_state(engine)
     manager.save_state(engine, outbox=restored["outbox"], source_checkpoint=restored["source_checkpoint"])
-    state.unlink()  # SQLite alone must suffice after migration.
+    state.unlink()  # setelah migrasi, SQLite saja harus cukup
     recovered = RBTAEngine()
     restored = DurableStateManager(state).restore_state(recovered)
     assert recovered._seen_alert_ids == {"legacy-alert"}
@@ -223,14 +223,14 @@ def test_restore_recreates_parent_dir_removed_between_init_and_restore(tmp_path)
 
 
 def test_derivation_hash_roundtrip_and_stable(tmp_path: Path):
-    """F6: derivation hash is stable across calls and round-trips through the manager."""
+    """Hash derivasi stabil antar pemanggilan dan utuh saat disimpan-dibaca lewat manager."""
     from src.runtime.durable_state import compute_derivation_hash
 
     h1 = compute_derivation_hash()
     h2 = compute_derivation_hash()
     assert h1 == h2
     assert len(h1) == 64
-    int(h1, 16)  # valid lowercase hex sha256
+    int(h1, 16)  # hex sha256 huruf kecil yang valid
 
     manager = DurableStateManager(tmp_path / "state.json")
     assert manager.get_derivation_hash() is None
@@ -239,8 +239,9 @@ def test_derivation_hash_roundtrip_and_stable(tmp_path: Path):
 
 
 def test_evidence_cache_overflow_flushes_before_clear(tmp_path: Path):
-    """F13a: a full dedup cache flushes buffered evidence to SQLite before clearing,
-    so a conflicting duplicate of a buffered-but-unflushed alert is still detected."""
+    """Cache dedup yang penuh mem-flush evidence yang masih di buffer ke SQLite sebelum dikosongkan,
+    sehingga duplikat bertentangan dari alert yang belum di-flush tetap terdeteksi.
+    """
     from src.runtime.raw_evidence import RawAlertEvidenceStore, RawEvidenceConflictError
 
     store = RawAlertEvidenceStore(db_path=tmp_path / "ev.sqlite3", batch_size=1000)
@@ -249,7 +250,7 @@ def test_evidence_cache_overflow_flushes_before_clear(tmp_path: Path):
 
     store.store(make_alert(1, base))
     store.store(make_alert(2, base))
-    store.store(make_alert(3, base))  # overflows the cache -> must flush first, then clear
+    store.store(make_alert(3, base))  # melebihi cache -> harus flush dulu, baru dikosongkan
 
     conflicting = CanonicalRawAlert(
         wazuh_alert_id="alert_1",
@@ -269,7 +270,7 @@ def test_evidence_cache_overflow_flushes_before_clear(tmp_path: Path):
 
 
 def test_empty_stored_fingerprint_raises_integrity_error(tmp_path: Path):
-    """F13b: a stored row with an empty canonical fingerprint is corruption, not a conflict."""
+    """Baris tersimpan dengan fingerprint kanonis kosong adalah korupsi, bukan konflik."""
     import sqlite3
 
     from src.runtime.raw_evidence import RawAlertEvidenceStore, RawEvidenceIntegrityError
@@ -290,7 +291,7 @@ def test_empty_stored_fingerprint_raises_integrity_error(tmp_path: Path):
 
 
 def test_first_save_backs_up_non_12_mirror_once(tmp_path: Path):
-    """F13c: the first save overwriting a non-1.2 JSON mirror copies it to .pre-1.2.bak exactly once."""
+    """Penyimpanan pertama yang menimpa mirror JSON non-1.2 menyalinnya ke .pre-1.2.bak tepat sekali."""
     legacy = {
         "schema_version": "1.0",
         "seen_alert_ids": [],
@@ -316,7 +317,7 @@ def test_first_save_backs_up_non_12_mirror_once(tmp_path: Path):
 
 
 def test_quarantine_add_returns_count_first_then_repeat(tmp_path: Path):
-    """N5a: quarantine_add returns the per-ID count (1 on first offense, 2 on repeat)."""
+    """quarantine_add mengembalikan count per ID (1 pada pelanggaran pertama, 2 pada pengulangan)."""
     manager = DurableStateManager(tmp_path / "state.json")
     assert manager.quarantine_add("alert_1", error_type="E1") == 1
     assert manager.quarantine_add("alert_1", error_type="E1") == 2
@@ -324,7 +325,7 @@ def test_quarantine_add_returns_count_first_then_repeat(tmp_path: Path):
 
 
 def test_quarantine_add_many_single_flush_returns_counts(tmp_path: Path):
-    """N5b: batch quarantine in one call; counts returned per entry in order."""
+    """Quarantine batch dalam satu panggilan; count dikembalikan per entri sesuai urutan."""
     manager = DurableStateManager(tmp_path / "state.json")
     entries = [
         {"wazuh_alert_id": "a1", "source_index": "idx", "source_document_id": "d1", "error_type": "E1"},
@@ -337,7 +338,7 @@ def test_quarantine_add_many_single_flush_returns_counts(tmp_path: Path):
 
 
 def test_quarantine_release_and_count(tmp_path: Path):
-    """N5d: release deletes by ID and returns affected rows; count is COUNT(*)."""
+    """Release menghapus berdasarkan ID dan mengembalikan jumlah baris terdampak; count = COUNT(*)."""
     manager = DurableStateManager(tmp_path / "state.json")
     manager.quarantine_add("a1", error_type="E1")
     manager.quarantine_add("a2", error_type="E2")
@@ -349,18 +350,18 @@ def test_quarantine_release_and_count(tmp_path: Path):
 
 
 def test_suppression_add_and_count(tmp_path: Path):
-    """API for dispatcher agent: add/count suppressed notification meta IDs."""
+    """API untuk dispatcher: tambah/hitung meta ID yang notifikasinya ditahan."""
     manager = DurableStateManager(tmp_path / "state.json")
     assert manager.suppression_count() == 0
     manager.suppression_add(7, "daily digest")
     manager.suppression_add(9, "suppressed noise")
     assert manager.suppression_count() == 2
-    manager.suppression_add(7, "daily digest")  # idempotent re-suppress
+    manager.suppression_add(7, "daily digest")  # penahanan ulang bersifat idempoten
     assert manager.suppression_count() == 2
 
 
 def test_derivation_hash_fail_closed_on_unreadable_config(tmp_path: Path, monkeypatch):
-    """N6-durable: no silent 'v1' fallback — unreadable config must raise."""
+    """Tidak ada fallback 'v1' diam-diam — konfigurasi yang tidak bisa dibaca harus error."""
     from src.runtime import durable_state as ds
 
     monkeypatch.setattr("src.config.domain.AGENT_CRITICALITY", None)
@@ -369,7 +370,7 @@ def test_derivation_hash_fail_closed_on_unreadable_config(tmp_path: Path, monkey
 
 
 def test_derivation_hash_pins_canonicalizer_version(tmp_path: Path):
-    """N6-durable: CANONICALIZER_VERSION is part of the hashed derivation dict."""
+    """CANONICALIZER_VERSION termasuk dalam dict derivasi yang di-hash."""
     import hashlib
     import json as _json
 
@@ -392,8 +393,9 @@ def test_derivation_hash_pins_canonicalizer_version(tmp_path: Path):
 
 
 def test_derivation_hash_covers_all_canonicalizer_tables(tmp_path: Path, monkeypatch):
-    """N6-durable: every domain table read by resolve_primary_rule_group /
-    get_agent_criticality flips the hash (nothing silently uncovered)."""
+    """Setiap tabel domain yang dibaca resolve_primary_rule_group / get_agent_criticality
+    mengubah hash (tidak ada yang luput diam-diam).
+    """
     from src.runtime import durable_state as ds
 
     base = ds.compute_derivation_hash()
@@ -411,7 +413,7 @@ def test_derivation_hash_covers_all_canonicalizer_tables(tmp_path: Path, monkeyp
 
 
 def test_save_state_meta_id_collision_fails_closed(tmp_path: Path):
-    """N8: overlapping batch meta_ids vs finalized_history raise; committed state intact."""
+    """meta_id batch yang bertabrakan dengan finalized_history melempar error; state yang sudah di-commit tetap utuh."""
     manager = DurableStateManager(tmp_path / "state.json")
     manager.append_finalized([{"meta_id": 42, "marker": "original"}])
     engine = RBTAEngine()
@@ -430,7 +432,7 @@ def test_save_state_meta_id_collision_fails_closed(tmp_path: Path):
 
 
 def test_restore_history_only_sets_counter_to_max_plus_one(tmp_path: Path):
-    """N8: history-only restore (no snapshot) resumes counter at MAX(meta_id)+1."""
+    """Restore yang hanya berisi history (tanpa snapshot) melanjutkan counter di MAX(meta_id)+1."""
     manager = DurableStateManager(tmp_path / "state.json")
     manager.append_finalized([{"meta_id": 5}, {"meta_id": 9}, {"meta_id": 7}])
     engine = RBTAEngine()
@@ -439,7 +441,7 @@ def test_restore_history_only_sets_counter_to_max_plus_one(tmp_path: Path):
 
 
 def test_restore_history_only_empty_keeps_counter_at_one(tmp_path: Path):
-    """N8 boundary: empty history leaves the fresh-engine counter at 1."""
+    """Batas: history kosong membiarkan counter engine baru di 1."""
     manager = DurableStateManager(tmp_path / "state.json")
     engine = RBTAEngine()
     manager.restore_state(engine)
@@ -447,7 +449,7 @@ def test_restore_history_only_empty_keeps_counter_at_one(tmp_path: Path):
 
 
 def test_restore_without_snapshot_but_with_seen_ids_fails_closed(tmp_path: Path):
-    """F13d: a lost SQLite snapshot with non-empty seen IDs must raise, never hydrate dedup into an empty engine."""
+    """Snapshot SQLite yang hilang dengan ID seen yang tidak kosong harus error, tidak pernah mengisi dedup ke engine kosong."""
     manager = DurableStateManager(tmp_path / "state.json")
     engine = RBTAEngine()
     now = datetime(2026, 9, 28, tzinfo=timezone.utc)
@@ -458,28 +460,30 @@ def test_restore_without_snapshot_but_with_seen_ids_fails_closed(tmp_path: Path)
     with sqlite3.connect(manager.history_db_path) as conn:
         conn.execute("DELETE FROM runtime_snapshot")
         conn.commit()
-    manager.filepath.unlink()  # also drop the JSON mirror: only SQLite dedup remains
+    manager.filepath.unlink()  # mirror JSON juga dihapus: hanya dedup SQLite yang tersisa
 
     with pytest.raises((ValueError, RuntimeError), match="snapshot"):
         manager.restore_state(RBTAEngine())
 
 
 def test_finalized_collision_identical_data_is_idempotent(tmp_path: Path):
-    """Minor(a): re-checkpointing byte-identical scored data is a safe no-op,
-    not a collision (lets a retried checkpoint succeed without data loss)."""
+    """Checkpoint ulang dengan data skor yang identik byte-per-byte adalah no-op yang aman,
+    bukan tabrakan (checkpoint yang di-retry bisa berhasil tanpa kehilangan data).
+    """
     manager = DurableStateManager(tmp_path / "state.json")
     engine = RBTAEngine()
     now = datetime(2026, 9, 28, tzinfo=timezone.utc)
     engine.process(make_alert(1, now))
     batch = [{"meta_id": 42, "marker": "same"}]
     manager.save_state(engine, new_finalized_history=batch)
-    manager.save_state(engine, new_finalized_history=[dict(batch[0])])  # must not raise
+    manager.save_state(engine, new_finalized_history=[dict(batch[0])])  # tidak boleh error
     assert manager.get_finalized(42) == {"meta_id": 42, "marker": "same"}
 
 
 def test_finalized_collision_differing_data_still_fails_closed(tmp_path: Path):
-    """Minor(a) boundary: identical content passes, but a divergent row under
-    an already-committed meta_id still raises and preserves the original."""
+    """Batas: isi identik lolos, tetapi baris berbeda di bawah meta_id yang sudah di-commit
+    tetap error dan data aslinya dipertahankan.
+    """
     manager = DurableStateManager(tmp_path / "state.json")
     engine = RBTAEngine()
     now = datetime(2026, 9, 28, tzinfo=timezone.utc)
@@ -491,7 +495,7 @@ def test_finalized_collision_differing_data_still_fails_closed(tmp_path: Path):
 
 
 def test_quarantine_id_set_returns_id_only_set(tmp_path: Path):
-    """quarantine_id_set returns just the ID set (cheap skip filter, no display columns)."""
+    """quarantine_id_set hanya mengembalikan set ID (filter skip yang murah, tanpa kolom tampilan)."""
     manager = DurableStateManager(tmp_path / "state.json")
     assert manager.quarantine_id_set() == set()
     manager.quarantine_add("a1", error_type="E1")
@@ -500,7 +504,7 @@ def test_quarantine_id_set_returns_id_only_set(tmp_path: Path):
 
 
 def test_notification_add_and_count(tmp_path: Path):
-    """notification_log table + notification_add/count API for the dispatcher agent."""
+    """Tabel notification_log + API notification_add/count untuk dispatcher."""
     manager = DurableStateManager(tmp_path / "state.json")
     assert manager.notification_count() == 0
     row_id1 = manager.notification_add(7, "run-1", "ESCALATE")

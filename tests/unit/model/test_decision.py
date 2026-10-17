@@ -1,13 +1,13 @@
-"""Unit tests for Decision Matrix and False Positive Gate (Sprint 4)."""
+"""Unit test Decision Matrix dan False Positive Gate."""
 import pytest
 from src.model.decision import evaluate_decision
 
 
 def test_decision_matrix_four_quadrants():
-    """Verify the 4 standard decision matrix quadrants when False Positive Gate does not trigger."""
+    """Empat kuadran decision matrix standar saat False Positive Gate tidak aktif."""
     threshold = 0.70
 
-    # 1. Anomaly High + Severity High -> CRITICAL -> ESCALATE
+    # Anomali tinggi + severity tinggi -> CRITICAL -> ESCALATE
     decision, action, escalate = evaluate_decision(
         anomaly_score=0.85, threshold=threshold, max_severity=10, alert_count=10, mitre_tactic_count=2
     )
@@ -15,7 +15,7 @@ def test_decision_matrix_four_quadrants():
     assert action == "ESCALATE"
     assert escalate is True
 
-    # 2. Anomaly High + Severity Low (with mitre tactics or count >= 5) -> SUSPICIOUS -> ESCALATE
+    # Anomali tinggi + severity rendah (ada taktik MITRE atau count >= 5) -> SUSPICIOUS -> ESCALATE
     decision, action, escalate = evaluate_decision(
         anomaly_score=0.85, threshold=threshold, max_severity=4, alert_count=10, mitre_tactic_count=1
     )
@@ -23,7 +23,7 @@ def test_decision_matrix_four_quadrants():
     assert action == "ESCALATE"
     assert escalate is True
 
-    # 3. Anomaly Low + Severity High -> NOISE_HIGH -> DAILY_DIGEST
+    # Anomali rendah + severity tinggi -> NOISE_HIGH -> DAILY_DIGEST
     decision, action, escalate = evaluate_decision(
         anomaly_score=0.50, threshold=threshold, max_severity=8, alert_count=10, mitre_tactic_count=0
     )
@@ -31,7 +31,7 @@ def test_decision_matrix_four_quadrants():
     assert action == "DAILY_DIGEST"
     assert escalate is False
 
-    # 4. Anomaly Low + Severity Low -> NOISE -> SUPPRESS
+    # Anomali rendah + severity rendah -> NOISE -> SUPPRESS
     decision, action, escalate = evaluate_decision(
         anomaly_score=0.40, threshold=threshold, max_severity=3, alert_count=2, mitre_tactic_count=0
     )
@@ -41,17 +41,17 @@ def test_decision_matrix_four_quadrants():
 
 
 def test_false_positive_gate_contextual_anomaly():
-    """If anomaly_score >= threshold BUT max_severity < 7 AND alert_count < 5 AND mitre_tactic_count == 0,
-    it must be classified as CONTEXTUAL_ANOMALY -> SUPPRESS.
+    """Bila anomaly_score >= threshold TETAPI max_severity < 7 DAN alert_count < 5 DAN mitre_tactic_count == 0,
+    hasilnya harus CONTEXTUAL_ANOMALY -> SUPPRESS.
     """
     threshold = 0.70
 
     decision, action, escalate = evaluate_decision(
-        anomaly_score=0.90,  # anomaly high
+        anomaly_score=0.90,  # anomali tinggi
         threshold=threshold,
         max_severity=4,       # severity < 7
         alert_count=2,        # count < 5
-        mitre_tactic_count=0, # no mitre tactics
+        mitre_tactic_count=0, # tanpa taktik MITRE
     )
     assert decision == "CONTEXTUAL_ANOMALY"
     assert action == "SUPPRESS"
@@ -59,7 +59,7 @@ def test_false_positive_gate_contextual_anomaly():
 
 
 def test_false_positive_gate_mitre_presence_prevents_suppression():
-    """If mitre_tactic_count > 0, False Positive Gate does NOT trigger even if count < 5 and severity < 7."""
+    """Bila mitre_tactic_count > 0, False Positive Gate TIDAK aktif meski count < 5 dan severity < 7."""
     threshold = 0.70
 
     decision, action, escalate = evaluate_decision(
@@ -67,7 +67,7 @@ def test_false_positive_gate_mitre_presence_prevents_suppression():
         threshold=threshold,
         max_severity=4,
         alert_count=2,
-        mitre_tactic_count=1,  # MITRE present -> bypasses FP gate
+        mitre_tactic_count=1,  # ada MITRE -> lolos dari FP gate
     )
     assert decision == "SUSPICIOUS"
     assert action == "ESCALATE"

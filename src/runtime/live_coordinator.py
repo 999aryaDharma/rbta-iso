@@ -1,4 +1,4 @@
-"""Live Ingestion Coordinator coordinating fast recent polling, reconciliation scans, and durable ingestion."""
+"""Coordinator ingestion live: polling cepat data terbaru, scan rekonsiliasi, dan ingestion durable."""
 
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -20,9 +20,9 @@ from src.runtime.service import LiveRBTAService
 
 logger = logging.getLogger(__name__)
 
-#: Deterministic per-record failures quarantined durably (QUARANTINE policy).
-#: engine.process is failure-atomic for these: zero commit state is mutated,
-#: the alert ID is never marked seen, so a retry reproduces the same error.
+# Kegagalan per record yang deterministik dikarantina secara durable (kebijakan QUARANTINE).
+# engine.process atomik untuk kasus ini: tidak ada state commit yang berubah dan ID alert
+# tidak pernah ditandai seen, sehingga retry akan menghasilkan error yang sama.
 _QUARANTINE_ERRORS = (
     RawEvidenceConflictError,
     RawEvidenceIntegrityError,
@@ -30,18 +30,18 @@ _QUARANTINE_ERRORS = (
     TemporalStateError,
 )
 
-#: N5 circuit breaker: halt the cycle instead of absorbing systemic corruption.
+# Circuit breaker: hentikan siklus alih-alih menyerap korupsi yang sistemik.
 _QUARANTINE_BREAKER_FRACTION = 0.01
 _QUARANTINE_BREAKER_ABSOLUTE = 100
 
-#: M2(c): event timestamps beyond now + this skew are future-dated (clock skew
-#: or corrupt event time) and must not shift newest_ingested_event_time.
+# Timestamp event yang melewati now + skew ini dianggap dari masa depan (clock skew
+# atau event time rusak) dan tidak boleh menggeser newest_ingested_event_time.
 _FUTURE_EVENT_SKEW = timedelta(minutes=5)
 
 
 @dataclass(frozen=True)
 class LiveCycleResult:
-    """Operational observability metrics for a single live ingestion cycle."""
+    """Metrik observability operasional untuk satu siklus ingestion live."""
 
     fast_candidates: int
     recent_reconciliation_candidates: int
@@ -53,55 +53,56 @@ class LiveCycleResult:
     new_scored_meta_alerts: int
     quarantined: int = 0
     skipped_quarantined: int = 0
+    excluded: int = 0
+    retention_expired: int = 0
 
     @property
     def reconciliation_candidates(self) -> int:
-        """Backwards-compatible aggregate reconciliation candidate count."""
+        """Jumlah agregat kandidat rekonsiliasi (dipertahankan untuk kompatibilitas)."""
         return self.recent_reconciliation_candidates + self.full_reconciliation_candidates
 
 
 class LiveIngestionCoordinator:
-    """Coordinates fast recent polling, recent reconciliation scans, and full-retention sweeps.
+    """Mengoordinasikan polling cepat data terbaru, scan rekonsiliasi terbaru, dan sweep seluruh retensi.
 
     Parameters
     ----------
     service : LiveRBTAService
-        Target live stateful runtime service.
+        Service runtime live stateful tujuan.
     poller : WazuhIndexerLivePoller | None
-        Wazuh Indexer poller source.
+        Sumber poller Wazuh Indexer.
     fast_poll_interval : timedelta
-        Frequency between fast recent polling cycles (default 5 seconds).
+        Jeda antar siklus polling cepat (default 5 detik).
     recent_reconciliation_interval : timedelta
-        Frequency between recent reconciliation scans (default 5 minutes).
+        Jeda antar scan rekonsiliasi terbaru (default 5 menit).
     full_reconciliation_interval : timedelta
-        Frequency between exhaustive full-retention sweeps (default 1 hour).
+        Jeda antar sweep menyeluruh seluruh retensi (default 1 jam).
     recent_reconciliation_days : int
-        Number of recent daily indices to scan during recent reconciliation (default 2).
+        Jumlah index harian terbaru yang di-scan saat rekonsiliasi terbaru (default 2).
     order_buffer_enabled : bool
-        When True, candidates are held in an OrderBuffer and only watermark /
-        max_hold releases are ingested, closing the cross-cycle ordering gap
-        (late reconciliation alerts vs fast-poll alerts). Default False, which
-        preserves the legacy immediate-ingest behavior.
+        Bila True, kandidat ditahan di OrderBuffer dan hanya yang dilepas oleh
+        watermark / max_hold yang di-ingest, sehingga celah urutan antar siklus
+        (alert rekonsiliasi yang terlambat vs alert fast-poll) tertutup. Default False,
+        yang mempertahankan perilaku lama (langsung ingest).
     order_buffer_hold_window : timedelta
-        Event-time hold window for the buffer watermark (default 30 seconds).
+        Window tahan event-time untuk watermark buffer (default 30 detik).
     order_buffer_max_hold : timedelta
-        Maximum wall-clock hold before force-release (default 5 minutes).
+        Batas tahan wall-clock sebelum dilepas paksa (default 5 menit).
     order_buffer_max_items : int
-        Bounded buffer capacity; exhaustion triggers backpressure, never drops.
+        Kapasitas buffer; bila penuh memicu backpressure, tidak pernah membuang alert.
     breaker_ack : str | None
-        Operator acknowledgement for a latched breaker trip. The server passes
-        ``RBTA_QUARANTINE_BREAKER_ACK`` here; a value matching the latched
-        ``trip_id`` clears the latch and resumes cycling, anything else keeps
-        halting. Default None (no acknowledgement).
+        Konfirmasi operator untuk breaker yang sedang ter-latch. Server meneruskan
+        ``RBTA_QUARANTINE_BREAKER_ACK`` ke sini; nilai yang cocok dengan ``trip_id``
+        yang ter-latch akan membersihkan latch dan siklus berjalan lagi, nilai lain
+        tetap menahan. Default None (tanpa konfirmasi).
 
-    Operational distinction
-    -----------------------
-    quarantine = an isolated corrupt record is absorbed and the cycle keeps
-    running (one bad apple never blinds ingestion). breaker-latch = systemic
-    corruption halted the cycle and persisted a ``breaker_tripped`` latch into
-    source state; every subsequent cycle raises immediately — without polling,
-    ingesting, or committing — until the operator acknowledges with the
-    matching ``trip_id``.
+    Perbedaan operasional
+    ---------------------
+    quarantine = satu record rusak yang terisolasi diserap dan siklus tetap berjalan
+    (satu record buruk tidak membutakan ingestion). breaker-latch = korupsi sistemik
+    menghentikan siklus dan menyimpan latch ``breaker_tripped`` ke source state; setiap
+    siklus berikutnya langsung error — tanpa polling, ingest, atau commit — sampai
+    operator mengonfirmasi dengan ``trip_id`` yang cocok.
     """
 
     def __init__(
@@ -121,6 +122,8 @@ class LiveIngestionCoordinator:
         breaker_ack: Optional[str] = None,
         live_archive_enabled: Optional[bool] = None,
         live_archive_dir: Optional[Union[str, Path]] = None,
+        excluded_agents: Optional[str] = None,
+        retention_days: int = 0,
     ) -> None:
         self.service: LiveRBTAService = service
         self.poller: WazuhIndexerLivePoller = poller or WazuhIndexerLivePoller()
@@ -143,9 +146,9 @@ class LiveIngestionCoordinator:
         )
         self.breaker_ack: Optional[str] = breaker_ack
 
-        # Design A: best-effort raw JSONL archive of live-ingested alerts.
-        # Default disabled so replay/demo paths are unaffected; enable via
-        # RBTA_LIVE_ARCHIVE_ENABLED=1 (dir via RBTA_LIVE_ARCHIVE_DIR).
+        # Arsip JSONL mentah (best effort) untuk alert yang di-ingest dari live.
+        # Default nonaktif agar jalur replay/demo tidak terpengaruh; aktifkan lewat
+        # RBTA_LIVE_ARCHIVE_ENABLED=1 (direktori lewat RBTA_LIVE_ARCHIVE_DIR).
         if live_archive_enabled is None:
             live_archive_enabled = os.environ.get(
                 "RBTA_LIVE_ARCHIVE_ENABLED", ""
@@ -156,7 +159,18 @@ class LiveIngestionCoordinator:
             live_archive_dir = env_dir if env_dir else "data/archive"
         self.live_archive_dir: Path = Path(live_archive_dir)
 
-        # Restore transport cursor state from service
+        # Agen uji yang dikecualikan dari ingestion live (RBTA_EXCLUDED_AGENTS, dipisah koma,
+        # cocok dengan agent_name ATAU agent_id, case-insensitive). Replay/offline tidak memakai ini.
+        if excluded_agents is None:
+            excluded_agents = os.environ.get("RBTA_EXCLUDED_AGENTS", "")
+        # Retensi (T12): seen_alert_ids lebih tua dari cutoff dipangkas, jadi kandidat dengan event time
+        # < cutoff dilewati (dihitung) agar tidak di-ingest ulang menjadi MetaAlert ganda. 0 = nonaktif.
+        self.retention_days: int = max(0, int(retention_days or 0))
+        self.excluded_agents: frozenset = frozenset(
+            token.strip().lower() for token in str(excluded_agents).split(",") if token.strip()
+        )
+
+        # Pulihkan state cursor transport dari service.
         source_state = self.service.get_live_source_state()
 
         raw_cursor = source_state.get("recent_poll_cursor")
@@ -182,7 +196,7 @@ class LiveIngestionCoordinator:
         )
 
     def run_fast_poll(self, current_time: Optional[datetime] = None) -> List[CanonicalRawAlert]:
-        """Execute fast recent polling path using current poll cursor hint."""
+        """Jalankan jalur polling cepat memakai hint cursor poll saat ini."""
         now = current_time or datetime.now(timezone.utc)
         return self.poller.poll_recent(current_time=now, recent_poll_cursor=self.recent_poll_cursor)
 
@@ -193,7 +207,7 @@ class LiveIngestionCoordinator:
         start_time: Optional[datetime] = None,
         end_time: Optional[datetime] = None,
     ) -> List[CanonicalRawAlert]:
-        """Execute recent reconciliation scan across recent daily indices."""
+        """Jalankan scan rekonsiliasi pada index harian terbaru."""
         now = current_time or datetime.now(timezone.utc)
         n_days = days or self.recent_reconciliation_days
         return self.poller.poll_reconciliation(
@@ -210,7 +224,7 @@ class LiveIngestionCoordinator:
         start_time: Optional[datetime] = None,
         end_time: Optional[datetime] = None,
     ) -> List[CanonicalRawAlert]:
-        """Backwards-compatible alias for run_recent_reconciliation."""
+        """Alias run_recent_reconciliation, dipertahankan untuk kompatibilitas."""
         return self.run_recent_reconciliation(
             current_time=current_time,
             days=days,
@@ -219,10 +233,10 @@ class LiveIngestionCoordinator:
         )
 
     def run_full_reconciliation(self, prefix: str = "wazuh-alerts-4.x-") -> List[CanonicalRawAlert]:
-        """Execute lossless full-retention reconciliation across all retained daily indices.
+        """Jalankan rekonsiliasi seluruh retensi tanpa kehilangan data di semua index harian yang tersimpan.
 
-        Strict index coverage: an unavailable discovered index fails hard
-        instead of being silently skipped as an apparent empty result.
+        Cakupan index ketat: index yang ditemukan tetapi tidak tersedia langsung gagal,
+        bukan diam-diam dilewati seolah hasilnya kosong.
         """
         return self.poller.poll_full_reconciliation(prefix=prefix, allow_unavailable=False)
 
@@ -233,72 +247,67 @@ class LiveIngestionCoordinator:
         force_full_reconciliation: bool = False,
         force_reconciliation: bool = False,
     ) -> LiveCycleResult:
-        """Execute a coordinated live ingestion cycle.
+        """Jalankan satu siklus ingestion live yang terkoordinasi.
 
-        1. Runs full-retention sweep if due or forced.
-        2. Runs recent reconciliation if due or forced.
-        3. Runs fast recent polling.
-        4. Merges candidate streams in deterministic order.
-        5. Submits each candidate to LiveRBTAService.
-        6. Flushes the per-cycle quarantine batch once, then checks the breaker.
-        7. Flushes idle buckets in LiveRBTAService.
-        8. Atomically updates and persists transport cursor state on success.
+        1. Jalankan sweep seluruh retensi bila sudah jadwalnya atau dipaksa.
+        2. Jalankan rekonsiliasi terbaru bila sudah jadwalnya atau dipaksa.
+        3. Jalankan polling cepat data terbaru.
+        4. Gabungkan aliran kandidat dengan urutan deterministik.
+        5. Kirim setiap kandidat ke LiveRBTAService.
+        6. Flush batch quarantine per siklus sekali, lalu cek breaker.
+        7. Flush bucket idle di LiveRBTAService.
+        8. Perbarui dan simpan state cursor transport secara atomik bila berhasil.
 
-        Deterministic per-record errors (RawEvidenceConflictError,
-        RawEvidenceIntegrityError, RBTAInvariantError, TemporalStateError)
-        plus per-hit poller bad documents (LiveCanonicalizationError collected
-        in ``poller.last_bad_docs``) are quarantined durably in a single
-        batched flush and skipped — the cycle continues so one corrupt record
-        cannot blind live ingestion (QUARANTINE policy, not halt). Only the
-        first offense for an ID logs at error level; repeats log at debug.
+        Error per record yang deterministik (RawEvidenceConflictError,
+        RawEvidenceIntegrityError, RBTAInvariantError, TemporalStateError) serta dokumen
+        buruk per hit dari poller (LiveCanonicalizationError yang dikumpulkan di
+        ``poller.last_bad_docs``) dikarantina secara durable dalam satu flush batch lalu
+        dilewati — siklus tetap berjalan sehingga satu record rusak tidak membutakan ingestion
+        live (kebijakan QUARANTINE, bukan berhenti). Hanya pelanggaran pertama untuk sebuah ID
+        yang dicatat level error; pengulangannya level debug.
 
-        M2(b): candidates whose ID is already quarantined are filtered before
-        the order buffer (one quarantine_id_set snapshot per cycle, a single
-        ID-only query, reported as skipped_quarantined) so persistently corrupt
-        alerts are never re-ingested — and never occupy the buffer. Without
-        the skip, re-polling a persistently corrupt alert re-quarantines it
-        every cycle and the breaker below trips forever — a permanent halt
-        with a frozen cursor. Skipped IDs add no failures.
-        Transient errors still raise, the cursor does not advance, and the
-        worker backs off.
+        Kandidat yang ID-nya sudah dikarantina disaring sebelum order buffer (satu snapshot
+        quarantine_id_set per siklus, satu query khusus ID, dilaporkan sebagai
+        skipped_quarantined), sehingga alert yang terus-menerus rusak tidak pernah di-ingest
+        ulang dan tidak pernah menempati buffer. Tanpa penyaringan ini, poll ulang alert yang
+        rusak akan mengarantinanya lagi setiap siklus dan breaker di bawah terus trip —
+        berhenti permanen dengan cursor beku. ID yang dilewati tidak menambah kegagalan.
+        Error sementara tetap dilempar, cursor tidak maju, dan worker melakukan back off.
 
-        Circuit breaker: when NEWLY quarantined candidates exceed 1% of
-        submitted (or 100 in one cycle) the cycle latches
-        ``breaker_tripped`` (trip_id, quarantined, submitted, at) into source
-        state via update_live_source_state and raises RuntimeError without
-        committing the cursor — systemic corruption halts instead of being
-        quietly absorbed, while the quarantine flush itself stays durably
-        stored. Every later cycle raises on the latch — no polling, no
-        ingest, no commit — until constructed with the matching breaker_ack,
-        which clears the latch and resumes. Re-encountered
-        (already-quarantined) IDs never reach the flush, and repeats that do
-        (same ID twice in one cycle) return count > 1 from quarantine_add_many
-        and are excluded from the breaker numerator, so only genuinely new
-        corruption can trip it.
+        Circuit breaker: bila kandidat yang BARU dikarantina melebihi 1% dari yang dikirim
+        (atau 100 dalam satu siklus), siklus menyimpan latch ``breaker_tripped`` (trip_id,
+        quarantined, submitted, at) ke source state lewat update_live_source_state dan
+        melempar RuntimeError tanpa commit cursor — korupsi sistemik menghentikan proses alih-alih
+        diserap diam-diam, sementara hasil flush quarantine tetap tersimpan durable. Setiap
+        siklus berikutnya error karena latch — tanpa polling, ingest, atau commit — sampai
+        dibangun dengan breaker_ack yang cocok, yang membersihkan latch dan melanjutkan siklus.
+        ID yang sudah dikarantina tidak pernah sampai ke flush, dan pengulangan yang lolos
+        (ID sama dua kali dalam satu siklus) mengembalikan count > 1 dari quarantine_add_many
+        sehingga tidak dihitung di pembilang breaker; hanya korupsi yang benar-benar baru yang
+        bisa memicunya.
 
         Parameters
         ----------
         current_time : datetime | None
-            Reference time for this cycle (defaults to UTC now).
+            Waktu acuan siklus ini (default UTC now).
         force_recent_reconciliation : bool
-            Whether to force a recent reconciliation scan.
+            Paksa scan rekonsiliasi terbaru.
         force_full_reconciliation : bool
-            Whether to force an exhaustive full-retention sweep.
+            Paksa sweep menyeluruh seluruh retensi.
         force_reconciliation : bool
-            Backwards-compatible alias for force_recent_reconciliation.
+            Alias force_recent_reconciliation untuk kompatibilitas.
 
         Returns
         -------
         LiveCycleResult
-            Operational metrics for this cycle.
+            Metrik operasional untuk siklus ini.
         """
         now = current_time or datetime.now(timezone.utc)
 
-        # P1 breaker-latch: a previous trip persists {"breaker_tripped":
-        # {"trip_id", "quarantined", "submitted", "at"}} in source state and
-        # halts every cycle — no polling, no ingest, no commit — until the
-        # operator acknowledges with the matching trip_id (falsy/None = no
-        # latch, cycle proceeds). A matching ack clears the latch and resumes.
+        # Breaker-latch: trip sebelumnya menyimpan {"breaker_tripped": {"trip_id", "quarantined",
+        # "submitted", "at"}} di source state dan menghentikan setiap siklus — tanpa polling,
+        # ingest, atau commit — sampai operator mengonfirmasi dengan trip_id yang cocok
+        # (falsy/None = tidak ada latch, siklus lanjut). Konfirmasi yang cocok membersihkan latch.
         latch = self.service.get_live_source_state().get("breaker_tripped")
         if latch:
             trip_id = latch.get("trip_id") if isinstance(latch, dict) else None
@@ -310,7 +319,7 @@ class LiveIngestionCoordinator:
                 )
             self.service.update_live_source_state({"breaker_tripped": None})
 
-        # 1. Full-retention reconciliation schedule check
+        # Cek jadwal rekonsiliasi seluruh retensi.
         should_full_recon = force_full_reconciliation
         if not should_full_recon:
             if self.last_full_reconciliation_at is None:
@@ -318,8 +327,8 @@ class LiveIngestionCoordinator:
             elif (now - self.last_full_reconciliation_at) >= self.full_reconciliation_interval:
                 should_full_recon = True
 
-        # N1b: per-hit bad documents drained from the poller after each poll
-        # path (poller resets last_bad_docs on every paginate call).
+        # Dokumen buruk per hit dikuras dari poller setelah setiap jalur poll
+        # (poller me-reset last_bad_docs di setiap pemanggilan paginate).
         bad_docs: List[Dict[str, Any]] = []
 
         def _drain_bad_docs() -> None:
@@ -332,7 +341,7 @@ class LiveIngestionCoordinator:
             full_recon_alerts = self.run_full_reconciliation()
             _drain_bad_docs()
 
-        # 2. Recent reconciliation schedule check
+        # Cek jadwal rekonsiliasi terbaru.
         should_recent_recon = force_recent_reconciliation or force_reconciliation
         if not should_recent_recon:
             if self.last_recent_reconciliation_at is None:
@@ -345,11 +354,11 @@ class LiveIngestionCoordinator:
             recent_recon_alerts = self.run_recent_reconciliation(current_time=now)
             _drain_bad_docs()
 
-        # 3. Fast recent poll
+        # Poll cepat data terbaru.
         fast_alerts: List[CanonicalRawAlert] = self.run_fast_poll(current_time=now)
         _drain_bad_docs()
 
-        # 4. Merge candidate streams with in-cycle deduplication
+        # Gabungkan aliran kandidat dengan dedup di dalam siklus.
         all_candidates: List[CanonicalRawAlert] = []
         seen_in_cycle: Set[str] = set()
 
@@ -358,15 +367,37 @@ class LiveIngestionCoordinator:
                 seen_in_cycle.add(a.wazuh_alert_id)
                 all_candidates.append(a)
 
-        # Stable sort by timestamp ASC, wazuh_alert_id ASC
+        # Sort stabil berdasarkan timestamp ASC, wazuh_alert_id ASC.
         all_candidates.sort(key=lambda a: (a.timestamp, a.wazuh_alert_id))
 
-        # M2(b): snapshot already-quarantined IDs once per cycle (single
-        # query, ID column only) and filter BEFORE the order buffer, so the
-        # buffer never holds persistently corrupt alerts. Without the skip,
-        # re-polling them re-quarantines every cycle and the breaker below
-        # trips forever — a permanent halt with a frozen cursor. Skipped IDs
-        # add no failures.
+        retention_expired = 0
+        if self.retention_days > 0:
+            cutoff = now - timedelta(days=self.retention_days)
+            kept_recent = [a for a in all_candidates if a.timestamp >= cutoff]
+            retention_expired = len(all_candidates) - len(kept_recent)
+            if retention_expired:
+                logger.debug("Skipping %d candidate(s) older than retention cutoff %s", retention_expired, cutoff)
+            all_candidates = kept_recent
+
+        # Agen yang dikecualikan disaring SEBELUM quarantine, order buffer, dan ingest: tidak masuk
+        # seen/evidence/arsip/RBTA, hanya dicatat (idempoten per ID) untuk counter kumulatif.
+        excluded_count = 0
+        if self.excluded_agents:
+            excluded_alerts = [
+                a for a in all_candidates
+                if str(a.agent_name).lower() in self.excluded_agents
+                or str(a.agent_id).lower() in self.excluded_agents
+            ]
+            if excluded_alerts:
+                self.service.state_manager.excluded_add_many(excluded_alerts)
+                excluded_ids = {a.wazuh_alert_id for a in excluded_alerts}
+                all_candidates = [a for a in all_candidates if a.wazuh_alert_id not in excluded_ids]
+                excluded_count = len(excluded_alerts)
+
+        # Snapshot ID yang sudah dikarantina sekali per siklus (satu query, hanya kolom ID) lalu
+        # saring SEBELUM order buffer, sehingga buffer tidak pernah menahan alert yang terus rusak.
+        # Tanpa ini, poll ulang akan mengarantinanya setiap siklus dan breaker di bawah terus trip —
+        # berhenti permanen dengan cursor beku. ID yang dilewati tidak menambah kegagalan.
         quarantined_ids: Set[str] = self.service.state_manager.quarantine_id_set()
         skipped_quarantined = 0
         if quarantined_ids:
@@ -382,19 +413,17 @@ class LiveIngestionCoordinator:
                     kept.append(candidate)
             all_candidates = kept
 
-        # 4b. Optional order buffer: hold on-time candidates, release only what
-        # is due by watermark / max_hold plus immediate late passthrough.
-        # Alerts refused under backpressure are ingested directly (sorted) so
-        # no valid alert is dropped; the event is metric-visible and logged.
+        # Order buffer opsional: tahan kandidat yang tepat waktu, lepaskan hanya yang sudah jatuh
+        # tempo menurut watermark / max_hold, ditambah alert terlambat yang langsung diteruskan.
+        # Alert yang ditolak karena backpressure langsung di-ingest (terurut) sehingga tidak ada
+        # alert valid yang dibuang; kejadiannya terlihat di metrik dan dicatat di log.
         if self.order_buffer is not None:
-            # F7b: already-seen duplicates bypass the buffer straight to
-            # ingest (conflict check still applies) so reconciliation
-            # re-polls never pollute the late metric.
-            # Minor is_seen 2N: snapshot membership once per candidate per
-            # cycle — partition and the ingest loop share this cache instead
-            # of hitting SQLite twice. (service exposes no bulk loader;
-            # loading the full seen table would be O(table), so per-cycle
-            # memoization is the cheap correct snapshot.)
+            # Duplikat yang sudah seen melewati buffer langsung ke ingest (cek konflik tetap berlaku)
+            # supaya poll ulang dari rekonsiliasi tidak mengotori metrik alert terlambat.
+            # Keanggotaan is_seen di-snapshot sekali per kandidat per siklus — partisi dan loop ingest
+            # berbagi cache ini alih-alih dua kali query ke SQLite. (Service tidak punya bulk loader;
+            # memuat seluruh tabel seen berarti O(tabel), jadi memoization per siklus adalah snapshot
+            # yang murah dan benar.)
             seen_cache: Dict[str, bool] = {}
 
             def _cached_is_seen(alert_id: str) -> bool:
@@ -415,7 +444,7 @@ class LiveIngestionCoordinator:
                 refused.sort(key=lambda a: (a.timestamp, a.wazuh_alert_id))
             all_candidates = [r.alert for r in buffered_releases] + refused + already_seen
 
-        # 5. Ingest candidates through LiveRBTAService
+        # Ingest kandidat lewat LiveRBTAService.
         new_ids_count = 0
         duplicate_noops = 0
         failures = 0
@@ -424,9 +453,8 @@ class LiveIngestionCoordinator:
         newly_ingested: List[CanonicalRawAlert] = []
         future_cutoff = now + _FUTURE_EVENT_SKEW
 
-        # N5b: quarantine entries are collected per cycle and flushed once
-        # (single transaction) before the cursor commit. Messages are kept
-        # alongside for first-offense error logging.
+        # Entri quarantine dikumpulkan per siklus dan di-flush sekali (satu transaksi) sebelum
+        # commit cursor. Pesannya disimpan juga untuk log error pelanggaran pertama.
         pending_quarantine: List[Dict[str, Any]] = []
         pending_messages: List[str] = []
 
@@ -446,12 +474,11 @@ class LiveIngestionCoordinator:
                     new_ids_count += 1
                     if use_seen_cache:
                         seen_cache[candidate.wazuh_alert_id] = True
-                # Design A: only newly ingested IDs are archived, so the
-                # archive stays duplicate-free for later replay.
+                # Hanya ID yang baru di-ingest yang diarsipkan, agar arsip bebas duplikat untuk replay nanti.
                 if not is_already_seen:
                     newly_ingested.append(candidate)
-                # M2(c): only successfully ingested, non-future-dated event
-                # times may advance newest_ingested_event_time.
+                # Hanya event time yang berhasil di-ingest dan bukan dari masa depan yang boleh
+                # memajukan newest_ingested_event_time.
                 if candidate.timestamp.tzinfo is None or candidate.timestamp <= future_cutoff:
                     ingested_event_times.append(candidate.timestamp)
             except _QUARANTINE_ERRORS as exc:
@@ -470,10 +497,9 @@ class LiveIngestionCoordinator:
                 failures += 1
                 raise
 
-        # Design A: best-effort raw JSONL archive of this cycle's newly
-        # ingested alerts (sorted, daily-rotated inside append_alerts).
-        # append_alerts never raises; this belt-and-suspenders guard keeps
-        # the live cycle green no matter what the archive path does.
+        # Arsip JSONL mentah (best effort) untuk alert yang baru di-ingest di siklus ini
+        # (diurutkan dan dirotasi harian di dalam append_alerts). append_alerts tidak pernah error;
+        # guard tambahan ini menjaga siklus live tetap jalan apa pun yang terjadi di jalur arsip.
         if self.live_archive_enabled and newly_ingested:
             try:
                 from src.runtime.live_archive import append_alerts
@@ -481,12 +507,11 @@ class LiveIngestionCoordinator:
             except Exception as exc:
                 logger.warning("Live archive batch failed: %s", exc)
 
-        # N1b: every per-hit bad document is quarantined, then the cycle continues.
-        # Unidentified docs key by content hash over {index, doc_id} ONLY —
-        # page_pos (embedded in the error text) is excluded so a re-polled
-        # identical doc maps to the same stable key across cycles and the
-        # repeat is skipped as already-quarantined instead of being
-        # re-quarantined under a new positional key each cycle.
+        # Setiap dokumen buruk per hit dikarantina, lalu siklus berlanjut. Dokumen tanpa identitas
+        # diberi kunci hash isi dari {index, doc_id} SAJA — page_pos (yang ada di teks error) tidak
+        # ikut, sehingga dokumen identik yang di-poll ulang mendapat kunci stabil yang sama antar siklus
+        # dan pengulangannya dilewati sebagai sudah dikarantina, bukan dikarantina ulang dengan kunci
+        # posisi baru setiap siklus.
         for bad in bad_docs:
             doc_id = bad.get("doc_id")
             if doc_id:
@@ -515,7 +540,7 @@ class LiveIngestionCoordinator:
             pending_messages.append(str(bad.get("error") or ""))
             failures += 1
 
-        # 6. Single batched quarantine flush (before the cursor commit) + breaker.
+        # Satu flush quarantine per batch (sebelum commit cursor) + breaker.
         quarantined = 0
         if pending_quarantine:
             counts = self.service.state_manager.quarantine_add_many(pending_quarantine)
@@ -534,17 +559,16 @@ class LiveIngestionCoordinator:
                     )
             quarantined = len(pending_quarantine)
 
-            # M2(a): the breaker counts only NEW quarantines (count == 1).
+            # Breaker hanya menghitung quarantine BARU (count == 1).
             submitted = len(all_candidates)
             fraction = (new_quarantined / submitted) if submitted else 0.0
             if new_quarantined > _QUARANTINE_BREAKER_ABSOLUTE or (
                 submitted and fraction > _QUARANTINE_BREAKER_FRACTION
             ):
                 trip_id = f"qb-{now.strftime('%Y%m%d%H%M%S')}-{new_quarantined}"
-                # Latch BEFORE raising: the quarantine flush above stays
-                # durably stored, the cursor is NOT committed, and every
-                # later cycle halts on the latch until the operator
-                # acknowledges with this trip_id.
+                # Latch dulu SEBELUM error: hasil flush quarantine di atas tetap tersimpan durable, cursor
+                # TIDAK di-commit, dan setiap siklus berikutnya berhenti karena latch sampai operator
+                # mengonfirmasi dengan trip_id ini.
                 self.service.update_live_source_state({
                     "breaker_tripped": {
                         "trip_id": trip_id,
@@ -561,11 +585,11 @@ class LiveIngestionCoordinator:
                     f"with breaker_ack='{trip_id}' before resuming"
                 )
 
-        # 7. Flush idle buckets
+        # Flush bucket idle.
         flushed_scored = self.service.check_idle_flush(now)
         total_scored.extend(flushed_scored)
 
-        # 8. Commit transport state atomically on successful cycle completion
+        # Commit state transport secara atomik bila siklus selesai dengan sukses.
         self.last_fast_poll_at = now
         if should_recent_recon:
             self.last_recent_reconciliation_at = now
@@ -575,11 +599,12 @@ class LiveIngestionCoordinator:
         if self.recent_poll_cursor is None or now > self.recent_poll_cursor:
             self.recent_poll_cursor = now
 
-        # M2(c): max over successfully ingested, non-future-dated candidates
-        # only; quarantined/corrupt and future-dated timestamps never shift
-        # lag telemetry. Explicit None when nothing qualifies (never stale).
+        # Maksimum hanya dari kandidat yang berhasil di-ingest dan bukan dari masa depan;
+        # timestamp yang dikarantina/rusak atau dari masa depan tidak pernah menggeser telemetri lag.
+        # None eksplisit bila tidak ada yang memenuhi (tidak pernah basi).
         newest_event = max(ingested_event_times, default=None)
         self.service.update_live_source_state({
+            "retention_expired_last_cycle": retention_expired,
             "recent_poll_cursor": self.recent_poll_cursor.isoformat() if self.recent_poll_cursor else None,
             "newest_ingested_event_time": newest_event.isoformat() if newest_event else None,
             "last_fast_poll_at": self.last_fast_poll_at.isoformat() if self.last_fast_poll_at else None,
@@ -612,4 +637,6 @@ class LiveIngestionCoordinator:
             new_scored_meta_alerts=len(total_scored),
             quarantined=quarantined,
             skipped_quarantined=skipped_quarantined,
+            excluded=excluded_count,
+            retention_expired=retention_expired,
         )

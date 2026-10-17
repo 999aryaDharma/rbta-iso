@@ -1,4 +1,4 @@
-"""Cached provenance catalog for deterministic replay datasets."""
+"""Katalog provenance (dengan cache) untuk dataset replay yang deterministik."""
 
 from contextlib import contextmanager
 from datetime import datetime, timezone
@@ -16,7 +16,7 @@ SUPPORTED_SUFFIXES = (".jsonl", ".jsonl.gz")
 
 
 class ReplayDatasetCatalog:
-    """Inspect replay sources once and reuse immutable provenance metadata."""
+    """Periksa sumber replay sekali lalu pakai ulang metadata provenance yang immutable."""
 
     def __init__(self, data_dir: Union[str, Path], cache_path: Union[str, Path, None] = None) -> None:
         self.data_dir = Path(data_dir).resolve()
@@ -183,7 +183,7 @@ class ReplayDatasetCatalog:
         return manifests
 
     def list_fast(self) -> List[Dict[str, Any]]:
-        """List datasets using stat/cache only; never read alert content."""
+        """Daftar dataset hanya dari stat/cache; isi alert tidak pernah dibaca."""
         paths = self._paths()
         manifests: List[Dict[str, Any]] = []
         with self._cache_lock:
@@ -223,7 +223,7 @@ class ReplayDatasetCatalog:
         return manifests
 
     def refresh_all(self, progress_callback=None) -> Dict[str, Any]:
-        """Inspect all current datasets and continue past individual failures."""
+        """Periksa semua dataset saat ini dan lanjut meski ada dataset yang gagal."""
         paths = self._paths()
         failed: List[Dict[str, str]] = []
         completed = 0

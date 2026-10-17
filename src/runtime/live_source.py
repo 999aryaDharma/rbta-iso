@@ -1,4 +1,4 @@
-"""Live Wazuh Indexer polling source with fast recent polling and lossless reconciliation scanning."""
+"""Sumber polling live Wazuh Indexer: polling cepat data terbaru dan scan rekonsiliasi tanpa kehilangan data."""
 
 from datetime import datetime, timedelta, timezone
 import logging
@@ -13,16 +13,16 @@ logger = logging.getLogger(__name__)
 
 
 def validate_index_id_uniqueness(hits: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
-    """Offline smoke-test for the poller identity contract (F10, no network).
+    """Smoke test offline untuk kontrak identitas poller (tanpa jaringan).
 
-    The poller assumes each source document carries a unique alert identity
-    (``_source.id``, falling back to ``_id``); success-page dedup, the
-    ``search_after`` cursor, and downstream exactly-once dedup all rest on
-    that assumption. This helper lets tests and smoke checks verify the
-    assumption against a captured page without touching the Indexer.
+    Poller mengasumsikan setiap dokumen sumber punya identitas alert yang unik
+    (``_source.id``, fallback ke ``_id``); dedup halaman sukses, cursor ``search_after``,
+    dan dedup exactly-once di hilir semuanya bergantung pada asumsi itu. Helper ini
+    membuat test dan smoke check bisa memverifikasi asumsi tersebut pada halaman yang
+    sudah direkam tanpa menyentuh Indexer.
 
-    Returns ``{"doc_count", "unique_ids", "id_is_unique"}``. Documents with
-    no usable identity are counted in ``doc_count`` but contribute no id.
+    Mengembalikan ``{"doc_count", "unique_ids", "id_is_unique"}``. Dokumen tanpa identitas
+    yang bisa dipakai tetap dihitung di ``doc_count`` tetapi tidak menyumbang id.
     """
     seen: Set[str] = set()
     count = 0
@@ -45,17 +45,17 @@ def validate_index_id_uniqueness(hits: Sequence[Dict[str, Any]]) -> Dict[str, An
 
 
 class LiveSourceError(RuntimeError):
-    """Base exception for live source errors."""
+    """Exception dasar untuk error sumber live."""
     pass
 
 
 class LiveSourceIntegrityError(LiveSourceError):
-    """Raised when source response, pagination, or integrity contract is violated."""
+    """Dilempar bila kontrak response, paginasi, atau integritas sumber dilanggar."""
     pass
 
 
 class LiveCanonicalizationError(LiveSourceIntegrityError):
-    """Raised when a source document fails canonicalization."""
+    """Dilempar bila sebuah dokumen sumber gagal dikanonisasi."""
     pass
 
 
@@ -64,21 +64,21 @@ def derive_daily_indices(
     end_time: datetime,
     prefix: str = "wazuh-alerts-4.x-",
 ) -> List[str]:
-    """Derive exact list of daily index names for all UTC days between start_time and end_time (inclusive).
+    """Turunkan daftar nama index harian untuk semua hari UTC antara start_time dan end_time (inklusif).
 
     Parameters
     ----------
     start_time : datetime
-        Start boundary timestamp.
+        Timestamp batas awal.
     end_time : datetime
-        End boundary timestamp.
+        Timestamp batas akhir.
     prefix : str
-        Wazuh daily index prefix (default 'wazuh-alerts-4.x-').
+        Prefix index harian Wazuh (default 'wazuh-alerts-4.x-').
 
     Returns
     -------
     List[str]
-        Chronologically sorted list of exact daily index names.
+        Daftar nama index harian, urut kronologis.
     """
     start_date = start_time.astimezone(timezone.utc).date()
     end_date = end_time.astimezone(timezone.utc).date()
@@ -94,18 +94,18 @@ def derive_daily_indices(
 
 
 class WazuhIndexerLivePoller:
-    """Polls Wazuh Indexer for raw security alerts using fast recent polling and reconciliation scanning.
+    """Polling Wazuh Indexer untuk raw alert keamanan dengan polling cepat dan scan rekonsiliasi.
 
     Parameters
     ----------
     client : WazuhIndexerClient | None
-        Wazuh client instance.
+        Instance client Wazuh.
     overlap_window : timedelta
-        Lookback overlap window for recent polling (default 5 minutes).
+        Window overlap ke belakang untuk polling terbaru (default 5 menit).
     poll_interval : timedelta
-        Interval between fast polls (default 5 seconds).
+        Jeda antar poll cepat (default 5 detik).
     page_size : int
-        Max hits per search request (default 500).
+        Jumlah hit maksimum per request pencarian (default 500).
     """
 
     def __init__(
@@ -119,10 +119,10 @@ class WazuhIndexerLivePoller:
         self.overlap_window: timedelta = overlap_window
         self.poll_interval: timedelta = poll_interval
         self.page_size: int = page_size
-        # N1b per-hit quarantine: documents that fail canonicalization are
-        # collected here (reset on every _paginate_search call) instead of
-        # failing the whole page. The coordinator drains this after each poll
-        # path and quarantines every entry durably, then continues.
+        # Quarantine per hit: dokumen yang gagal dikanonisasi dikumpulkan di sini (di-reset
+        # di setiap pemanggilan _paginate_search) alih-alih menggagalkan satu halaman penuh.
+        # Coordinator menguras daftar ini setelah setiap jalur poll, mengarantina setiap entri
+        # secara durable, lalu lanjut.
         self.last_bad_docs: List[Dict[str, Any]] = []
 
     def _paginate_search(
@@ -132,29 +132,26 @@ class WazuhIndexerLivePoller:
         end_time: Optional[datetime] = None,
         allow_unavailable: bool = True,
     ) -> List[CanonicalRawAlert]:
-        """Execute deterministic paginated search using @timestamp ASC and id ASC.
+        """Jalankan pencarian berhalaman yang deterministik dengan @timestamp ASC dan id ASC.
 
-        Enforces strict fail-closed response validation and canonicalization integrity.
+        Validasi response dan integritas kanonisasi dilakukan secara ketat (gagal tertutup).
 
-        Identity assumption (F10): every hit is keyed by a unique alert id
-        (``_source.id``, fallback ``_id``); see
-        :func:`validate_index_id_uniqueness` for the offline smoke check.
+        Asumsi identitas: setiap hit dikunci oleh id alert yang unik (``_source.id``,
+        fallback ``_id``); lihat :func:`validate_index_id_uniqueness` untuk smoke check offline-nya.
 
-        Shard tolerance (F10): a response *without* the ``_shards`` key is
-        accepted as long as ``hits.hits`` is well-formed — several Indexer
-        fixtures and proxies omit ``_shards`` on success — but any explicit
-        ``failed != 0``, ``timed_out``, or ``terminated_early`` still fails
-        closed. ``allow_partial_search_results`` is always forced to
-        ``"false"`` so partial shard coverage can never look like success.
+        Toleransi shard: response *tanpa* key ``_shards`` diterima selama ``hits.hits``
+        berbentuk benar — beberapa fixture Indexer dan proxy menghilangkan ``_shards`` saat
+        sukses — tetapi ``failed != 0``, ``timed_out``, atau ``terminated_early`` yang eksplisit
+        tetap gagal. ``allow_partial_search_results`` selalu dipaksa ``"false"`` agar cakupan
+        shard parsial tidak pernah terlihat seperti sukses.
 
-        ``allow_unavailable=True`` (default, fast recent path) tolerates
-        missing daily indices; ``False`` is the strict mode intended for
-        discovery/full-recon callers that must notice absent indices.
+        ``allow_unavailable=True`` (default, jalur cepat) menoleransi index harian yang tidak ada;
+        ``False`` adalah mode ketat untuk pemanggil discovery/rekonsiliasi penuh yang harus
+        menyadari index yang hilang.
 
-        Per-hit canonicalization (N1b, replaces page-fail L1): a document that
-        fails canonicalization is appended to ``self.last_bad_docs`` as
-        ``{"index", "doc_id", "error"}`` and skipped — valid documents on the
-        same page are still returned. ``last_bad_docs`` resets on every call.
+        Kanonisasi per hit: dokumen yang gagal dikanonisasi ditambahkan ke ``self.last_bad_docs``
+        sebagai ``{"index", "doc_id", "error"}`` lalu dilewati — dokumen valid di halaman yang sama
+        tetap dikembalikan. ``last_bad_docs`` di-reset setiap pemanggilan.
         """
         self.last_bad_docs = []
         if not indices:
@@ -194,7 +191,7 @@ class WazuhIndexerLivePoller:
             except Exception as exc:
                 raise LiveSourceIntegrityError(f"Indexer response is not valid JSON: {exc}") from exc
 
-            # Strict response validation
+            # Validasi response secara ketat.
             if not isinstance(data, dict):
                 raise LiveSourceIntegrityError(
                     f"Malformed Indexer response: expected JSON object, got {type(data).__name__}"
@@ -215,8 +212,7 @@ class WazuhIndexerLivePoller:
 
             hits = data["hits"]["hits"]
 
-            # Per-hit quarantine loop (N1b): collect the corrupt document,
-            # keep every valid sibling on the page.
+            # Loop quarantine per hit: kumpulkan dokumen rusak, pertahankan semua dokumen valid di halaman itu.
             for pos, hit in enumerate(hits):
                 try:
                     alert = canonicalize_wazuh_alert(hit)
@@ -238,11 +234,11 @@ class WazuhIndexerLivePoller:
                         ),
                     })
 
-            # Termination condition
+            # Kondisi berhenti.
             if len(hits) < self.page_size:
                 break
 
-            # Pagination cursor validation on full pages
+            # Validasi cursor paginasi pada halaman yang penuh.
             last_hit = hits[-1]
             if not isinstance(last_hit, dict) or "sort" not in last_hit:
                 raise LiveSourceIntegrityError(
@@ -271,17 +267,17 @@ class WazuhIndexerLivePoller:
         self,
         prefix: str = "wazuh-alerts-4.x-",
     ) -> List[str]:
-        """Discover all retained Wazuh daily alert indices currently present on the Indexer.
+        """Temukan semua index alert harian Wazuh yang saat ini tersimpan di Indexer.
 
         Parameters
         ----------
         prefix : str
-            Index name prefix for daily alert indices.
+            Prefix nama index alert harian.
 
         Returns
         -------
         List[str]
-            Chronologically sorted list of discovered daily alert index names.
+            Daftar nama index alert harian yang ditemukan, urut kronologis.
         """
         raw_indices = self.client.list_indices("wazuh-alerts-*")
         daily_indices: List[str] = []
@@ -306,19 +302,19 @@ class WazuhIndexerLivePoller:
         recent_poll_cursor: Optional[datetime] = None,
         allow_unavailable: bool = True,
     ) -> List[CanonicalRawAlert]:
-        """Fast recent polling path for low-latency alert discovery.
+        """Jalur polling cepat untuk menemukan alert dengan latensi rendah.
 
         Parameters
         ----------
         current_time : datetime | None
-            Reference time for poll cycle (defaults to UTC now).
+            Waktu acuan siklus poll (default UTC now).
         recent_poll_cursor : datetime | None
-            Starting hint timestamp for fast polling.
+            Hint timestamp awal untuk polling cepat.
 
         Returns
         -------
         List[CanonicalRawAlert]
-            List of raw alerts found within the recent polling window.
+            Daftar raw alert yang ditemukan di dalam window polling terbaru.
         """
         now = current_time or datetime.now(timezone.utc)
         start_time = (recent_poll_cursor or now) - self.overlap_window
@@ -336,23 +332,23 @@ class WazuhIndexerLivePoller:
         end_time: Optional[datetime] = None,
         allow_unavailable: bool = True,
     ) -> List[CanonicalRawAlert]:
-        """Recent reconciliation scan path over retained daily indices (default 2 days: today and yesterday).
+        """Jalur scan rekonsiliasi terbaru pada index harian yang tersimpan (default 2 hari: hari ini dan kemarin).
 
         Parameters
         ----------
         current_time : datetime | None
-            Reference time for the scan.
+            Waktu acuan scan.
         reconciliation_days : int
-            Number of recent daily indices to scan (default 2: today and yesterday).
+            Jumlah index harian terbaru yang di-scan (default 2: hari ini dan kemarin).
         start_time : datetime | None
-            Optional explicit start time override.
+            Override waktu mulai (opsional).
         end_time : datetime | None
-            Optional explicit end time override.
+            Override waktu selesai (opsional).
 
         Returns
         -------
         List[CanonicalRawAlert]
-            All canonical alerts retrievable across the scanned recent daily indices.
+            Semua alert kanonis yang bisa diambil dari index harian terbaru yang di-scan.
         """
         now = end_time or current_time or datetime.now(timezone.utc)
         scan_start = start_time or (now - timedelta(days=max(0, reconciliation_days - 1)))
@@ -367,20 +363,20 @@ class WazuhIndexerLivePoller:
         prefix: str = "wazuh-alerts-4.x-",
         allow_unavailable: bool = True,
     ) -> List[CanonicalRawAlert]:
-        """Lossless full-retention reconciliation scan across all retained Wazuh daily alert indices.
+        """Scan rekonsiliasi seluruh retensi tanpa kehilangan data di semua index alert harian Wazuh.
 
-        Discovers every daily alert index currently present in the Indexer and paginates all of them
-        completely with zero timestamp-based cutoffs.
+        Menemukan setiap index alert harian yang ada di Indexer lalu membaca semuanya sampai habis
+        tanpa batas waktu berbasis timestamp.
 
         Parameters
         ----------
         prefix : str
-            Index name prefix to discover.
+            Prefix nama index yang dicari.
 
         Returns
         -------
         List[CanonicalRawAlert]
-            All canonical alerts retrievable across all retained daily indices.
+            Semua alert kanonis yang bisa diambil dari seluruh index harian yang tersimpan.
         """
         indices = self.discover_retained_daily_alert_indices(prefix=prefix)
         if not indices:
@@ -396,6 +392,6 @@ class WazuhIndexerLivePoller:
         recent_poll_cursor: Optional[datetime] = None,
         high_watermark: Optional[datetime] = None,
     ) -> List[CanonicalRawAlert]:
-        """Convenience method for fast recent polling (deprecated high_watermark alias)."""
+        """Shortcut polling cepat (alias high_watermark yang sudah deprecated)."""
         cursor = recent_poll_cursor or high_watermark
         return self.poll_recent(current_time=current_time, recent_poll_cursor=cursor)

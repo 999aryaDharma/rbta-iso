@@ -1,4 +1,4 @@
-"""Unit tests for CanonicalRawAlert DTO contract."""
+"""Unit test kontrak DTO CanonicalRawAlert."""
 from dataclasses import FrozenInstanceError
 from datetime import datetime, timezone
 import pytest
@@ -6,7 +6,7 @@ from src.contracts.raw_alert import CanonicalRawAlert
 
 
 def test_canonical_raw_alert_valid_instantiation():
-    """Test valid instantiation with all required and optional fields."""
+    """Instansiasi valid dengan semua field wajib dan opsional."""
     now = datetime.now(timezone.utc)
     alert = CanonicalRawAlert(
         wazuh_alert_id="1787895525.48425",
@@ -36,7 +36,7 @@ def test_canonical_raw_alert_valid_instantiation():
 
 
 def test_canonical_raw_alert_immutability():
-    """Test that CanonicalRawAlert attributes cannot be modified after creation."""
+    """Atribut CanonicalRawAlert tidak bisa diubah setelah dibuat."""
     now = datetime.now(timezone.utc)
     alert = CanonicalRawAlert(
         wazuh_alert_id="1787895525.48425",
@@ -55,7 +55,7 @@ def test_canonical_raw_alert_immutability():
 
 
 def test_canonical_raw_alert_metadata_immutability():
-    """Test that CanonicalRawAlert metadata mapping cannot be mutated in place (FIX 7)."""
+    """Mapping metadata CanonicalRawAlert tidak bisa dimutasi in-place."""
     now = datetime.now(timezone.utc)
     alert = CanonicalRawAlert(
         wazuh_alert_id="1787895525.48425",
@@ -78,7 +78,7 @@ def test_canonical_raw_alert_metadata_immutability():
 
 
 def test_canonical_raw_alert_timezone_awareness_enforced():
-    """Test that naive datetimes are rejected with ValueError."""
+    """Datetime naive ditolak dengan ValueError."""
     naive_dt = datetime(2026, 8, 28, 5, 38, 45)
     with pytest.raises(ValueError, match="timezone-aware"):
         CanonicalRawAlert(
@@ -96,7 +96,7 @@ def test_canonical_raw_alert_timezone_awareness_enforced():
 
 
 def test_canonical_raw_alert_rule_level_range_validation():
-    """Test that rule_level must be within Wazuh standard 0..15 range."""
+    """rule_level harus dalam rentang standar Wazuh 0..15."""
     now = datetime.now(timezone.utc)
     with pytest.raises(ValueError, match="rule_level"):
         CanonicalRawAlert(
@@ -128,7 +128,7 @@ def test_canonical_raw_alert_rule_level_range_validation():
 
 
 def test_canonical_raw_alert_criticality_range_validation():
-    """Test that agent_criticality must be within 1..4 range."""
+    """agent_criticality harus dalam rentang 1..4."""
     now = datetime.now(timezone.utc)
     with pytest.raises(ValueError, match="agent_criticality"):
         CanonicalRawAlert(
@@ -146,7 +146,7 @@ def test_canonical_raw_alert_criticality_range_validation():
 
 
 def test_canonical_raw_alert_wazuh_alert_id_required():
-    """Test that wazuh_alert_id must not be empty."""
+    """wazuh_alert_id tidak boleh kosong."""
     now = datetime.now(timezone.utc)
     with pytest.raises(ValueError, match="wazuh_alert_id"):
         CanonicalRawAlert(

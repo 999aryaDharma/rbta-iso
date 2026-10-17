@@ -1,4 +1,4 @@
-"""Canonical Seven-Feature Extractor for RBTA MetaAlert representations."""
+"""Ekstraktor tujuh fitur kanonis dari representasi MetaAlert RBTA."""
 
 import math
 from typing import Any, Mapping, Sequence
@@ -18,22 +18,22 @@ FEATURE_COLUMNS: tuple[str, ...] = (
 
 
 class FeatureExtractionError(ValueError):
-    """Raised when a MetaAlert is malformed or feature values cannot be calculated."""
+    """Dilempar bila MetaAlert rusak atau nilai fitur tidak bisa dihitung."""
     pass
 
 
 def compute_rule_diversity_shannon(rule_id_distribution: Mapping[str, int]) -> float:
-    """Compute normalized Shannon entropy H_norm = H / ln(k) for rule ID distribution.
+    """Hitung entropi Shannon ternormalisasi H_norm = H / ln(k) untuk distribusi rule ID.
 
     Parameters
     ----------
     rule_id_distribution : Mapping[str, int]
-        Mapping of Wazuh rule IDs to counts.
+        Pemetaan rule ID Wazuh ke jumlahnya.
 
     Returns
     -------
     float
-        Normalized Shannon entropy in range [0.0, 1.0]. Returns 0.0 if k <= 1.
+        Entropi Shannon ternormalisasi dalam rentang [0.0, 1.0]. Bernilai 0.0 bila k <= 1.
     """
     counts = [c for c in rule_id_distribution.values() if c > 0]
     k = len(counts)
@@ -59,17 +59,17 @@ def compute_rule_diversity_shannon(rule_id_distribution: Mapping[str, int]) -> f
 
 
 def compute_severity_dispersion(severity_distribution: Mapping[int, int]) -> float:
-    """Compute population standard deviation of severity levels in the bucket.
+    """Hitung simpangan baku populasi dari level severity dalam bucket.
 
     Parameters
     ----------
     severity_distribution : Mapping[int, int]
-        Mapping of rule severity levels to counts.
+        Pemetaan level severity rule ke jumlahnya.
 
     Returns
     -------
     float
-        Population standard deviation of severity. Returns 0.0 for singletons or identical severities.
+        Simpangan baku populasi severity. Bernilai 0.0 untuk singleton atau severity yang seragam.
     """
     total_count = sum(severity_distribution.values())
     if total_count <= 1:
@@ -83,26 +83,26 @@ def compute_severity_dispersion(severity_distribution: Mapping[int, int]) -> flo
 
 
 class SevenFeatureExtractor:
-    """Extracts exactly the 7 canonical research features from MetaAlert DTOs."""
+    """Mengekstrak tepat 7 fitur penelitian kanonis dari DTO MetaAlert."""
 
     @staticmethod
     def extract_features_dict(meta: MetaAlert) -> dict[str, float]:
-        """Extract features as an ordered dictionary.
+        """Ekstrak fitur sebagai dict berurutan.
 
         Parameters
         ----------
         meta : MetaAlert
-            Immutable MetaAlert instance.
+            Instance MetaAlert immutable.
 
         Returns
         -------
         dict[str, float]
-            Dictionary of 7 feature names to float values.
+            Dict 7 nama fitur ke nilai float.
 
         Raises
         ------
         FeatureExtractionError
-            If meta is missing required attributes or values are invalid/non-finite.
+            Bila meta tidak punya atribut wajib atau nilainya tidak valid/tidak finite.
         """
         try:
             alert_count = meta.alert_count
@@ -136,34 +136,34 @@ class SevenFeatureExtractor:
 
     @classmethod
     def extract_features_vector(cls, meta: MetaAlert) -> tuple[float, ...]:
-        """Extract features as a tuple of floats in exact FEATURE_COLUMNS order.
+        """Ekstrak fitur sebagai tuple float dengan urutan persis FEATURE_COLUMNS.
 
         Parameters
         ----------
         meta : MetaAlert
-            Immutable MetaAlert instance.
+            Instance MetaAlert immutable.
 
         Returns
         -------
         tuple[float, ...]
-            7-element tuple in canonical feature order.
+            Tuple 7 elemen sesuai urutan fitur kanonis.
         """
         f_dict = cls.extract_features_dict(meta)
         return tuple(f_dict[col] for col in FEATURE_COLUMNS)
 
     @classmethod
     def extract_features_df(cls, metas: Sequence[MetaAlert]) -> pd.DataFrame:
-        """Extract features for a sequence of MetaAlerts into a pandas DataFrame.
+        """Ekstrak fitur dari sekumpulan MetaAlert ke DataFrame pandas.
 
         Parameters
         ----------
         metas : Sequence[MetaAlert]
-            Sequence of MetaAlert instances.
+            Urutan instance MetaAlert.
 
         Returns
         -------
         pd.DataFrame
-            DataFrame with columns matching FEATURE_COLUMNS exactly, dtype float64.
+            DataFrame dengan kolom persis FEATURE_COLUMNS, dtype float64.
         """
         rows = [cls.extract_features_dict(m) for m in metas]
         df = pd.DataFrame(rows, columns=list(FEATURE_COLUMNS))

@@ -6,7 +6,6 @@ import {
   SidebarContent,
   SidebarFooter,
   SidebarGroup,
-  SidebarGroupLabel,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
@@ -24,6 +23,7 @@ import {
   MagnifyingGlass,
   CaretUpDown,
   Pulse,
+  ListChecks,
 } from "@phosphor-icons/react";
 
 export function AppSidebar() {
@@ -99,7 +99,6 @@ export function AppSidebar() {
 
   return (
     <Sidebar>
-      {/* 1. Header with Company/Platform switcher */}
       <SidebarHeader className="p-3 border-b border-kumo-line flex items-center justify-between">
         <div className="flex items-center gap-2.5 min-w-0 ml-4">
           <span className="font-semibold text-base text-kumo-strong truncate group-data-[state=collapsed]/sidebar:hidden">
@@ -112,20 +111,18 @@ export function AppSidebar() {
         />
       </SidebarHeader>
 
-      {/* 2. Scrollable Navigation Content */}
       <SidebarContent>
-        {/* Quick Search */}
         <div className="px-2 pt-2 pb-1 group-data-[state=collapsed]/sidebar:px-1">
           <button
             type="button"
             onClick={openSearch}
             className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg border border-kumo-line bg-kumo-recessed/40 text-kumo-subtle hover:text-kumo-default hover:bg-kumo-recessed text-sm transition-colors cursor-pointer group-data-[state=collapsed]/sidebar:justify-center group-data-[state=collapsed]/sidebar:px-0"
-            title="Quick search (Press / or ⌘K)"
+            title="Cari (tekan / atau ⌘K)"
           >
             <div className="flex items-center gap-2.5 truncate">
               <MagnifyingGlass size={16} className="shrink-0" />
               <span className="truncate group-data-[state=collapsed]/sidebar:hidden">
-                Quick search...
+                Cari…
               </span>
             </div>
             <kbd className="hidden sm:inline-flex rounded border border-kumo-line bg-kumo-canvas px-1.5 py-0.5 text-xs font-mono text-kumo-subtle group-data-[state=collapsed]/sidebar:hidden">
@@ -134,17 +131,16 @@ export function AppSidebar() {
           </button>
         </div>
 
-        {/* Primary Views */}
         <SidebarGroup>
           <SidebarMenu>
             <SidebarMenuItem>
               <SidebarMenuButton
                 icon={House}
                 active={isPathActive("/overview")}
-                tooltip="Home / Overview"
+                tooltip="Ringkasan: kondisi alert dan beban analyst"
                 onClick={() => navigate(withRunId("/overview"))}
               >
-                Home
+                Ringkasan
               </SidebarMenuButton>
             </SidebarMenuItem>
 
@@ -152,10 +148,10 @@ export function AppSidebar() {
               <SidebarMenuButton
                 icon={ChartBar}
                 active={isPathActive("/meta-alerts")}
-                tooltip="Analytics & Logs"
+                tooltip="Daftar meta-alert: telusuri kelompok alert dan skornya"
                 onClick={() => navigate(withRunId("/meta-alerts"))}
               >
-                Analytics & Logs
+                Daftar meta-alert
               </SidebarMenuButton>
             </SidebarMenuItem>
 
@@ -163,54 +159,60 @@ export function AppSidebar() {
               <SidebarMenuButton
                 icon={Cpu}
                 active={isPathActive("/rbta")}
-                tooltip="RBTA Engine"
+                tooltip="Status pengelompokan: kelompok terbuka dan jendela waktu per agen"
                 onClick={() => navigate(withRunId("/rbta"))}
               >
-                RBTA Engine
+                Status pengelompokan
               </SidebarMenuButton>
             </SidebarMenuItem>
           </SidebarMenu>
         </SidebarGroup>
 
-        {/* Thesis Sidang Section */}
         <SidebarGroup>
-          <SidebarGroupLabel>Sidang</SidebarGroupLabel>
           <SidebarMenu>
             <SidebarMenuItem>
               <SidebarMenuButton
                 icon={Pulse}
                 active={isPathActive("/live")}
-                tooltip="Live stream Wazuh"
+                tooltip="Pemantauan live: status pemrosesan dan kesegaran data"
                 onClick={() => navigate(withRunId("/live"))}
               >
-                Live
+                Pemantauan live
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                icon={ListChecks}
+                active={isPathActive("/review-queue")}
+                tooltip="Antrean review: label hasil pengecekan analyst"
+                onClick={() => navigate("/review-queue")}
+              >
+                Antrean review
               </SidebarMenuButton>
             </SidebarMenuItem>
             <SidebarMenuItem>
               <SidebarMenuButton
                 icon={Play}
                 active={isPathActive("/demo")}
-                tooltip="Replay penelitian"
+                tooltip="Replay sidang: putar ulang data penelitian dan hasil evaluasi"
                 onClick={() => navigate(withRunId("/demo"))}
               >
-                Replay
+                Replay sidang
               </SidebarMenuButton>
             </SidebarMenuItem>
           </SidebarMenu>
         </SidebarGroup>
 
-        {/* Protect & Connect Section */}
         <SidebarGroup>
-          <SidebarGroupLabel>Protect & Connect</SidebarGroupLabel>
           <SidebarMenu>
             <SidebarMenuItem>
               <SidebarMenuButton
                 icon={Plugs}
                 active={isPathActive("/integrations")}
-                tooltip="Integrations"
+                tooltip="Integrasi: status Telegram dan Shuffle"
                 onClick={() => navigate(withRunId("/integrations"))}
               >
-                Integrations
+                Integrasi
               </SidebarMenuButton>
             </SidebarMenuItem>
 
@@ -218,17 +220,16 @@ export function AppSidebar() {
               <SidebarMenuButton
                 icon={GearSix}
                 active={isPathActive("/system")}
-                tooltip="System Health"
+                tooltip="Sistem: versi model dan konfigurasi"
                 onClick={() => navigate(withRunId("/system"))}
               >
-                System Health
+                Sistem
               </SidebarMenuButton>
             </SidebarMenuItem>
           </SidebarMenu>
         </SidebarGroup>
       </SidebarContent>
 
-      {/* 3. Footer with Collapse Trigger and Version */}
       <SidebarFooter className="p-3 border-t border-kumo-line flex items-center justify-between">
         <SidebarTrigger />
         <div className="flex items-center gap-1.5 group-data-[state=collapsed]/sidebar:hidden">

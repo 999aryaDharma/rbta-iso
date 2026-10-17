@@ -1,4 +1,4 @@
-"""Canonical research orchestration package."""
+"""Paket orkestrasi penelitian kanonis."""
 from src.research.orchestrator import (
     ResearchInputError,
     _generate_engineering_smoke_fixture,

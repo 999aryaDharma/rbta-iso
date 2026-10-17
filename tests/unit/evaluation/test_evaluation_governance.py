@@ -1,11 +1,11 @@
-"""Governance tests for evaluation package (Sprint 8)."""
+"""Test batas tanggung jawab paket evaluasi."""
 from pathlib import Path
 
 EVAL_SRC = Path(__file__).resolve().parent.parent.parent.parent / "src" / "evaluation"
 
 
 def test_no_synthetic_attack_or_ground_truth_labels_in_eval_src():
-    """Verify that src/evaluation does not parameterize or require ground truth / synthetic attack labels."""
+    """src/evaluation tidak boleh memakai parameter atau membutuhkan ground truth / label serangan sintetis."""
     forbidden = [
         "synthetic_attack",
         "ground_truth_labels",

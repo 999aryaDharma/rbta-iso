@@ -1,10 +1,8 @@
-"""Unit tests for the standalone live Telegram dispatcher (L5).
+"""Unit test dispatcher Telegram live yang berdiri sendiri.
 
-TDD RED: this module imports src.runtime.telegram_dispatcher which does
-not exist yet. Dispatcher scope: standalone thread reading the service
-outbox; only action == ESCALATE is sent via Telegram (locked decision);
-success -> commit_outbox; failure -> stays in outbox (never lost, never
-duplicated); no credentials -> safe dry-run.
+Cakupan dispatcher: thread terpisah yang membaca outbox service; hanya action == ESCALATE
+yang dikirim lewat Telegram (keputusan terkunci); berhasil -> commit_outbox; gagal -> tetap
+di outbox (tidak hilang, tidak terduplikasi); tanpa kredensial -> dry-run yang aman.
 """
 
 from datetime import datetime, timezone
@@ -14,6 +12,13 @@ import pytest
 
 from src.contracts.scored_meta_alert import ScoredMetaAlert
 from src.runtime.telegram_dispatcher import TelegramDispatcher, make_telegram_sender
+
+
+
+@pytest.fixture(autouse=True)
+def _no_cooldown(monkeypatch):
+    """Tes lama menguji perilaku per item; cooldown T10 diuji di test_escalation_cooldown.py."""
+    monkeypatch.setenv("RBTA_ESCALATION_COOLDOWN_MIN", "0")
 
 
 def _scored(
@@ -59,7 +64,7 @@ def _scored(
 
 
 class _FakeService:
-    """Minimal service double exposing only the outbox contract."""
+    """Double service minimal yang hanya menyediakan kontrak outbox."""
 
     def __init__(self, outbox: List[ScoredMetaAlert], live_source_state=None) -> None:
         self._outbox = list(outbox)
@@ -82,7 +87,7 @@ class _FakeService:
 
 
 class _NoStateMethodService:
-    """Service double WITHOUT get_live_source_state (M1 fallback path)."""
+    """Double service TANPA get_live_source_state (jalur fallback)."""
 
     def __init__(self, outbox: List[ScoredMetaAlert]) -> None:
         self._outbox = list(outbox)
@@ -99,7 +104,7 @@ class _NoStateMethodService:
 
 
 class _RecordingManager:
-    """Fake state_manager exposing notification_add (+suppression_add)."""
+    """state_manager tiruan yang menyediakan notification_add (+suppression_add)."""
 
     def __init__(self) -> None:
         self.notifications: list = []
@@ -113,7 +118,7 @@ class _RecordingManager:
 
 
 def _sender_factory(behaviour: List[Any]):
-    """Build an injectable sender; each entry is None (success) or an Exception to raise."""
+    """Bangun sender yang bisa di-inject; setiap entri bernilai None (sukses) atau Exception yang dilempar."""
     calls: List[Dict[str, Any]] = []
     queue = list(behaviour)
 
@@ -147,13 +152,13 @@ def test_fail_then_success_sends_once_and_empties_outbox():
     result = dispatcher.dispatch_once()
 
     assert result.sent == 1
-    assert len(send.calls) == 2  # one retry, then success
+    assert len(send.calls) == 2  # satu retry, lalu sukses
     assert service.get_outbox() == []
     assert service.committed == [[101]]
     payload = send.calls[-1]
     assert payload["meta_id"] == 101
     assert payload["idempotency_key"] == "live:101"
-    # Decision vs action shown separately, no doubled label.
+    # Decision dan action ditampilkan terpisah, tanpa label ganda.
     assert payload["decision"] == "CRITICAL"
     assert payload["action"] == "ESCALATE"
     assert "ESCALATE ESCALATE" not in payload["message"]
@@ -178,10 +183,10 @@ def test_persistent_failure_keeps_item_in_outbox_without_duplicate_send_record()
 
     assert result.sent == 0
     assert result.failed == 1
-    # Item is NOT lost and NOT committed.
+    # Item TIDAK hilang dan TIDAK di-commit.
     assert [m.meta_id for m in service.get_outbox()] == [102]
     assert service.committed == []
-    # Retries happened for the single item, but only one logical message.
+    # Retry terjadi untuk item tunggal itu, tetapi hanya satu pesan logis.
     assert len(send.calls) == 3
     assert {c["idempotency_key"] for c in send.calls} == {"live:102"}
 
@@ -218,7 +223,7 @@ def test_missing_credentials_is_safe_dry_run(monkeypatch):
     assert result.dry_run == 1
     assert result.sent == 0
     assert len(send.calls) == 0
-    # N7: dry-run drains the outbox (commit + dedup key), payload buffered.
+    # Dry-run menguras outbox (commit + kunci dedup), payload disimpan di buffer.
     assert service.get_outbox() == []
     assert service.committed == [[104]]
 
@@ -236,7 +241,7 @@ def test_already_sent_key_is_not_resent_in_same_dispatcher():
         bootstrap_started_at=now,
     )
     dispatcher.dispatch_once()
-    # Item reappears in outbox (e.g. service restart re-queued it).
+    # Item muncul lagi di outbox (mis. di-antrekan ulang setelah service restart).
     service._outbox.append(_scored(105, end_time=now))
 
     result = dispatcher.dispatch_once()
@@ -247,7 +252,7 @@ def test_already_sent_key_is_not_resent_in_same_dispatcher():
 
 
 def _mock_session(response=None, error=None):
-    """Fake requests-like session; records posts without network access."""
+    """Session tiruan mirip requests; mencatat post tanpa akses jaringan."""
     from unittest.mock import MagicMock
 
     session = MagicMock()
@@ -311,9 +316,9 @@ def test_make_sender_refuses_payload_without_chat_id():
     session.post.assert_not_called()
 
 
-# ---- F1/F4/F8 remediation tests (TDD RED) ----
+# Keamanan token, retry, dan rate limit.
 
-def test_f1_sender_sanitizes_token_url_from_error():
+def test_sender_sanitizes_token_url_from_error():
     import requests
 
     secret = "SECRET123TOKEN"
@@ -327,11 +332,11 @@ def test_f1_sender_sanitizes_token_url_from_error():
     with pytest.raises(RuntimeError) as excinfo:
         send(_sender_payload())
     assert secret not in str(excinfo.value)
-    # N3: exception chain must not carry the token-bearing URL.
+    # Rantai exception tidak boleh membawa URL yang berisi token.
     assert excinfo.value.__cause__ is None
 
 
-def test_f1_sender_includes_http_status_without_url():
+def test_sender_includes_http_status_without_url():
     import requests
 
     secret = "SECRET999TOKEN"
@@ -349,7 +354,7 @@ def test_f1_sender_includes_http_status_without_url():
     assert "429" in str(excinfo.value)
 
 
-def test_f1_dispatcher_log_never_contains_token(caplog):
+def test_dispatcher_log_never_contains_token(caplog):
     import logging
 
     secret = "LEAKEDTOKEN456"
@@ -374,7 +379,7 @@ def test_f1_dispatcher_log_never_contains_token(caplog):
     assert secret not in caplog.text
 
 
-def test_f4_historical_item_suppressed_but_committed():
+def test_historical_item_suppressed_but_committed():
     from datetime import timedelta
 
     now = datetime.now(timezone.utc)
@@ -400,7 +405,7 @@ def test_f4_historical_item_suppressed_but_committed():
     assert dispatcher.status()["suppressed_historical_total"] == 1
 
 
-def test_f4_max_age_reads_env(monkeypatch):
+def test_max_age_reads_env(monkeypatch):
     from datetime import timedelta
 
     now = datetime.now(timezone.utc)
@@ -422,13 +427,13 @@ def test_f4_max_age_reads_env(monkeypatch):
     assert service.get_outbox() == []
 
 
-def test_f8_docstring_is_honest_about_at_least_once():
+def test_docstring_is_honest_about_at_least_once():
     import src.runtime.telegram_dispatcher as mod
 
     assert "at-least-once" in mod.__doc__
 
 
-def test_f8_duplicate_still_commits_to_unstick_item():
+def test_duplicate_still_commits_to_unstick_item():
     now = datetime.now(timezone.utc)
     service = _FakeService([_scored(105, end_time=now)])
     send = _sender_factory([None])
@@ -452,7 +457,7 @@ def test_f8_duplicate_still_commits_to_unstick_item():
     assert service.get_outbox() == []
 
 
-def test_f8_formatter_shows_meta_id():
+def test_formatter_shows_meta_id():
     from src.runtime.telegram_formatter import format_telegram_alert
 
     text = format_telegram_alert(_scored(999), run_id="live")
@@ -460,7 +465,7 @@ def test_f8_formatter_shows_meta_id():
     assert "META-ALERT" in text
 
 
-def test_f8_throttle_sleeps_between_successful_sends():
+def test_throttle_sleeps_between_successful_sends():
     sleeps: list = []
     now = datetime.now(timezone.utc)
     service = _FakeService([_scored(501, end_time=now), _scored(502, end_time=now)])
@@ -479,7 +484,7 @@ def test_f8_throttle_sleeps_between_successful_sends():
     assert any(s >= 0.9 for s in sleeps)
 
 
-def test_f8_429_retry_after_is_honored():
+def test_429_retry_after_is_honored():
     sleeps: list = []
 
     calls: list = []
@@ -530,13 +535,15 @@ def test_status_exposes_required_counters():
         "failed_total": 0,
         "suppressed_historical_total": 0,
         "dry_run_total": 0,
+        "suppressed_cooldown_total": 0,
+        "cooldown_min": 0.0,
         "mode": "live",
     }
 
 
-# ---- N2/N3/N7 + ponytail rework (TDD RED) ----
+# Penahanan alert historis, dry-run, dan dedup.
 
-def test_n2_historical_suppressed_against_bootstrap_time():
+def test_historical_suppressed_against_bootstrap_time():
     from datetime import timedelta
 
     now = datetime.now(timezone.utc)
@@ -563,15 +570,15 @@ def test_n2_historical_suppressed_against_bootstrap_time():
     assert dispatcher.status()["suppressed_historical_total"] == 1
 
 
-def test_m1_no_bootstrap_means_fail_closed_no_send_no_commit(caplog):
-    """M1: unknown bootstrap fails closed — item skipped, outbox retained."""
+def test_no_bootstrap_means_fail_closed_no_send_no_commit(caplog):
+    """Bootstrap yang tidak diketahui gagal tertutup — item dilewati, outbox dipertahankan."""
     import logging
 
     from datetime import timedelta
 
     now = datetime.now(timezone.utc)
     old = now - timedelta(seconds=7200)
-    # _NoStateMethodService has no get_live_source_state at all.
+    # _NoStateMethodService sama sekali tidak punya get_live_source_state.
     service = _NoStateMethodService([_scored(802, end_time=old)])
     send = _sender_factory([None])
     dispatcher = TelegramDispatcher(
@@ -590,18 +597,18 @@ def test_m1_no_bootstrap_means_fail_closed_no_send_no_commit(caplog):
     assert result.suppressed_historical == 0
     assert result.skipped == 1
     assert len(send.calls) == 0
-    # Outbox retained: nothing committed.
+    # Outbox dipertahankan: tidak ada yang di-commit.
     assert [m.meta_id for m in service.get_outbox()] == [802]
     assert service.committed == []
     assert "fail-closed" in caplog.text
 
 
-def test_n2_recent_item_after_bootstrap_cutoff_is_sent():
+def test_recent_item_after_bootstrap_cutoff_is_sent():
     from datetime import timedelta
 
     now = datetime.now(timezone.utc)
     bootstrap = now - timedelta(seconds=100)
-    recent = bootstrap - timedelta(seconds=100)  # within 3600 tolerance
+    recent = bootstrap - timedelta(seconds=100)  # masih dalam toleransi 3600
     service = _FakeService([_scored(803, end_time=recent)])
     send = _sender_factory([None])
     dispatcher = TelegramDispatcher(
@@ -619,7 +626,7 @@ def test_n2_recent_item_after_bootstrap_cutoff_is_sent():
     assert result.suppressed_historical == 0
 
 
-def test_n2_missing_end_time_never_suppressed():
+def test_missing_end_time_never_suppressed():
     from types import SimpleNamespace
 
     now = datetime.now(timezone.utc)
@@ -633,13 +640,13 @@ def test_n2_missing_end_time_never_suppressed():
         bootstrap_started_at=now,
         sleep_fn=lambda s: None,
     )
-    # invalid/missing end_time never suppresses (fail-open to send)
+    # end_time tidak valid/tidak ada tidak pernah menahan (tetap dikirim)
     assert dispatcher._is_historical(SimpleNamespace(end_time=None)) is False
     assert dispatcher._is_historical(SimpleNamespace()) is False
     assert dispatcher._is_historical(SimpleNamespace(end_time="not-a-datetime")) is False
 
 
-def test_n2_suppressed_item_recorded_via_state_manager_when_present():
+def test_suppressed_item_recorded_via_state_manager_when_present():
     from datetime import timedelta
 
     now = datetime.now(timezone.utc)
@@ -664,12 +671,12 @@ def test_n2_suppressed_item_recorded_via_state_manager_when_present():
         sleep_fn=lambda s: None,
     )
     dispatcher.dispatch_once()
-    # Single source: suppression verdicts live only in notification_log.
+    # Satu sumber: putusan penahanan hanya ada di notification_log.
     assert recorded == [(805, "live", "SUPPRESSED_HISTORICAL")]
     assert service.get_outbox() == []
 
 
-def test_n3_traceback_and_logs_never_contain_token(caplog):
+def test_traceback_and_logs_never_contain_token(caplog):
     import logging
     import traceback
 
@@ -685,7 +692,7 @@ def test_n3_traceback_and_logs_never_contain_token(caplog):
     text = "".join(traceback.format_exception(excinfo.value))
     assert secret not in text
     assert excinfo.value.__cause__ is None
-    # dispatcher log path is also token-free
+    # jalur log dispatcher juga bebas token
     now = datetime.now(timezone.utc)
     service = _FakeService([_scored(806, end_time=now)])
     bad = _sender_factory(
@@ -707,7 +714,7 @@ def test_n3_traceback_and_logs_never_contain_token(caplog):
     assert logging.getLogger("urllib3").level >= logging.WARNING
 
 
-def test_n7_dry_run_drains_outbox_and_dedups_across_passes(monkeypatch):
+def test_dry_run_drains_outbox_and_dedups_across_passes(monkeypatch):
     monkeypatch.delenv("RBTA_TELEGRAM_BOT_TOKEN", raising=False)
     monkeypatch.delenv("RBTA_TELEGRAM_CHAT_ID", raising=False)
     monkeypatch.delenv("RBTA_TELEGRAM_DRY_RUN", raising=False)
@@ -723,7 +730,7 @@ def test_n7_dry_run_drains_outbox_and_dedups_across_passes(monkeypatch):
     assert service.get_outbox() == []
     assert service.committed == [[807]]
     assert "live:807" in dispatcher._sent_keys
-    # item reappears -> duplicate_skipped, not dry_run again
+    # item muncul lagi -> duplicate_skipped, bukan dry_run lagi
     service._outbox.append(_scored(807, end_time=now))
     result2 = dispatcher.dispatch_once()
     assert result2.duplicate_skipped == 1
@@ -731,7 +738,7 @@ def test_n7_dry_run_drains_outbox_and_dedups_across_passes(monkeypatch):
     assert dispatcher.status()["dry_run_total"] == 1
 
 
-def test_n7_dry_run_payloads_capped_at_50(monkeypatch):
+def test_dry_run_payloads_capped_at_50(monkeypatch):
     monkeypatch.delenv("RBTA_TELEGRAM_BOT_TOKEN", raising=False)
     monkeypatch.delenv("RBTA_TELEGRAM_CHAT_ID", raising=False)
     monkeypatch.delenv("RBTA_TELEGRAM_DRY_RUN", raising=False)
@@ -748,7 +755,7 @@ def test_n7_dry_run_payloads_capped_at_50(monkeypatch):
     assert service.get_outbox() == []
 
 
-def test_ponytail_sent_keys_evicts_fifo_at_10000():
+def test_sent_keys_evicts_fifo_at_10000():
     service = _FakeService([])
     dispatcher = TelegramDispatcher(
         service, sender=_sender_factory([]), run_id="live", bot_token="t", chat_id="c"
@@ -762,7 +769,7 @@ def test_ponytail_sent_keys_evicts_fifo_at_10000():
     assert "live:0" not in dispatcher._sent_keys
 
 
-def test_ponytail_retry_after_falls_back_to_body_parameters():
+def test_retry_after_falls_back_to_body_parameters():
     import requests
 
     err = requests.exceptions.HTTPError("429 slow down")
@@ -781,7 +788,7 @@ def test_ponytail_retry_after_falls_back_to_body_parameters():
     assert _retry_after_of(err) == 7.0
 
 
-def test_ponytail_cycle_chain_terminates():
+def test_cycle_chain_terminates():
     from src.runtime.telegram_dispatcher import _http_status_of, _retry_after_of
 
     err = RuntimeError("cycle")
@@ -790,14 +797,14 @@ def test_ponytail_cycle_chain_terminates():
     assert _retry_after_of(err) is None
 
 
-# ---- M1: lazy bootstrap + fail-closed (TDD RED) ----
+# Bootstrap lazy + gagal tertutup.
 
-def test_m1_explicit_param_wins_over_state_key():
+def test_explicit_param_wins_over_state_key():
     from datetime import timedelta
 
     now = datetime.now(timezone.utc)
     ancient = now - timedelta(seconds=7200)
-    # State says bootstrap long ago (would suppress), explicit param is fresh.
+    # State menyebut bootstrap sudah lama (akan menahan), parameter eksplisit masih baru.
     service = _FakeService(
         [_scored(811, end_time=now)],
         live_source_state={"live_first_started_at": ancient.isoformat()},
@@ -818,7 +825,7 @@ def test_m1_explicit_param_wins_over_state_key():
     assert result.suppressed_historical == 0
 
 
-def test_m1_state_key_iso_string_used_when_no_param():
+def test_state_key_iso_string_used_when_no_param():
     from datetime import timedelta
 
     now = datetime.now(timezone.utc)
@@ -845,7 +852,7 @@ def test_m1_state_key_iso_string_used_when_no_param():
     assert service.committed == [[812]]
 
 
-def test_m1_warning_logged_once_per_pass_when_unknown(caplog):
+def test_warning_logged_once_per_pass_when_unknown(caplog):
     import logging
 
     from datetime import timedelta
@@ -871,7 +878,7 @@ def test_m1_warning_logged_once_per_pass_when_unknown(caplog):
     assert len(warnings) == 1
 
 
-def test_m1_invalid_state_value_fails_closed():
+def test_invalid_state_value_fails_closed():
     now = datetime.now(timezone.utc)
     service = _FakeService(
         [_scored(815, end_time=now)],
@@ -893,7 +900,7 @@ def test_m1_invalid_state_value_fails_closed():
     assert service.committed == []
 
 
-def test_m1_raising_state_getter_fails_closed():
+def test_raising_state_getter_fails_closed():
     now = datetime.now(timezone.utc)
     service = _FakeService([_scored(816, end_time=now)])
 
@@ -917,12 +924,12 @@ def test_m1_raising_state_getter_fails_closed():
     assert service.committed == []
 
 
-def test_m1_tolerance_boundary_recent_item_still_sent_old_suppressed():
+def test_tolerance_boundary_recent_item_still_sent_old_suppressed():
     from datetime import timedelta
 
     now = datetime.now(timezone.utc)
     bootstrap = now
-    # Design boundary: ESCALATE ending <1h before bootstrap is still sent.
+    # Batas desain: ESCALATE yang berakhir <1 jam sebelum bootstrap tetap dikirim.
     recent = bootstrap - timedelta(seconds=3599)
     old = bootstrap - timedelta(seconds=3601)
     service = _FakeService([_scored(817, end_time=recent), _scored(818, end_time=old)])
@@ -944,9 +951,9 @@ def test_m1_tolerance_boundary_recent_item_still_sent_old_suppressed():
     assert service.committed == [[817], [818]]
 
 
-# ---- M3: durable notification_add verdicts (TDD RED) ----
+# Putusan notification_add yang durable.
 
-def test_m3_sent_records_notification_add():
+def test_sent_records_notification_add():
     now = datetime.now(timezone.utc)
     service = _FakeService([_scored(821, end_time=now)])
     manager = _RecordingManager()
@@ -965,7 +972,7 @@ def test_m3_sent_records_notification_add():
     assert manager.notifications == [(821, "live", "SENT")]
 
 
-def test_m3_dry_run_records_notification_add(monkeypatch):
+def test_dry_run_records_notification_add(monkeypatch):
     monkeypatch.delenv("RBTA_TELEGRAM_BOT_TOKEN", raising=False)
     monkeypatch.delenv("RBTA_TELEGRAM_CHAT_ID", raising=False)
     monkeypatch.delenv("RBTA_TELEGRAM_DRY_RUN", raising=False)
@@ -985,7 +992,7 @@ def test_m3_dry_run_records_notification_add(monkeypatch):
     assert manager.notifications == [(822, "live", "DRY_RUN")]
 
 
-def test_m3_suppressed_records_notification_add():
+def test_suppressed_records_notification_add():
     from datetime import timedelta
 
     now = datetime.now(timezone.utc)
@@ -1005,11 +1012,11 @@ def test_m3_suppressed_records_notification_add():
     result = dispatcher.dispatch_once()
     assert result.suppressed_historical == 1
     assert manager.notifications == [(823, "live", "SUPPRESSED_HISTORICAL")]
-    # Unified ruling: historical suppression lives only in notification_log.
+    # Satu putusan: penahanan historis hanya ada di notification_log.
     assert manager.suppressions == []
 
 
-def test_m3_fallback_without_notification_add_method_still_sends():
+def test_fallback_without_notification_add_method_still_sends():
     from types import SimpleNamespace
 
     now = datetime.now(timezone.utc)
@@ -1029,7 +1036,7 @@ def test_m3_fallback_without_notification_add_method_still_sends():
     assert service.committed == [[824]]
 
 
-def test_m3_fallback_without_state_manager_still_sends():
+def test_fallback_without_state_manager_still_sends():
     now = datetime.now(timezone.utc)
     service = _FakeService([_scored(825, end_time=now)])
     assert not hasattr(service, "state_manager")
@@ -1047,15 +1054,15 @@ def test_m3_fallback_without_state_manager_still_sends():
     assert service.committed == [[825]]
 
 
-# ---- Ponytail: exact header + depth pin (TDD RED) ----
+# Header Retry-After dan batas kedalaman.
 
-def test_ponytail_chain_scan_depth_is_8():
+def test_chain_scan_depth_is_8():
     import src.runtime.telegram_dispatcher as mod
 
     assert mod._CHAIN_SCAN_DEPTH == 8
 
 
-def test_ponytail_retry_after_exact_header_wins():
+def test_retry_after_exact_header_wins():
     err = RuntimeError("429 slow down")
     err.retry_after_sec = 9.0  # type: ignore[attr-defined]
     resp = type(
@@ -1066,13 +1073,13 @@ def test_ponytail_retry_after_exact_header_wins():
     err.response = resp  # type: ignore[attr-defined]
     from src.runtime.telegram_dispatcher import _retry_after_of
 
-    # Direct attribute still wins over the header (unchanged precedence).
+    # Atribut langsung tetap mengalahkan header (urutan prioritas tidak berubah).
     assert _retry_after_of(err) == 9.0
     del err.retry_after_sec  # type: ignore[attr-defined]
     assert _retry_after_of(err) == 3.0
 
 
-def test_ponytail_retry_after_lowercase_header_only_is_ignored():
+def test_retry_after_lowercase_header_only_is_ignored():
     class _Resp:
         status_code = 429
         headers = {"retry-after": "5"}
@@ -1087,7 +1094,7 @@ def test_ponytail_retry_after_lowercase_header_only_is_ignored():
     assert _retry_after_of(err) is None
 
 
-# ---- Default sleep is interruptible via stop_event (TDD RED) ----
+# Sleep default bisa diinterupsi lewat stop_event.
 
 def test_default_sleep_stop_is_fast():
     service = _FakeService([])
@@ -1099,9 +1106,9 @@ def test_default_sleep_stop_is_fast():
         chat_id="chat",
         poll_interval_sec=3600.0,
     )
-    # Default sleep_fn=None binds the interruptible stop_event.wait ...
+    # sleep_fn=None default memakai stop_event.wait yang bisa diinterupsi ...
     assert dispatcher._sleep == dispatcher._stop_event.wait
-    # ... while an explicit sleep_fn is kept verbatim.
+    # ... sedangkan sleep_fn eksplisit dipakai apa adanya.
     probe = lambda s: None
     explicit = TelegramDispatcher(
         service, sender=_sender_factory([]), run_id="live", sleep_fn=probe
@@ -1114,9 +1121,9 @@ def test_default_sleep_stop_is_fast():
     assert not thread.is_alive()
 
 
-# ---- P2: explicit dry-run vs credentials-hold (TDD RED) ----
+# Dry-run eksplisit vs hold karena kredensial.
 
-def test_p2_missing_credentials_without_flag_holds_outbox(monkeypatch, caplog):
+def test_missing_credentials_without_flag_holds_outbox(monkeypatch, caplog):
     import logging
 
     monkeypatch.delenv("RBTA_TELEGRAM_BOT_TOKEN", raising=False)
@@ -1139,7 +1146,7 @@ def test_p2_missing_credentials_without_flag_holds_outbox(monkeypatch, caplog):
     assert result.sent == 0
     assert result.dry_run == 0
     assert len(send.calls) == 0
-    # Outbox retained: nothing committed.
+    # Outbox dipertahankan: tidak ada yang di-commit.
     assert [m.meta_id for m in service.get_outbox()] == [901, 902]
     assert service.committed == []
     assert dispatcher.status()["mode"] == "hold"
@@ -1147,7 +1154,7 @@ def test_p2_missing_credentials_without_flag_holds_outbox(monkeypatch, caplog):
     assert len(hold_warnings) == 1
 
 
-def test_p2_explicit_dry_run_param_drains_and_records(monkeypatch):
+def test_explicit_dry_run_param_drains_and_records(monkeypatch):
     monkeypatch.delenv("RBTA_TELEGRAM_BOT_TOKEN", raising=False)
     monkeypatch.delenv("RBTA_TELEGRAM_CHAT_ID", raising=False)
     monkeypatch.delenv("RBTA_TELEGRAM_DRY_RUN", raising=False)
@@ -1172,7 +1179,7 @@ def test_p2_explicit_dry_run_param_drains_and_records(monkeypatch):
     assert manager.suppressions == []
 
 
-def test_p2_dry_run_env_flag_drains_without_param(monkeypatch):
+def test_dry_run_env_flag_drains_without_param(monkeypatch):
     monkeypatch.delenv("RBTA_TELEGRAM_BOT_TOKEN", raising=False)
     monkeypatch.delenv("RBTA_TELEGRAM_CHAT_ID", raising=False)
     monkeypatch.setenv("RBTA_TELEGRAM_DRY_RUN", "true")
@@ -1191,7 +1198,7 @@ def test_p2_dry_run_env_flag_drains_without_param(monkeypatch):
     assert service.get_outbox() == []
 
 
-def test_p2_live_mode_with_credentials(monkeypatch):
+def test_live_mode_with_credentials(monkeypatch):
     monkeypatch.delenv("RBTA_TELEGRAM_DRY_RUN", raising=False)
     now = datetime.now(timezone.utc)
     service = _FakeService([_scored(905, end_time=now)])
@@ -1208,7 +1215,7 @@ def test_p2_live_mode_with_credentials(monkeypatch):
     assert dispatcher.status()["mode"] == "live"
 
 
-# ---- Unified suppression + record-before-commit (TDD RED) ----
+# Penahanan terpadu + catat sebelum commit.
 
 def test_unified_historical_suppression_only_notification_log():
     from datetime import timedelta
@@ -1286,9 +1293,9 @@ def test_record_failure_skips_commit_dry_run_path(monkeypatch):
     assert service.committed == []
 
 
-# ---- Ponytail: throttle interval via env (TDD RED) ----
+# Interval throttle lewat env.
 
-def test_ponytail_min_interval_env_zero_disables_throttle(monkeypatch):
+def test_min_interval_env_zero_disables_throttle(monkeypatch):
     monkeypatch.setenv("RBTA_TELEGRAM_MIN_INTERVAL_SEC", "0")
     monkeypatch.delenv("RBTA_TELEGRAM_DRY_RUN", raising=False)
     sleeps: list = []

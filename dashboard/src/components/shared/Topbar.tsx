@@ -47,56 +47,51 @@ export function Topbar() {
   return (
     <>
       <header className="w-full h-14 min-h-[3.5rem] flex items-center justify-between px-6 lg:px-8 border-b border-kumo-line bg-kumo-canvas shrink-0 z-20 sticky top-0">
-        {/* Left: Context Breadcrumb & Runtime Status Badges */}
         <div className="flex items-center gap-3 min-w-0">
           <div className="flex items-center gap-2 text-sm font-medium text-kumo-subtle">
-            <span>Security Operations</span>
+            <span>Operasi keamanan</span>
             <span>/</span>
-            <span className="text-kumo-strong font-semibold">Production SOC</span>
+            <span className="text-kumo-strong font-semibold">SOC kampus</span>
           </div>
 
           <span className="h-4 w-px bg-kumo-line hidden sm:inline-block shrink-0" />
 
-          {/* Runtime Mode & Health Status */}
           <div className="flex items-center gap-2 text-xs">
             {runId ? (
               <Badge variant="warning">REPLAY: {runId.slice(0, 8)}</Badge>
             ) : (
-              <Badge variant="success">LIVE RUNTIME</Badge>
+              <Badge variant="success">DATA LANGSUNG</Badge>
             )}
 
             <span className="hidden lg:inline-flex">
               <Badge variant={data?.system_status === 'READY' ? 'secondary' : 'error'}>
-                {data?.system_status === 'READY' ? 'SYSTEM READY' : 'DEGRADED'}
+                {data?.system_status === 'READY' ? 'SISTEM SIAP' : 'TERGANGGU'}
               </Badge>
             </span>
           </div>
         </div>
 
-        {/* Right: Quick Search, Theme Cycler, Shortcuts Help, User Info */}
         <div className="flex items-center gap-2.5">
-          {/* Quick Search Button */}
           <button
             type="button"
             onClick={() => setShowPalette(true)}
             className="flex items-center justify-between gap-3 px-3 py-1.5 rounded-lg border border-kumo-line bg-kumo-recessed/40 hover:bg-kumo-recessed text-kumo-subtle hover:text-kumo-default text-sm transition-colors cursor-pointer w-40 sm:w-56"
-            title="Search RBTA (Press / or ⌘K)"
+            title="Cari (tekan / atau ⌘K)"
           >
             <div className="flex items-center gap-2 truncate">
               <MagnifyingGlass size={15} className="shrink-0 text-kumo-subtle" />
-              <span className="truncate">Search RBTA...</span>
+              <span className="truncate">Cari…</span>
             </div>
             <kbd className="rounded border border-kumo-line bg-kumo-canvas px-1.5 py-0.5 text-xs font-mono text-kumo-subtle">
               /
             </kbd>
           </button>
 
-          {/* Theme Toggle */}
           <Button
             variant="ghost"
             size="sm"
             onClick={cycleTheme}
-            aria-label={`Theme: ${theme}`}
+            aria-label={`Tema: ${theme}`}
             className="text-kumo-subtle hover:text-kumo-default"
           >
             {theme === 'light' && <Sun size={17} />}
@@ -104,25 +99,23 @@ export function Topbar() {
             {theme === 'system' && <Desktop size={17} />}
           </Button>
 
-          {/* Keyboard Shortcuts Help */}
           <Button
             variant="ghost"
             size="sm"
             onClick={() => setShowShortcuts(true)}
-            aria-label="Keyboard shortcuts"
+            aria-label="Pintasan keyboard"
             className="text-kumo-subtle hover:text-kumo-default"
           >
             <Question size={17} />
           </Button>
 
-          {/* User Profile Pill */}
           <div className="hidden sm:flex items-center gap-2.5 pl-3 ml-1 border-l border-kumo-line">
             <div className="size-8 rounded-full bg-kumo-recessed border border-kumo-line flex items-center justify-center text-kumo-strong">
               <User size={15} />
             </div>
             <div className="hidden xl:flex flex-col text-left">
-              <span className="text-xs font-semibold text-kumo-strong leading-none">SOC Analyst</span>
-              <span className="text-[11px] font-mono text-kumo-subtle mt-0.5">UID 10001</span>
+              <span className="text-xs font-semibold text-kumo-strong leading-none">Analyst SOC</span>
+              <span className="text-[11px] font-mono text-kumo-subtle mt-0.5">Pengguna dashboard</span>
             </div>
           </div>
         </div>

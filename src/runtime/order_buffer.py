@@ -1,40 +1,38 @@
-"""Order buffer: waiting-room sorter closing the cross-cycle ordering gap.
+"""Order buffer: ruang tunggu pengurut untuk menutup celah urutan antar siklus.
 
-LiveIngestionCoordinator sorts candidates only within a single cycle, so a
-late alert from reconciliation (older event-time, arriving in a later cycle)
-would be ingested after newer fast-poll alerts. OrderBuffer holds on-time
-candidates briefly and releases them in ``(timestamp, wazuh_alert_id)`` order.
+LiveIngestionCoordinator hanya mengurutkan kandidat di dalam satu siklus, sehingga
+alert terlambat dari rekonsiliasi (event-time lebih lama, datang di siklus berikutnya)
+akan di-ingest setelah alert fast-poll yang lebih baru. OrderBuffer menahan kandidat
+yang tepat waktu sebentar lalu melepasnya dengan urutan ``(timestamp, wazuh_alert_id)``.
 
-Release rules
--------------
-* ``watermark = max observed event-time - hold_window``. Held items with
-  ``timestamp <= watermark`` are released in order.
-* Items held longer than ``max_hold`` (wall-clock, ``now - arrived_at``) are
-  force-released in order so a quiet stream cannot wedge the buffer.
-* An arriving alert older than the current watermark is released immediately
-  flagged ``late=True``. It is still processed downstream — per the locked
-  rule, no valid alert may be dropped merely for arriving out of order.
-* Honest scope (F7): ``hold_window`` only smooths jitter *smaller* than the
-  window (cross-cycle reordering of seconds). Reconciliation delays of
-  minutes/hours are *expected-late by design*: those alerts pass through
-  immediately flagged ``late=True`` instead of being held. The buffer never
-  claims to eliminate late data, only to order the on-time fraction.
-* Event-times beyond ``now + future_tolerance`` (default 5 minutes) are
-  treated as clock anomalies: they pass through immediately flagged
-  ``late=True`` under the ``future_anomalies`` counter and never move the
-  watermark, so one bad timestamp cannot wedge ordering for the whole stream.
-* Capacity is bounded by ``max_items``. When full, new on-time arrivals are
-  refused (backpressure): ``backpressure_count`` is incremented,
-  ``buffer_dropped`` stays ``0``, and the refused alerts are handed back via
-  :meth:`pop_refused` so the caller can retry or ingest them directly.
-  Nothing is silently discarded. Honest trade-off (F7): refused alerts are
-  intentionally *not* auto-ingested by the buffer — the caller decides
-  (retry-later preserves ordering, ingest-now preserves freshness). Either
-  way the buffer itself drops nothing.
+Aturan pelepasan
+----------------
+* ``watermark = event-time terbesar yang teramati - hold_window``. Item yang ditahan
+  dengan ``timestamp <= watermark`` dilepas secara berurutan.
+* Item yang ditahan lebih lama dari ``max_hold`` (wall-clock, ``now - arrived_at``)
+  dilepas paksa secara berurutan agar aliran yang sepi tidak membuat buffer macet.
+* Alert yang datang lebih tua dari watermark saat ini langsung dilepas dengan penanda
+  ``late=True``. Alert itu tetap diproses di hilir — sesuai aturan yang dikunci, tidak ada
+  alert valid yang boleh dibuang hanya karena datang tidak berurutan.
+* Batas cakupan: ``hold_window`` hanya meratakan jitter yang *lebih kecil* dari window
+  (pengurutan ulang antar siklus dalam hitungan detik). Keterlambatan rekonsiliasi dalam
+  hitungan menit/jam memang *diperkirakan terlambat*: alert itu langsung diteruskan dengan
+  penanda ``late=True`` alih-alih ditahan. Buffer tidak pernah mengklaim menghilangkan
+  data terlambat, hanya mengurutkan bagian yang tepat waktu.
+* Event-time yang melewati ``now + future_tolerance`` (default 5 menit) dianggap anomali
+  jam: langsung diteruskan dengan penanda ``late=True`` dan dihitung di ``future_anomalies``,
+  serta tidak pernah menggeser watermark, sehingga satu timestamp buruk tidak bisa membuat
+  urutan seluruh aliran macet.
+* Kapasitas dibatasi ``max_items``. Bila penuh, kedatangan baru yang tepat waktu ditolak
+  (backpressure): ``backpressure_count`` bertambah, ``buffer_dropped`` tetap ``0``, dan
+  alert yang ditolak dikembalikan lewat :meth:`pop_refused` agar pemanggil bisa mencoba lagi
+  atau langsung meng-ingest-nya. Tidak ada yang dibuang diam-diam. Trade-off: alert yang
+  ditolak sengaja *tidak* di-ingest otomatis oleh buffer — pemanggil yang memutuskan
+  (coba lagi nanti menjaga urutan, ingest sekarang menjaga kesegaran data). Apa pun
+  pilihannya, buffer sendiri tidak membuang apa-apa.
 
-Checkpoint format (restart recovery design; durable persistence is deferred
-to the integration phase, the in-memory buffer intentionally does not touch
-disk here)::
+Format checkpoint (desain pemulihan restart; persistensi durable ditunda ke tahap
+integrasi, buffer in-memory di sini sengaja tidak menyentuh disk)::
 
     {
         "max_observed_event_time": "<ISO-8601 str>" | None,
@@ -60,10 +58,10 @@ disk here)::
         "future_anomalies": int,
     }
 
-A coordinator checkpoint stores the Indexer transport cursor plus this
-snapshot; on restart the buffer is rebuilt with :meth:`from_checkpoint`
-before polling resumes, so unreleased alerts are re-held rather than lost
-(exactly-once effect continues to rely on the existing service dedup).
+Checkpoint coordinator menyimpan cursor transport Indexer beserta snapshot ini; saat
+restart buffer dibangun ulang dengan :meth:`from_checkpoint` sebelum polling dilanjutkan,
+sehingga alert yang belum dilepas ditahan lagi, bukan hilang (efek exactly-once tetap
+mengandalkan dedup service yang sudah ada).
 """
 
 from bisect import insort
@@ -77,7 +75,7 @@ from src.runtime.json_safe import to_json_safe
 
 @dataclass(frozen=True)
 class BufferedRelease:
-    """One alert released by the buffer with its lateness flag."""
+    """Satu alert yang dilepas buffer beserta penanda keterlambatannya."""
 
     alert: CanonicalRawAlert
     late: bool = False
@@ -87,12 +85,11 @@ def partition_unseen(
     candidates: List[CanonicalRawAlert],
     is_seen_fn: Callable[[str], bool],
 ) -> Tuple[List[CanonicalRawAlert], List[CanonicalRawAlert]]:
-    """Split candidates into ``(unseen, seen)`` using an id-membership predicate.
+    """Pisahkan kandidat menjadi ``(unseen, seen)`` memakai predikat keanggotaan id.
 
-    Pure helper for the coordinator dedup pre-pass (F7): input order is
-    preserved in both outputs, nothing is dropped, and the predicate is
-    called exactly once per candidate. ``is_seen_fn`` receives the
-    ``wazuh_alert_id`` and returns True when already processed.
+    Helper murni untuk pra-proses dedup di coordinator: urutan input dipertahankan di kedua
+    output, tidak ada yang dibuang, dan predikat dipanggil tepat sekali per kandidat.
+    ``is_seen_fn`` menerima ``wazuh_alert_id`` dan mengembalikan True bila sudah diproses.
     """
     unseen: List[CanonicalRawAlert] = []
     seen: List[CanonicalRawAlert] = []
@@ -102,7 +99,7 @@ def partition_unseen(
 
 
 class OrderBuffer:
-    """Bounded waiting-room sorter keyed on event-time with late passthrough."""
+    """Ruang tunggu pengurut terbatas berbasis event-time, dengan jalur langsung untuk alert terlambat."""
 
     def __init__(
         self,
@@ -135,7 +132,7 @@ class OrderBuffer:
         alerts: List[CanonicalRawAlert],
         now: Optional[datetime] = None,
     ) -> List[BufferedRelease]:
-        """Accept arrivals; return the releases due in ``(timestamp, id)`` order."""
+        """Terima kedatangan; kembalikan yang sudah jatuh tempo dengan urutan ``(timestamp, id)``."""
         current = now or datetime.now(timezone.utc)
         released: List[BufferedRelease] = []
         seen_in_call: set = set()
@@ -146,7 +143,7 @@ class OrderBuffer:
                 continue
             seen_in_call.add(alert.wazuh_alert_id)
             if alert.timestamp > current + self.future_tolerance:
-                # F7: clock anomaly — passthrough flagged late, watermark untouched.
+                # Anomali jam: diteruskan dengan penanda late, watermark tidak disentuh.
                 released.append(BufferedRelease(alert=alert, late=True))
                 self._late_total += 1
                 self._future_anomalies += 1
@@ -165,8 +162,8 @@ class OrderBuffer:
                 refused_now.append(alert)
 
         if refused_now:
-            # Backpressure: intake refused, never dropped. The caller retrieves
-            # these via pop_refused() and must retry them on a later cycle.
+            # Backpressure: ditolak masuk, tidak pernah dibuang. Pemanggil mengambilnya
+            # lewat pop_refused() dan wajib mencobanya lagi di siklus berikutnya.
             self._refused.extend(refused_now)
             self._backpressure_count += 1
 
@@ -187,19 +184,19 @@ class OrderBuffer:
         return released
 
     def flush(self) -> List[BufferedRelease]:
-        """Release everything still held, in ``(timestamp, id)`` order."""
+        """Lepaskan semua yang masih ditahan, dengan urutan ``(timestamp, id)``."""
         released = [BufferedRelease(alert=a, late=False) for _, _, a, _ in self._held]
         self._held = []
         self._held_ids = set()
         return released
 
     def pop_refused(self) -> List[CanonicalRawAlert]:
-        """Take back alerts refused under backpressure (caller must retry them)."""
+        """Ambil kembali alert yang ditolak karena backpressure (pemanggil wajib mencobanya lagi)."""
         refused, self._refused = self._refused, []
         return refused
 
     def status(self) -> Dict[str, Any]:
-        """Operational counters; ``buffer_dropped`` is always 0 (never drop)."""
+        """Counter operasional; ``buffer_dropped`` selalu 0 (tidak pernah membuang)."""
         return {
             "size": len(self._held),
             "late_total": self._late_total,
@@ -210,7 +207,7 @@ class OrderBuffer:
         }
 
     def to_checkpoint(self) -> Dict[str, Any]:
-        """Serialize held items plus watermark/counters (see module docstring)."""
+        """Serialisasi item yang ditahan beserta watermark/counter (lihat docstring modul)."""
         return {
             "max_observed_event_time": (
                 self._max_observed.isoformat() if self._max_observed else None
@@ -245,7 +242,7 @@ class OrderBuffer:
         max_hold: timedelta = timedelta(minutes=5),
         max_items: int = 1000,
     ) -> "OrderBuffer":
-        """Rebuild a buffer from :meth:`to_checkpoint` output."""
+        """Bangun ulang buffer dari output :meth:`to_checkpoint`."""
         buf = cls(hold_window=hold_window, max_hold=max_hold, max_items=max_items)
         raw_max = snapshot.get("max_observed_event_time")
         buf._max_observed = datetime.fromisoformat(raw_max) if raw_max else None

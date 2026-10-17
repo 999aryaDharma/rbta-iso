@@ -25,14 +25,14 @@ const bars: TimelineBar[] = [
 describe('ActiveBucketsTimeline', () => {
   it('menampilkan state kosong saat belum ada bucket', () => {
     render(<ActiveBucketsTimeline bars={[]} windowMinutes={15} onSelect={() => {}} />);
-    expect(screen.getByRole('status')).toHaveTextContent(/belum ada bucket aktif/i);
+    expect(screen.getByRole('status')).toHaveTextContent(/belum ada kelompok alert yang terbuka/i);
   });
 
   it('menandai baris yang masih mengagregasi tanpa link MetaAlert', () => {
     render(<ActiveBucketsTimeline bars={bars} windowMinutes={15} onSelect={() => {}} />);
-    expect(screen.getByText(/mengagregasi/i)).toBeInTheDocument();
+    expect(screen.getByText(/^masih bertambah$/i)).toBeInTheDocument();
     expect(screen.getByText(/49/)).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /metaalert/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /meta-alert/i })).not.toBeInTheDocument();
   });
 
   it('klik nama bucket memanggil onOpenBucket', () => {
@@ -40,7 +40,7 @@ describe('ActiveBucketsTimeline', () => {
     render(
       <ActiveBucketsTimeline bars={bars} windowMinutes={15} onSelect={() => {}} onOpenBucket={onOpenBucket} />,
     );
-    fireEvent.click(screen.getByRole('button', { name: /buka isi bucket 005 rootcheck/i }));
+    fireEvent.click(screen.getByRole('button', { name: /buka isi kelompok 005 rootcheck/i }));
     expect(onOpenBucket).toHaveBeenCalledWith(expect.objectContaining({ key: '005|rootcheck' }));
   });
 
@@ -48,7 +48,7 @@ describe('ActiveBucketsTimeline', () => {
     const onSelect = vi.fn();
     const final = [{ ...bars[0], meta_id: 5, finalized: true }];
     render(<ActiveBucketsTimeline bars={final} windowMinutes={15} onSelect={onSelect} />);
-    fireEvent.click(screen.getByRole('button', { name: /metaalert 5/i }));
+    fireEvent.click(screen.getByRole('button', { name: /meta-alert 5/i }));
     expect(onSelect).toHaveBeenCalledWith(5);
   });
 });

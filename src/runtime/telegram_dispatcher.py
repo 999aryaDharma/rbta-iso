@@ -1,32 +1,31 @@
-"""Standalone live Telegram dispatcher (L5).
+"""Dispatcher Telegram live yang berdiri sendiri.
 
-Reads scored MetaAlerts with ``action == "ESCALATE"`` from the service
-outbox and delivers them via Telegram only (locked decision — no other
-channel). Success commits the item via ``service.commit_outbox`` (durable
-inside the service); failure leaves it in the outbox — at-least-once
-across restarts (idempotency key ``"{run_id}:{meta_id}"``). Effective
-mode is ``live`` (credentials present), ``dry_run`` (explicit
-``dry_run=True`` or ``RBTA_TELEGRAM_DRY_RUN=true`` — items are committed
-and recorded without sending), or ``hold`` (no credentials and no
-dry-run flag — items are skipped and the outbox is retained).
+Membaca MetaAlert terskor dengan ``action == "ESCALATE"`` dari outbox service dan
+mengirimkannya hanya lewat Telegram (keputusan terkunci — tidak ada kanal lain). Bila
+berhasil, item di-commit lewat ``service.commit_outbox`` (durable di dalam service); bila
+gagal, item tetap di outbox — at-least-once lintas restart (kunci idempotensi
+``"{run_id}:{meta_id}"``). Mode efektifnya ``live`` (kredensial ada), ``dry_run``
+(``dry_run=True`` eksplisit atau ``RBTA_TELEGRAM_DRY_RUN=true`` — item di-commit dan dicatat
+tanpa dikirim), atau ``hold`` (tanpa kredensial dan tanpa flag dry-run — item dilewati dan
+outbox dipertahankan).
 
-Message format reuses :func:`src.runtime.telegram_formatter.format_telegram_alert`
-(the same canonical format as the replay deferred Telegram sink), which
-already shows decision vs action on separate fields.
+Format pesan memakai :func:`src.runtime.telegram_formatter.format_telegram_alert` (format
+kanonis yang sama dengan sink Telegram tertunda milik replay), yang sudah menampilkan
+decision dan action di field terpisah.
 
-The sender is injected (``Callable[[dict], None]``, raising on failure)
-so the dispatcher is testable without real network access. The default
-sender is a placeholder that raises — real HTTP delivery is wired later.
+Sender di-inject (``Callable[[dict], None]``, melempar error bila gagal) sehingga dispatcher
+bisa diuji tanpa akses jaringan sungguhan. Sender default adalah placeholder yang melempar
+error; pengiriman HTTP sungguhan dipasang lewat make_telegram_sender.
 
-Thread ownership: the dispatcher runs its own polling thread and never
-touches ``LiveWorker`` internals; it only calls the public outbox
-contract (``get_outbox`` / ``commit_outbox``).
+Kepemilikan thread: dispatcher menjalankan thread polling sendiri dan tidak pernah
+menyentuh internal ``LiveWorker``; ia hanya memanggil kontrak outbox publik
+(``get_outbox`` / ``commit_outbox``).
 
-Proposed lifespan wiring (NOT applied — for the integrating agent):
+Pemasangan di lifespan:
 
     dispatcher = TelegramDispatcher(live_service, sender=make_telegram_sender())
-    dispatcher.start()    # in FastAPI lifespan startup, after worker start
-    dispatcher.stop()     # in lifespan shutdown, before worker stop
+    dispatcher.start()    # saat startup lifespan FastAPI, setelah worker start
+    dispatcher.stop()     # saat shutdown lifespan, sebelum worker stop
 """
 
 from __future__ import annotations
@@ -39,6 +38,8 @@ from collections import deque
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, Deque, Dict, List, Optional, Protocol, Set
+
+from html import escape
 
 from src.runtime.telegram_formatter import format_telegram_alert
 
@@ -54,9 +55,11 @@ CHAT_ID_ENV = "RBTA_TELEGRAM_CHAT_ID"
 NOTIFY_MAX_AGE_ENV = "RBTA_TELEGRAM_NOTIFY_MAX_AGE_SEC"
 DRY_RUN_ENV = "RBTA_TELEGRAM_DRY_RUN"
 MIN_INTERVAL_ENV = "RBTA_TELEGRAM_MIN_INTERVAL_SEC"
+COOLDOWN_ENV = "RBTA_ESCALATION_COOLDOWN_MIN"
+DEFAULT_COOLDOWN_MIN = 60.0
 DEFAULT_NOTIFY_MAX_AGE_SEC = 3600.0
-# Default gap between sends. Telegram group chats allow ~20 msgs/min, so
-# raise RBTA_TELEGRAM_MIN_INTERVAL_SEC to >= 3.0 for group delivery.
+# Jeda default antar pengiriman. Grup Telegram membatasi ~20 pesan/menit, jadi naikkan
+# RBTA_TELEGRAM_MIN_INTERVAL_SEC ke >= 3.0 untuk pengiriman ke grup.
 MIN_SEND_INTERVAL_SEC = 1.0
 MAX_RETRY_AFTER_SEC = 60.0
 MAX_SENT_KEYS = 10000
@@ -65,7 +68,7 @@ _CHAIN_SCAN_DEPTH = 8
 
 
 class OutboxReader(Protocol):
-    """Minimal public outbox contract consumed from the runtime service."""
+    """Kontrak outbox publik minimal yang dipakai dari service runtime."""
 
     def get_outbox(self) -> list: ...
     def commit_outbox(self, meta_ids: List[int]) -> int: ...
@@ -76,7 +79,7 @@ SenderFn = Callable[[Dict[str, Any]], None]
 
 @dataclass
 class DispatchResult:
-    """Outcome counts of a single dispatch pass over the outbox snapshot."""
+    """Jumlah hasil satu putaran dispatch atas snapshot outbox."""
 
     sent: int = 0
     failed: int = 0
@@ -84,12 +87,14 @@ class DispatchResult:
     dry_run: int = 0
     duplicate_skipped: int = 0
     suppressed_historical: int = 0
+    suppressed_cooldown: int = 0
+    cooldown_summaries: int = 0
     attempts: int = 0
     sleeps_sec: List[float] = field(default_factory=list)
 
 
 def _http_status_of(exc: BaseException) -> Optional[int]:
-    """Extract an HTTP status code without touching URL/body content."""
+    """Ambil kode status HTTP tanpa menyentuh isi URL/body."""
     current: Optional[BaseException] = exc
     for _ in range(_CHAIN_SCAN_DEPTH):
         if current is None:
@@ -107,10 +112,10 @@ def _http_status_of(exc: BaseException) -> Optional[int]:
 
 
 def _retry_after_of(exc: BaseException) -> Optional[float]:
-    """Extract a Retry-After delay in seconds, capped by the caller.
+    """Ambil jeda Retry-After dalam detik, dibatasi oleh pemanggil.
 
-    Header ``Retry-After`` wins; Telegram 429 bodies carry
-    ``parameters.retry_after`` as fallback (read silently, never logged).
+    Header ``Retry-After`` diutamakan; body 429 Telegram membawa ``parameters.retry_after``
+    sebagai fallback (dibaca tanpa dicatat ke log).
     """
     current: Optional[BaseException] = exc
     for _ in range(_CHAIN_SCAN_DEPTH):
@@ -150,7 +155,7 @@ def _retry_after_of(exc: BaseException) -> Optional[float]:
 
 
 def _sanitize_send_error(exc: BaseException) -> str:
-    """Render a send failure without URL, body, or credential content."""
+    """Tampilkan kegagalan kirim tanpa URL, body, atau isi kredensial."""
     status = _http_status_of(exc)
     if status is not None:
         return f"{type(exc).__name__} HTTP {status}"
@@ -175,14 +180,14 @@ def _resolve_notify_max_age_sec(raw: Optional[float]) -> Optional[float]:
 
 
 def _resolve_dry_run(explicit: Optional[bool]) -> bool:
-    """Explicit ``dry_run`` wins; otherwise RBTA_TELEGRAM_DRY_RUN=true."""
+    """``dry_run`` eksplisit diutamakan; selain itu RBTA_TELEGRAM_DRY_RUN=true."""
     if explicit is not None:
         return bool(explicit)
     return os.environ.get(DRY_RUN_ENV, "false").strip().lower() == "true"
 
 
 def _resolve_min_interval_sec(raw: Optional[float]) -> float:
-    """Explicit ``min_interval_sec`` wins; else env; else default 1.0."""
+    """``min_interval_sec`` eksplisit diutamakan; selain itu env; selain itu default 1.0."""
     if raw is not None:
         return max(0.0, float(raw))
     env_raw = os.environ.get(MIN_INTERVAL_ENV)
@@ -199,6 +204,19 @@ def _resolve_min_interval_sec(raw: Optional[float]) -> float:
     return MIN_SEND_INTERVAL_SEC
 
 
+def _resolve_cooldown_min(raw: Optional[float]) -> float:
+    """``cooldown_min`` eksplisit diutamakan; selain itu env; selain itu 60. 0 = nonaktif."""
+    if raw is not None:
+        return max(0.0, float(raw))
+    env_raw = os.environ.get(COOLDOWN_ENV)
+    if env_raw is not None and env_raw.strip():
+        try:
+            return max(0.0, float(env_raw))
+        except (TypeError, ValueError):
+            logger.warning("Invalid %s=%r; falling back to default %.0f", COOLDOWN_ENV, env_raw, DEFAULT_COOLDOWN_MIN)
+    return DEFAULT_COOLDOWN_MIN
+
+
 def _default_sender(_payload: Dict[str, Any]) -> None:
     raise RuntimeError(
         "No Telegram sender configured: pass sender= explicitly or wire "
@@ -211,11 +229,11 @@ def make_telegram_sender(
     timeout_sec: float = 10.0,
     session: Any = None,
 ) -> SenderFn:
-    """Build a real Telegram Bot API sender (sendMessage).
+    """Bangun sender Telegram Bot API sungguhan (sendMessage).
 
-    Raises on transport failure or when the API answers ``ok: false``.
-    No credentials are logged. Network use happens only when the returned
-    callable is invoked by the dispatcher thread.
+    Melempar error bila transport gagal atau API menjawab ``ok: false``. Kredensial tidak
+    pernah dicatat. Jaringan baru dipakai saat callable yang dikembalikan dipanggil oleh
+    thread dispatcher.
     """
     import requests
 
@@ -246,8 +264,8 @@ def make_telegram_sender(
                 err.http_status = status  # type: ignore[attr-defined]
             if retry_after is not None:
                 err.retry_after_sec = retry_after  # type: ignore[attr-defined]
-            # N3: rantai asli (URL berisi bot token) tidak boleh terbawa di
-            # __cause__/__traceback__ — pesan `safe` sudah cukup untuk debug.
+            # Rantai asli (URL berisi bot token) tidak boleh terbawa di __cause__/__traceback__ —
+            # pesan `safe` sudah cukup untuk debug.
             raise err from None
         if not isinstance(data, dict) or not data.get("ok"):
             raise RuntimeError(
@@ -258,18 +276,16 @@ def make_telegram_sender(
 
 
 class TelegramDispatcher:
-    """Poll the service outbox and deliver ESCALATE items via Telegram.
+    """Polling outbox service dan kirim item ESCALATE lewat Telegram.
 
-    Bootstrap resolution priority for historical suppression: the explicit
-    ``bootstrap_started_at`` constructor param when given, else the
-    ``live_first_started_at`` key lazily read from
-    ``service.get_live_source_state()`` (guarded — missing method, errors,
-    or unparsable values resolve to None), else None.
+    Prioritas penentuan waktu bootstrap untuk menahan alert historis: parameter constructor
+    ``bootstrap_started_at`` bila diberikan, selain itu key ``live_first_started_at`` yang dibaca
+    lazy dari ``service.get_live_source_state()`` (dijaga — method tidak ada, error, atau nilai
+    yang tidak bisa di-parse dianggap None), selain itu None.
 
-    Effective delivery mode (``mode``): ``"live"`` when credentials are
-    configured, ``"dry_run"`` when ``dry_run`` is explicit or
-    ``RBTA_TELEGRAM_DRY_RUN=true``, else ``"hold"`` (outbox retained,
-    nothing sent, nothing committed).
+    Mode pengiriman efektif (``mode``): ``"live"`` bila kredensial dikonfigurasi, ``"dry_run"``
+    bila ``dry_run`` eksplisit atau ``RBTA_TELEGRAM_DRY_RUN=true``, selain itu ``"hold"`` (outbox
+    dipertahankan, tidak ada yang dikirim maupun di-commit).
     """
 
     def __init__(
@@ -288,6 +304,8 @@ class TelegramDispatcher:
         dry_run: Optional[bool] = None,
         monotonic_fn: Callable[[], float] = time.monotonic,
         min_interval_sec: Optional[float] = None,
+        cooldown_min: Optional[float] = None,
+        clock_fn: Optional[Callable[[], datetime]] = None,
     ) -> None:
         self._service = service
         self._sender = sender or _default_sender
@@ -299,8 +317,8 @@ class TelegramDispatcher:
         self._backoff_base_sec = max(0.0, backoff_base_sec)
         self._poll_interval_sec = max(0.1, poll_interval_sec)
         self._stop_event = threading.Event()
-        # None -> interruptible stop_event.wait (worker pattern); an explicit
-        # sleep_fn is kept verbatim (e.g. test probes).
+        # None -> stop_event.wait yang bisa diinterupsi (pola worker); sleep_fn eksplisit
+        # dipakai apa adanya (mis. probe di test).
         self._sleep = sleep_fn if sleep_fn is not None else self._stop_event.wait
         self._notify_max_age_sec = _resolve_notify_max_age_sec(notify_max_age_sec)
         if bootstrap_started_at is not None and bootstrap_started_at.tzinfo is None:
@@ -312,25 +330,34 @@ class TelegramDispatcher:
         self._sent_keys: Set[str] = set()
         self._sent_order: Deque[str] = deque()
         self._lock = threading.Lock()
+        # Menyerialkan throttle + kirim antara thread dispatcher dan job lain (digest, ringkasan cooldown).
+        self._send_lock = threading.Lock()
         self._thread: Optional[threading.Thread] = None
         self.dry_run_payloads: List[Dict[str, Any]] = []
         self._sent_total = 0
         self._failed_total = 0
         self._suppressed_historical_total = 0
         self._dry_run_total = 0
+        # Cooldown eskalasi berulang (T10): kebijakan PENGIRIMAN saja, decision/action tidak berubah.
+        # (agent_id, rule_group_primary) -> {"sent_at", "agent_name", "suppressed": [meta_id, ...]}.
+        # In-memory: restart mereset cooldown (paling buruk satu eskalasi ekstra, tidak ada yang hilang).
+        self._cooldown = timedelta(minutes=_resolve_cooldown_min(cooldown_min))
+        self._clock = clock_fn or (lambda: datetime.now(timezone.utc))
+        self._cooldowns: Dict[tuple, Dict[str, Any]] = {}
+        self._suppressed_cooldown_total = 0
 
     @property
     def enabled(self) -> bool:
-        """True only when both bot token and chat id are configured."""
+        """True hanya bila bot token dan chat id sama-sama dikonfigurasi."""
         return bool(self._bot_token and self._chat_id)
 
     @property
     def mode(self) -> str:
-        """Effective delivery mode: ``live`` | ``dry_run`` | ``hold``.
+        """Mode pengiriman efektif: ``live`` | ``dry_run`` | ``hold``.
 
-        ``dry_run`` (explicit flag or RBTA_TELEGRAM_DRY_RUN=true) wins over
-        credentials; ``live`` needs credentials without dry-run; otherwise
-        ``hold`` — skip items, retain the outbox, warn once per pass.
+        ``dry_run`` (flag eksplisit atau RBTA_TELEGRAM_DRY_RUN=true) mengalahkan kredensial;
+        ``live`` butuh kredensial tanpa dry-run; selain itu ``hold`` — item dilewati, outbox
+        dipertahankan, peringatan sekali per putaran.
         """
         if self._dry_run:
             return "dry_run"
@@ -339,18 +366,20 @@ class TelegramDispatcher:
         return "hold"
 
     def status(self) -> Dict[str, Any]:
-        """Cumulative dispatch counters plus the effective mode."""
+        """Counter dispatch kumulatif beserta mode efektif."""
         with self._lock:
             return {
                 "sent_total": self._sent_total,
                 "failed_total": self._failed_total,
                 "suppressed_historical_total": self._suppressed_historical_total,
                 "dry_run_total": self._dry_run_total,
+                "suppressed_cooldown_total": self._suppressed_cooldown_total,
+                "cooldown_min": self._cooldown.total_seconds() / 60.0,
                 "mode": self.mode,
             }
 
     def _remember_sent_key(self, key: str) -> None:
-        """Record an idempotency key with FIFO eviction at MAX_SENT_KEYS."""
+        """Catat kunci idempotensi dengan eviction FIFO pada MAX_SENT_KEYS."""
         with self._lock:
             if key in self._sent_keys:
                 return
@@ -365,12 +394,11 @@ class TelegramDispatcher:
             return key in self._sent_keys
 
     def _effective_bootstrap_started_at(self) -> Optional[datetime]:
-        """Resolve the bootstrap timestamp with lazy state fallback.
+        """Tentukan timestamp bootstrap dengan fallback lazy ke state.
 
-        Priority: explicit constructor param when given, else the
-        ``live_first_started_at`` key from ``service.get_live_source_state()``
-        (guarded — a missing method, any error, a non-dict state, or an
-        unparsable value resolves to None), else None.
+        Prioritas: parameter constructor bila diberikan, selain itu key ``live_first_started_at``
+        dari ``service.get_live_source_state()`` (dijaga — method tidak ada, error apa pun, state
+        bukan dict, atau nilai yang tidak bisa di-parse dianggap None), selain itu None.
         """
         if self._bootstrap_started_at is not None:
             return self._bootstrap_started_at
@@ -400,18 +428,17 @@ class TelegramDispatcher:
         return resolved
 
     def _is_historical(self, scored: Any) -> bool:
-        """True when the item ended before bootstrap minus tolerance.
+        """True bila item berakhir sebelum waktu bootstrap dikurangi toleransi.
 
-        N2: suppress keyed on BOOTSTRAP time, not on age-at-send — an
-        outage mid-run must not swallow fresh ESCALATEs. Invalid/missing
-        end_time never suppresses.
+        Penahanan berpatokan pada waktu BOOTSTRAP, bukan umur saat dikirim — gangguan di tengah run
+        tidak boleh menelan ESCALATE yang masih baru. end_time yang tidak valid/tidak ada tidak
+        pernah menahan.
 
-        Design boundary: an ESCALATE whose ``end_time`` is less than
-        ``notify_max_age_sec`` (default 3600s) before bootstrap is still
-        sent — only strictly older items suppress.
+        Batas desain: ESCALATE dengan ``end_time`` kurang dari ``notify_max_age_sec`` (default 3600
+        detik) sebelum bootstrap tetap dikirim — hanya item yang benar-benar lebih tua yang ditahan.
 
-        An unknown bootstrap (None) returns False here; the caller
-        (``dispatch_once``) must fail closed instead of sending.
+        Bootstrap yang tidak diketahui (None) mengembalikan False di sini; pemanggil
+        (``dispatch_once``) wajib gagal tertutup alih-alih mengirim.
         """
         bootstrap = self._effective_bootstrap_started_at()
         if bootstrap is None:
@@ -427,14 +454,12 @@ class TelegramDispatcher:
         return end_time < cutoff
 
     def _record_notification(self, meta_id: Any, verdict: str) -> bool:
-        """Durable delivery-verdict note; single ruling source.
+        """Catatan putusan pengiriman yang durable; satu-satunya sumber putusan.
 
-        Calls ``state_manager.notification_add(meta_id, run_id, verdict)``
-        with verdict ``SENT`` / ``DRY_RUN`` / ``SUPPRESSED_HISTORICAL``.
-        Returns True when recorded or when the method is absent (integrating
-        agent not finished yet — counter+log only). Returns False when the
-        call raises; the caller must then skip the commit so the item stays
-        queued for a later pass.
+        Memanggil ``state_manager.notification_add(meta_id, run_id, verdict)`` dengan verdict
+        ``SENT`` / ``DRY_RUN`` / ``SUPPRESSED_HISTORICAL``. True bila tercatat atau bila method-nya
+        tidak ada (hanya counter+log). False bila pemanggilan error; pemanggil harus melewati commit
+        agar item tetap antre untuk putaran berikutnya.
         """
         record = getattr(
             getattr(self._service, "state_manager", None), "notification_add", None
@@ -456,6 +481,40 @@ class TelegramDispatcher:
             )
             return False
         return True
+
+    def _flush_cooldowns(self, result: DispatchResult) -> None:
+        """Kirim satu ringkasan "+N meta-alert serupa" untuk setiap cooldown yang sudah berakhir."""
+        now = self._clock()
+        for ck in list(self._cooldowns):
+            entry = self._cooldowns[ck]
+            if now - entry["sent_at"] < self._cooldown:
+                continue
+            ids = entry["suppressed"]
+            if ids:
+                shown = ", ".join(f"#{i}" for i in ids[:20]) + (" ..." if len(ids) > 20 else "")
+                message = (
+                    f"<b>+{len(ids)} meta-alert serupa</b>\n"
+                    f"<code>{escape(str(entry['agent_name']))} ({escape(ck[0])}) · {escape(ck[1])}</code>\n"
+                    f"Tidak dikirim terpisah selama cooldown {self._cooldown.total_seconds() / 60:.0f} mnt "
+                    f"setelah eskalasi terakhir: {shown}\n"
+                    "<i>Keputusan tetap ESCALATE; lihat dashboard untuk detail.</i>"
+                )
+                if self.send_text(message, kind=f"cooldown:{ck[0]}:{ck[1]}:{ids[0]}") not in ("sent", "dry_run"):
+                    continue  # coba lagi di putaran berikutnya
+                result.cooldown_summaries += 1
+            del self._cooldowns[ck]
+
+    def _in_cooldown(self, scored: Any) -> bool:
+        if self._cooldown.total_seconds() <= 0:
+            return False
+        entry = self._cooldowns.get((str(scored.agent_id), str(scored.rule_group_primary)))
+        return entry is not None and self._clock() - entry["sent_at"] < self._cooldown
+
+    def _start_cooldown(self, scored: Any) -> None:
+        if self._cooldown.total_seconds() > 0:
+            self._cooldowns[(str(scored.agent_id), str(scored.rule_group_primary))] = {
+                "sent_at": self._clock(), "agent_name": scored.agent_name, "suppressed": [],
+            }
 
     def _build_payload(self, scored: Any) -> Dict[str, Any]:
         message = format_telegram_alert(scored, run_id=self._run_id)
@@ -520,26 +579,20 @@ class TelegramDispatcher:
         return False
 
     def dispatch_once(self) -> DispatchResult:
-        """Single pass over the current outbox snapshot.
+        """Satu putaran atas snapshot outbox saat ini.
 
-        Only ``action == "ESCALATE"`` items are sent. Successful sends are
-        committed via ``service.commit_outbox``; failures stay queued
-        (at-least-once across restarts: a restart may redeliver an item
-        whose send succeeded but whose commit was lost). Items whose
-        ``end_time`` predates bootstrap start minus ``notify_max_age_sec``
-        are suppressed from sending but still committed to drain bootstrap
-        backlogs. An unknown bootstrap (neither explicit param nor
-        ``live_first_started_at`` state) fails closed: the item is skipped
-        for this pass, kept in the outbox (NOT committed), and a single
-        WARNING is logged per pass. Hold mode (no credentials and no
-        dry-run flag) also skips without committing — the outbox is
-        retained and a single WARNING is logged per pass. Explicit
-        dry-run drains the outbox: each item is committed, its key
-        recorded for cross-pass dedup, and its payload kept in the
-        last-50 buffer while the dry-run counter stays exact. Final
-        outcomes (sent, dry-run, suppressed) are recorded via
-        ``state_manager.notification_add`` when available; a failed
-        record skips the commit so the item stays queued (failed += 1).
+        Hanya item ``action == "ESCALATE"`` yang dikirim. Pengiriman yang berhasil di-commit lewat
+        ``service.commit_outbox``; yang gagal tetap antre (at-least-once lintas restart: restart bisa
+        mengirim ulang item yang terkirim tetapi commit-nya hilang). Item yang ``end_time``-nya lebih
+        awal dari waktu bootstrap dikurangi ``notify_max_age_sec`` ditahan dari pengiriman tetapi tetap
+        di-commit untuk menguras backlog bootstrap. Bootstrap yang tidak diketahui (tidak ada parameter
+        eksplisit maupun state ``live_first_started_at``) gagal tertutup: item dilewati untuk putaran ini,
+        tetap di outbox (TIDAK di-commit), dan satu WARNING dicatat per putaran. Mode hold (tanpa kredensial
+        dan tanpa flag dry-run) juga melewati tanpa commit — outbox dipertahankan dan satu WARNING dicatat
+        per putaran. Dry-run eksplisit menguras outbox: setiap item di-commit, kuncinya dicatat untuk dedup
+        lintas putaran, dan payload-nya disimpan di buffer 50 terakhir sementara counter dry-run tetap akurat.
+        Hasil akhir (sent, dry-run, suppressed) dicatat lewat ``state_manager.notification_add`` bila
+        tersedia; pencatatan yang gagal membatalkan commit sehingga item tetap antre (failed += 1).
         """
         result = DispatchResult()
         snapshot = list(self._service.get_outbox())
@@ -547,6 +600,8 @@ class TelegramDispatcher:
         mode = self.mode
         unknown_warned = False
         hold_warned = False
+        if mode != "hold":
+            self._flush_cooldowns(result)
         for scored in snapshot:
             if scored.action != "ESCALATE":
                 result.skipped += 1
@@ -593,6 +648,25 @@ class TelegramDispatcher:
                     hold_warned = True
                 result.skipped += 1
                 continue
+            if self._in_cooldown(scored):
+                suppress = getattr(getattr(self._service, "state_manager", None), "suppression_add", None)
+                try:
+                    if callable(suppress):
+                        suppress(int(scored.meta_id), "cooldown")
+                except Exception:
+                    with self._lock:
+                        self._failed_total += 1
+                    result.failed += 1
+                    continue
+                entry = self._cooldowns[(str(scored.agent_id), str(scored.rule_group_primary))]
+                entry["suppressed"].append(scored.meta_id)
+                result.suppressed_cooldown += 1
+                with self._lock:
+                    self._suppressed_cooldown_total += 1
+                self._remember_sent_key(key)
+                self._service.commit_outbox([scored.meta_id])
+                logger.info("Telegram dispatcher cooldown-suppressed %s", key)
+                continue
             if mode == "dry_run":
                 payload = self._build_payload(scored)
                 if not self._record_notification(scored.meta_id, "DRY_RUN"):
@@ -604,20 +678,24 @@ class TelegramDispatcher:
                 with self._lock:
                     self._dry_run_total += 1
                 self._remember_sent_key(key)
+                self._start_cooldown(scored)
                 self.dry_run_payloads.append(payload)
                 del self.dry_run_payloads[:-MAX_DRY_RUN_PAYLOADS]
                 self._service.commit_outbox([scored.meta_id])
                 logger.info("Telegram dispatcher dry-run for %s (no send)", key)
                 continue
             payload = self._build_payload(scored)
-            self._throttle_before_send(result)
-            if self._send_with_retry(payload, result):
+            with self._send_lock:
+                self._throttle_before_send(result)
+                delivered = self._send_with_retry(payload, result)
+            if delivered:
                 if not self._record_notification(scored.meta_id, "SENT"):
                     with self._lock:
                         self._failed_total += 1
                     result.failed += 1
                     continue
                 self._remember_sent_key(key)
+                self._start_cooldown(scored)
                 with self._lock:
                     self._sent_total += 1
                 try:
@@ -632,8 +710,42 @@ class TelegramDispatcher:
                 result.failed += 1
         return result
 
+    def send_text(self, message: str, kind: str = "text") -> str:
+        """Kirim pesan non-MetaAlert (digest, ringkasan) dengan mode, throttle, dan retry yang sama.
+
+        Hasil: ``sent`` | ``dry_run`` (payload disimpan, tidak dikirim) | ``held`` (tanpa kredensial)
+        | ``failed``. Tidak menyentuh outbox maupun notification_log.
+        """
+        mode = self.mode
+        if mode == "hold":
+            logger.warning("Telegram dispatcher holding %s: credentials missing and dry-run not set", kind)
+            return "held"
+        payload = {
+            "meta_id": None,
+            "idempotency_key": f"{self._run_id}:{kind}",
+            "run_id": self._run_id,
+            "chat_id": self._chat_id,
+            "message": message,
+            "parse_mode": "HTML",
+        }
+        if mode == "dry_run":
+            self.dry_run_payloads.append(payload)
+            del self.dry_run_payloads[:-MAX_DRY_RUN_PAYLOADS]
+            logger.info("Telegram dispatcher dry-run for %s (no send)", kind)
+            return "dry_run"
+        result = DispatchResult()
+        with self._send_lock:
+            self._throttle_before_send(result)
+            delivered = self._send_with_retry(payload, result)
+            if delivered:
+                try:
+                    self._last_send_monotonic = self._monotonic_fn()
+                except Exception:
+                    self._last_send_monotonic = None
+        return "sent" if delivered else "failed"
+
     def start(self) -> None:
-        """Start the background polling thread (idempotent)."""
+        """Jalankan thread polling latar belakang (idempoten)."""
         with self._lock:
             if self._thread is not None and self._thread.is_alive():
                 return
@@ -644,7 +756,7 @@ class TelegramDispatcher:
             self._thread.start()
 
     def stop(self, timeout_sec: float = 10.0) -> None:
-        """Stop the background thread (idempotent)."""
+        """Hentikan thread latar belakang (idempoten)."""
         with self._lock:
             thread = self._thread
         self._stop_event.set()

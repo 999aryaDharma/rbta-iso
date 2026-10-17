@@ -9,7 +9,7 @@ from pathlib import Path
 import time
 import sys
 
-# Ensure project root is in sys.path
+# Pastikan root proyek ada di sys.path.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from src.etl.wazuh_canonicalizer import canonicalize_wazuh_alert
@@ -24,7 +24,7 @@ from src.contracts.raw_alert import CanonicalRawAlert
 logger = logging.getLogger(__name__)
 
 def create_dummy_bundle():
-    """Create a dummy ModelArtifactBundle to satisfy ScoringPipeline."""
+    """Buat ModelArtifactBundle dummy agar ScoringPipeline bisa dibuat."""
     base_t = datetime.now(timezone.utc)
     dummy_metas = [
         MetaAlert(
@@ -58,7 +58,7 @@ def run_benchmark(dataset_path: Path, output_dir: Path):
     state_file = output_dir / "state.json"
     sqlite_file = output_dir / "raw_alert_evidence.sqlite3"
     
-    # Remove old files if they exist
+    # Hapus file lama bila ada.
     if state_file.exists():
         state_file.unlink()
     if sqlite_file.exists():
@@ -66,7 +66,7 @@ def run_benchmark(dataset_path: Path, output_dir: Path):
 
     logger.info("Initializing components...")
     
-    # Pre-load lines to count total events
+    # Baca semua baris dulu untuk menghitung total event.
     with open(dataset_path, "r", encoding="utf-8") as f:
         lines = [line.strip() for line in f if line.strip()]
     total_events = len(lines)
@@ -77,10 +77,8 @@ def run_benchmark(dataset_path: Path, output_dir: Path):
     state_manager = DurableStateManager(state_file)
     raw_evidence_store = RawAlertEvidenceStore(sqlite_file)
     
-    # Disable auto_persist to mimic production batched behavior or we can leave it to true
-    # Prompt asks for "full replay pipeline", let's use auto_persist=False and checkpoint explicitly,
-    # or let ingest_alert do it. The LiveRBTAService uses auto_persist=True by default. 
-    # For MAX speed, maybe auto_persist=False and we manually persist? Let's use auto_persist=False to time state_persist_ms precisely.
+    # auto_persist dimatikan dan checkpoint dilakukan eksplisit, supaya waktu
+    # state_persist_ms bisa diukur terpisah dari proses ingest.
     service = LiveRBTAService(
         scoring_pipeline=scoring_pipeline,
         state_manager=state_manager,
@@ -106,7 +104,7 @@ def run_benchmark(dataset_path: Path, output_dir: Path):
             with metrics.stage("canonicalize"):
                 canonical_alert = canonicalize_wazuh_alert(raw_data)
                 
-            # We time raw evidence store
+            # Ukur waktu raw evidence store.
             with metrics.stage("raw_evidence"):
                 raw_evidence_store.store(canonical_alert, source_mode="REPLAY")
                 
@@ -116,7 +114,7 @@ def run_benchmark(dataset_path: Path, output_dir: Path):
                     service.pending_scoring.extend(finalized_metas)
                     
             with metrics.stage("scoring"):
-                # Score pending meta-alerts
+                # Skor meta-alert yang tertunda.
                 scored = []
                 while service.pending_scoring:
                     meta = service.pending_scoring.pop(0)
@@ -128,13 +126,13 @@ def run_benchmark(dataset_path: Path, output_dir: Path):
 
         metrics.increment("events_processed")
         
-        # Periodic durable checkpoint (every 500 events)
+        # Checkpoint durable berkala (setiap 500 event).
         if metrics.counts["events_processed"] % 500 == 0:
             with metrics.stage("state_persist"):
                 service.checkpoint()
             metrics.increment("checkpoints_written")
             
-    # Drain at the end
+    # Drain di akhir.
     with metrics.stage("total_processing"):
         with metrics.stage("rbta_engine"):
             drained_metas = service.engine.drain()
@@ -183,7 +181,7 @@ if __name__ == "__main__":
     
     args = parser.parse_args()
     
-    # Minimal logging configuration for the script itself
+    # Konfigurasi logging minimal untuk script ini.
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     
     run_benchmark(Path(args.dataset).resolve(), Path(args.output_dir).resolve())

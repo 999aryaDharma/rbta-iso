@@ -4,6 +4,7 @@ import { fetchBuckets, fetchBucketRawAlerts } from '@/api/dashboard';
 import { ApiError } from '@/api/client';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { formatDateTime, formatNumber } from '@/lib/formatters';
+import { TERMS } from '@/lib/labels';
 import { Banner } from '@cloudflare/kumo/components/banner';
 import { Button } from '@cloudflare/kumo/components/button';
 import { Badge } from '@cloudflare/kumo/components/badge';
@@ -74,12 +75,12 @@ export function BucketDetailPage() {
   return (
     <>
       <PageHeader
-        breadcrumbs={['Operasi', 'Live Stream', bucketKey]}
-        title={`Bucket ${bucketKey}`}
-        description="Raw alert anggota bucket yang masih mengagregasi. Isi berubah saat alert baru masuk sampai bucket final."
+        breadcrumbs={['Operasi', 'Pemantauan live', bucketKey]}
+        title={`Kelompok ${bucketKey}`}
+        description="Alert dalam kelompok yang masih terbuka. Isinya bertambah saat alert baru masuk, sampai kelompok ditutup menjadi meta-alert."
         actions={
           <Button variant="ghost" size="sm" onClick={() => navigate(withRunId('/live'))}>
-            <ArrowLeft size={14} className="mr-1" /> Kembali ke Live
+            <ArrowLeft size={14} className="mr-1" /> Kembali ke pemantauan live
           </Button>
         }
       />
@@ -88,31 +89,31 @@ export function BucketDetailPage() {
         {bucket && (
           <div className="flex flex-wrap items-center gap-x-6 gap-y-3 rounded-xl border border-kumo-hairline bg-kumo-canvas px-6 py-4 text-xs shadow-xs">
             <span className="inline-flex flex-col gap-1">
-              <Badge variant="secondary">Mengagregasi</Badge>
+              <Badge variant="secondary">Masih bertambah</Badge>
               {bucket.meta_id != null && (
-                <span className="font-mono text-[11px] text-kumo-subtle">calon #{bucket.meta_id}</span>
+                <span className="font-mono text-[11px] text-kumo-subtle">akan menjadi meta-alert #{bucket.meta_id}</span>
               )}
             </span>
             <div>
               <p className="font-mono font-bold text-kumo-strong text-lg leading-none">
                 {formatNumber(bucket.alert_count)}
               </p>
-              <p className="text-kumo-subtle mt-1">Alert anggota</p>
+              <p className="text-kumo-subtle mt-1">Alert dalam kelompok</p>
             </div>
             <div>
               <p className="font-mono text-kumo-default">{formatDateTime(bucket.start_time)}</p>
-              <p className="text-kumo-subtle mt-1">Window dibuka</p>
+              <p className="text-kumo-subtle mt-1">Mulai dikelompokkan</p>
             </div>
             <div>
               <p className="font-mono font-semibold text-kumo-default">
                 {bucket.max_severity} / 15
               </p>
-              <p className="text-kumo-subtle mt-1">Level max</p>
+              <p className="text-kumo-subtle mt-1">Keparahan maks.</p>
             </div>
             {bucket.agent_name && (
               <div>
                 <p className="font-mono text-kumo-default">{bucket.agent_name}</p>
-                <p className="text-kumo-subtle mt-1">Nama agent</p>
+                <p className="text-kumo-subtle mt-1">Nama agen</p>
               </div>
             )}
           </div>
@@ -124,13 +125,13 @@ export function BucketDetailPage() {
             size="sm"
             title={
               goneFinalizedId != null
-                ? `Bucket sudah final sebagai MetaAlert #${goneFinalizedId}.`
-                : 'Bucket tidak aktif.'
+                ? `Kelompok ini sudah ditutup menjadi meta-alert #${goneFinalizedId}.`
+                : 'Kelompok tidak lagi terbuka.'
             }
             description={
               goneFinalizedId != null
-                ? 'Anggota bucket kini menjadi bukti MetaAlert final; buka halaman detailnya.'
-                : 'Bucket sudah final atau belum pernah ada. Kembali ke Live untuk bucket aktif.'
+                ? 'Alert dalam kelompok ini kini menjadi bukti meta-alert tersebut; buka halaman detailnya.'
+                : 'Kelompok sudah ditutup atau belum pernah ada. Kembali ke pemantauan live untuk melihat kelompok yang masih terbuka.'
             }
           />
         )}
@@ -141,7 +142,7 @@ export function BucketDetailPage() {
               size="sm"
               onClick={() => navigate(withRunId(`/meta-alerts/${goneFinalizedId}`))}
             >
-              Buka MetaAlert #{goneFinalizedId}
+              Buka meta-alert #{goneFinalizedId}
             </Button>
           </div>
         )}
@@ -150,8 +151,8 @@ export function BucketDetailPage() {
           <Banner
             variant="alert"
             size="sm"
-            title={`Partial Local Evidence: ${membersQuery.data.resolved_total} of ${membersQuery.data.source_total} source alerts resolved.`}
-            description={`${membersQuery.data.unresolved_alert_ids.length} source alert(s) belum tersedia di bukti lokal: ${membersQuery.data.unresolved_alert_ids.join(', ')}`}
+            title={`${membersQuery.data.resolved_total} dari ${membersQuery.data.source_total} alert asli tersedia.`}
+            description={`${membersQuery.data.unresolved_alert_ids.length} alert asli belum tersimpan lokal: ${membersQuery.data.unresolved_alert_ids.join(', ')}`}
           />
         )}
 
@@ -159,26 +160,26 @@ export function BucketDetailPage() {
           <div className="px-6 py-4 border-b border-kumo-hairline flex items-center justify-between">
             <div>
               <h2 className="text-sm font-semibold text-kumo-strong">
-                Anggota bucket ({membersQuery.data ? formatNumber(membersQuery.data.filtered_total) : '…'})
+                {TERMS.bucketMembers} ({membersQuery.data ? formatNumber(membersQuery.data.filtered_total) : '…'})
               </h2>
               <p className="text-xs text-kumo-subtle mt-0.5">
                 Urutan kedatangan. Baris bukan bukti serangan.
               </p>
             </div>
             {membersQuery.isFetching && (
-              <p role="status" className="text-xs text-kumo-subtle font-mono">Refreshing…</p>
+              <p role="status" className="text-xs text-kumo-subtle font-mono">Memperbarui…</p>
             )}
           </div>
           <Table>
             <Table.Header>
               <Table.Row className="bg-kumo-recessed/50 text-[11px] uppercase tracking-wider">
-                <Table.Head>Timestamp</Table.Head>
-                <Table.Head>Wazuh Alert ID</Table.Head>
-                <Table.Head>Detection Signature</Table.Head>
+                <Table.Head>Waktu</Table.Head>
+                <Table.Head>ID alert Wazuh</Table.Head>
+                <Table.Head>Deskripsi deteksi</Table.Head>
                 <Table.Head className="text-right">Level</Table.Head>
-                <Table.Head>Rule Group</Table.Head>
-                <Table.Head>Source IP</Table.Head>
-                <Table.Head>MITRE Tactics</Table.Head>
+                <Table.Head>Kategori aturan (Rule Group)</Table.Head>
+                <Table.Head>IP sumber</Table.Head>
+                <Table.Head>Taktik MITRE</Table.Head>
               </Table.Row>
             </Table.Header>
             <Table.Body>
@@ -213,7 +214,7 @@ export function BucketDetailPage() {
                     {a.mitre_tactics && a.mitre_tactics.length > 0 ? (
                       <Badge variant="secondary">{a.mitre_tactics.join(', ')}</Badge>
                     ) : (
-                      <span className="text-kumo-subtle">None</span>
+                      <span className="text-kumo-subtle">Tidak ada</span>
                     )}
                   </Table.Cell>
                 </Table.Row>
@@ -221,7 +222,7 @@ export function BucketDetailPage() {
               {membersQuery.data && membersQuery.data.items.length === 0 && (
                 <Table.Row>
                   <Table.Cell colSpan={7} className="py-12 text-center text-xs text-kumo-subtle font-mono">
-                    Belum ada anggota bucket yang dapat ditampilkan.
+                    Belum ada alert dalam kelompok ini yang dapat ditampilkan.
                   </Table.Cell>
                 </Table.Row>
               )}

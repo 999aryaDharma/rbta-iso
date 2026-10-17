@@ -1,4 +1,4 @@
-"""JSON-safe serialization, deterministic fingerprinting, and presentation redaction helpers."""
+"""Helper serialisasi aman-JSON, fingerprint deterministik, dan penyamaran data untuk tampilan."""
 
 from datetime import datetime, date
 import hashlib
@@ -22,7 +22,7 @@ SENSITIVE_KEY_PATTERNS: Set[str] = {
 
 
 def to_json_safe(obj: Any) -> Any:
-    """Recursively convert immutable / non-serializable objects into standard JSON-serializable primitives."""
+    """Ubah objek immutable / non-serializable menjadi primitif JSON standar secara rekursif."""
     if obj is None or isinstance(obj, (bool, int, float, str)):
         return obj
     if isinstance(obj, (datetime, date)):
@@ -48,7 +48,7 @@ def to_json_safe(obj: Any) -> Any:
 
 
 def deterministic_json_dumps(obj: Any) -> str:
-    """Produce a stable, compact, key-sorted JSON string."""
+    """Hasilkan string JSON yang stabil, ringkas, dan key-nya terurut."""
     safe_obj = to_json_safe(obj)
     return json.dumps(safe_obj, sort_keys=True, separators=(",", ":"))
 
@@ -67,7 +67,7 @@ def compute_canonical_fingerprint(
     metadata: Any,
     version: int = 2,
 ) -> str:
-    """Hash canonical evidence; v2 excludes transport envelope fields only."""
+    """Hash bukti kanonis; v2 hanya mengecualikan field envelope transport."""
     if version not in (1, 2):
         raise ValueError("Unsupported canonical fingerprint version")
     if version == 2:
@@ -99,7 +99,7 @@ def compute_canonical_fingerprint(
 
 
 def redact_sensitive_data(obj: Any) -> Any:
-    """Recursively redact sensitive key values for API presentation, preserving structure."""
+    """Samarkan nilai key sensitif untuk tampilan API secara rekursif, struktur tetap dipertahankan."""
     if isinstance(obj, dict):
         redacted = {}
         for k, v in obj.items():

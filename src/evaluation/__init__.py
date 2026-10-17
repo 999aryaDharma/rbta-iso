@@ -1,4 +1,4 @@
-"""Evaluation package for RBTA reduction, sensitivity, noise robustness, runtime, and model structure."""
+"""Paket evaluasi: reduksi RBTA, sensitivitas, ketahanan noise, runtime, dan struktur model."""
 
 from src.evaluation.fixed_window_baseline import FixedWindowResult, run_fixed_window_baseline
 from src.evaluation.metrics import MetricsError, compute_arr

@@ -1,16 +1,17 @@
 # Reproducible production dependency resolution used by Docker.
 # Regenerate deliberately after running the full regression suite.
-# Set ini = environment lokal yang menghijaukan 381 backend tests +
-# shadow-run live scoring (2026-10-03). Model rbta-if-v1 dilatih dengan
-# sklearn 1.7.2; runtime 1.9.0 memuatnya tanpa error di semua gate
-# (bila ragu, uji ulang scoring sebelum naik versi).
+# scikit-learn DIKUNCI ke 1.7.2 = versi pelatihan model skripsi
+# (rbta-if-thesis-v1, Python 3.11.15) agar artefak dimuat tanpa
+# InconsistentVersionWarning dan skornya identik (tests/unit/model/
+# test_thesis_model_compat.py). numpy 2.3.5 / scipy 1.17.1 adalah versi
+# terbaru yang punya wheel untuk Python 3.11 sekaligus 3.14.
 fastapi==0.141.1
 joblib==1.5.3
 matplotlib==3.11.1
-numpy==2.5.2
+numpy==2.3.5
 pandas==3.0.5
 pydantic==2.13.5
 requests==2.34.2
-scikit-learn==1.9.0
-scipy==1.18.1
+scikit-learn==1.7.2
+scipy==1.17.1
 uvicorn==0.52.4

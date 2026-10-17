@@ -1,11 +1,8 @@
-"""
-02_export_jsonl.py  —  Export Stream to JSONL Format
-=====================================================
-Replay alerts dan export ke newline-delimited JSON untuk downstream processing.
+"""Replay alert lalu export ke JSON per baris untuk pemrosesan berikutnya.
 
-Gunakan untuk:
-  - Save stream ke file untuk later analysis
-  - Integration dengan tools lain (jq, pandas, etc)
+Berguna untuk:
+  - Menyimpan aliran ke file untuk dianalisis nanti
+  - Integrasi dengan tool lain (jq, pandas, dll.)
   - Debugging & development
 """
 
@@ -25,7 +22,7 @@ def main():
     
     export_path = "output/02_alerts_stream.jsonl"
     
-    # Initialize simulator dengan export enabled
+    # Siapkan simulator dengan export aktif.
     sim = AlertStreamSimulator(
         csv_path="data/raw/rbta_ready_all.csv",
         speed_factor=100,
@@ -39,7 +36,7 @@ def main():
     print(f"\nSimulating alerts dan exporting ke {export_path}...\n")
     stats = sim.replay()
     
-    # Verify export
+    # Verifikasi hasil export.
     print("\n" + "-"*80)
     print("Verifying exported JSONL...")
     print("-"*80)
@@ -49,7 +46,7 @@ def main():
         for line in f:
             line_count += 1
             if line_count <= 3:
-                # Print first 3 lines as sample
+                # Cetak 3 baris pertama sebagai sampel.
                 data = json.loads(line)
                 print(f"\nLine {line_count} (sample):")
                 print(f"  Agent: {data.get('agent_name')}")
@@ -60,7 +57,7 @@ def main():
     print(f"\nTotal lines in JSONL: {line_count:,}")
     print(f"File size: {os.path.getsize(export_path) / (1024**2):.1f} MB")
     
-    # Load to DataFrame untuk analysis
+    # Muat ke DataFrame untuk dianalisis.
     print("\n" + "-"*80)
     print("Loading JSONL to pandas DataFrame...")
     print("-"*80)

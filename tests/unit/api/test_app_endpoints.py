@@ -1,4 +1,4 @@
-"""Unit tests for FastAPI operational endpoints (Sprint 9)."""
+"""Unit test endpoint operasional FastAPI."""
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import MagicMock
@@ -30,7 +30,7 @@ def make_alert(idx: int, ts: datetime, group: str = "pam", level: int = 3, crit:
 
 
 def test_health_endpoint_liveness():
-    """GET /health returns 200 OK with service identifier."""
+    """GET /health mengembalikan 200 OK beserta identitas service."""
     app = create_app(service=None)
     client = TestClient(app)
     resp = client.get("/health")
@@ -79,7 +79,7 @@ def test_api_rejects_declared_oversized_request_before_parsing(monkeypatch):
 
 
 def test_ready_endpoint_fails_503_when_no_active_model(tmp_path: Path):
-    """GET /ready returns 503 Service Unavailable when model registry has no published bundle."""
+    """GET /ready mengembalikan 503 bila registry model belum punya bundle yang dipublikasikan."""
     registry = ModelRegistry(base_dir=tmp_path / "models")
     app = create_app(service=None, model_registry=registry)
     client = TestClient(app)
@@ -91,8 +91,8 @@ def test_ready_endpoint_fails_503_when_no_active_model(tmp_path: Path):
     assert "Service not initialized" in data["reason"]
 
 def test_ready_endpoint_with_service_but_no_registry():
-    """GET /ready returns 200 using metadata when service exists but registry does not."""
-    # Create dummy pipeline with metadata
+    """GET /ready mengembalikan 200 dari metadata bila service ada tetapi registry tidak."""
+    # Buat pipeline dummy dengan metadata.
     class DummyPipeline:
         metadata = {"model_version": "meta-v1"}
         bundle = None
@@ -109,7 +109,7 @@ def test_ready_endpoint_with_service_but_no_registry():
 
 
 def test_ready_endpoint_passes_200_when_active_model_published(tmp_path: Path):
-    """GET /ready returns 200 OK when model registry has active verified bundle."""
+    """GET /ready mengembalikan 200 OK bila registry model punya bundle aktif yang terverifikasi."""
     base_t = datetime(2026, 8, 28, 10, 0, 0, tzinfo=timezone.utc)
     sample_alerts = [
         make_alert(i, base_t + timedelta(minutes=i * 20), level=(i % 12) + 1)
@@ -138,7 +138,7 @@ def test_ready_endpoint_passes_200_when_active_model_published(tmp_path: Path):
 
 
 def test_ingest_alert_endpoint_and_outbox_ack(tmp_path: Path):
-    """POST /api/v1/alerts/ingest accepts raw alert, updates stats, and allows outbox inspection and ack."""
+    """POST /api/v1/alerts/ingest menerima raw alert, memperbarui statistik, dan outbox bisa diperiksa serta dikonfirmasi."""
     base_t = datetime(2026, 8, 28, 10, 0, 0, tzinfo=timezone.utc)
     sample_alerts = [
         make_alert(i, base_t + timedelta(minutes=i * 20), level=(i % 12) + 1)
@@ -158,7 +158,7 @@ def test_ingest_alert_endpoint_and_outbox_ack(tmp_path: Path):
     app = create_app(service=service, api_key="test-api-key")
     client = TestClient(app)
 
-    # Ingest 1 alert
+    # Ingest 1 alert.
     payload = {
         "id": "raw_100",
         "timestamp": "2026-08-28T10:00:00.000+0000",
@@ -166,24 +166,24 @@ def test_ingest_alert_endpoint_and_outbox_ack(tmp_path: Path):
         "rule": {"id": "5501", "level": 3, "groups": ["pam"]},
     }
 
-    # Unauthorized request
+    # Request tanpa otorisasi.
     resp_unauth = client.post("/api/v1/alerts/ingest", json=payload)
     assert resp_unauth.status_code == 401
 
-    # Authorized request
+    # Request dengan otorisasi.
     headers = {"Authorization": "Bearer test-api-key"}
     resp = client.post("/api/v1/alerts/ingest", json=payload, headers=headers)
     assert resp.status_code == 200
     assert resp.json()["status"] == "accepted"
     assert resp.json()["is_duplicate"] is False
 
-    # Stats check
+    # Cek statistik.
     stats_resp = client.get("/runtime/stats", headers=headers)
     assert stats_resp.status_code == 200
     assert stats_resp.json()["seen_alerts_count"] == 1
     assert stats_resp.json()["active_buckets_count"] == 1
 
-    # Ingest second alert after 20 minutes (triggers bucket finalization)
+    # Ingest alert kedua 20 menit kemudian (memicu finalisasi bucket).
     payload2 = {
         "id": "raw_101",
         "timestamp": "2026-08-28T10:20:00.000+0000",
@@ -193,8 +193,8 @@ def test_ingest_alert_endpoint_and_outbox_ack(tmp_path: Path):
     resp2 = client.post("/api/v1/alerts/ingest", json=payload2, headers=headers)
     assert resp2.status_code == 200
 
-    # Low-context/non-ESCALATE results remain queryable history but are not
-    # incorrectly queued for an external dispatch.
+    # Hasil low-context/non-ESCALATE tetap bisa dicari di history tetapi tidak
+    # keliru masuk antrean dispatch eksternal.
     outbox_resp = client.get("/api/v1/outbox", headers=headers)
     assert outbox_resp.status_code == 200
     outbox_items = outbox_resp.json()
@@ -203,11 +203,11 @@ def test_ingest_alert_endpoint_and_outbox_ack(tmp_path: Path):
     assert history["total"] == 1
     meta_id = history["items"][0]["meta_id"]
 
-    # Check meta-alert details
+    # Cek detail meta-alert.
     meta_resp = client.get(f"/api/v1/meta-alerts/{meta_id}", headers=headers)
     assert meta_resp.status_code == 200
     assert meta_resp.json()["meta_id"] == meta_id
 
-    # A nonexistent delivery record cannot be acknowledged silently.
+    # Record pengiriman yang tidak ada tidak boleh bisa dikonfirmasi diam-diam.
     ack_resp = client.post(f"/api/v1/outbox/{meta_id}/ack", headers=headers)
     assert ack_resp.status_code == 404

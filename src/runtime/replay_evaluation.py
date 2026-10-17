@@ -1,4 +1,4 @@
-"""Constant-cost live research metrics for an active replay run."""
+"""Metrik penelitian live dengan biaya konstan untuk replay run yang aktif."""
 
 from typing import Any, Dict, Mapping
 
@@ -6,7 +6,7 @@ from src.contracts.scored_meta_alert import ScoredMetaAlert
 
 
 class ReplayEvaluationTracker:
-    """Track live reduction and frozen-model behavior without any refitting."""
+    """Lacak reduksi live dan perilaku model beku tanpa refit sama sekali."""
 
     _DECISIONS = ("CRITICAL", "SUSPICIOUS", "NOISE_HIGH", "NOISE")
     _ACTIONS = ("ESCALATE", "DAILY_DIGEST", "SUPPRESS")

@@ -1,9 +1,7 @@
-"""
-INTEGRATION EXAMPLE 3: Windowed Real-Time Processing
-═════════════════════════════════════════════════════
+"""Contoh integrasi: pemrosesan real-time berbasis window.
 
-Continuous RBTA window updates as alerts arrive.
-Most production-like approach for streaming.
+Window RBTA diperbarui terus-menerus saat alert datang,
+pendekatan yang paling mirip produksi untuk streaming.
 """
 
 import sys
@@ -21,14 +19,13 @@ from src.engine.isolation_forest import run_pipeline as run_isolation_forest
 
 
 class WindowedProcessingEngine:
-    """
-    Maintain rolling RBTA window, update continuously.
-    
-    Pattern:
-    1. Keep incoming alerts in rolling window (lookback_sec)
-    2. Every N alerts, run RBTA on window contents
-    3. Score results with IF
-    4. Output anomalies in real-time
+    """Pertahankan rolling window RBTA dan perbarui terus-menerus.
+
+    Pola:
+    1. Simpan alert yang masuk di rolling window (lookback_sec)
+    2. Setiap N alert, jalankan RBTA pada isi window
+    3. Skor hasilnya dengan IF
+    4. Keluarkan anomali secara real-time
     """
     
     def __init__(self, window_sec=600, update_freq=1000, if_engine=None):
@@ -44,8 +41,8 @@ class WindowedProcessingEngine:
         self.results = []
     
     def process_alert(self, alert):
-        """Process incoming alert."""
-        # Add to window
+        """Proses alert yang masuk."""
+        # Tambahkan ke window.
         ts = alert.get('timestamp_utc')
         self.window_alerts.append({
             'timestamp_utc': ts,
@@ -64,16 +61,16 @@ class WindowedProcessingEngine:
         
         self.processed_count += 1
         
-        # Process window every N alerts
+        # Proses window setiap N alert.
         if self.processed_count % self.update_freq == 0:
             self._process_window()
     
     def _process_window(self):
-        """Run RBTA + IF on current window."""
+        """Jalankan RBTA + IF pada window saat ini."""
         if not self.window_alerts:
             return
         
-        # Trim window to timeframe
+        # Potong window sesuai rentang waktu.
         now = self.window_alerts[-1]['timestamp_utc']
         cutoff = now - timedelta(seconds=self.window_sec)
         
@@ -85,7 +82,7 @@ class WindowedProcessingEngine:
         if len(valid_alerts) < 2:
             return
         
-        # Convert to DataFrame and run RBTA
+        # Ubah ke DataFrame lalu jalankan RBTA.
         df_valid = pd.DataFrame(valid_alerts)
         df_valid = df_valid.rename(columns={
             'timestamp_utc': 'timestamp',
@@ -103,15 +100,15 @@ class WindowedProcessingEngine:
             
             self.bucket_count += len(df_meta)
             
-            # IF scoring (if available)
+            # Scoring IF (bila tersedia).
             if self.if_engine and len(df_meta) > 0:
                 try:
-                    # Save to temp CSV
+                    # Simpan ke CSV sementara.
                     temp_csv = Path("output/temp_window_for_if.csv")
                     temp_csv.parent.mkdir(exist_ok=True)
                     df_meta.to_csv(temp_csv, index=False)
                     
-                    # Call run_isolation_forest
+                    # Panggil run_isolation_forest.
                     df_scored, model, scaler, theta = self.if_engine(
                         csv_path=str(temp_csv),
                         output_dir="output",
@@ -125,8 +122,8 @@ class WindowedProcessingEngine:
                     anomalies = df_scored[df_scored.get('escalate') == 1]
                     self.anomaly_count += len(anomalies)
                     
-                    # Store results
-                    for _, bucket in anomalies.head(10).iterrows():  # Top 10 per window
+                    # Simpan hasil.
+                    for _, bucket in anomalies.head(10).iterrows():  # 10 teratas per window
                         self.results.append({
                             'timestamp': datetime.now().isoformat(),
                             'agent': str(bucket.get('agent_name', '')),
@@ -136,14 +133,14 @@ class WindowedProcessingEngine:
                             'decision': str(bucket.get('decision', '')),
                         })
                 except:
-                    # Silently skip IF if model not available
+                    # Lewati IF tanpa pesan bila model tidak tersedia.
                     pass
         except Exception as e:
-            # Silently continue if RBTA fails on small window
+            # Lanjut tanpa pesan bila RBTA gagal pada window kecil.
             pass
     
     def finalize(self):
-        """Process remaining window."""
+        """Proses sisa window."""
         self._process_window()
 
 
@@ -152,7 +149,7 @@ def main():
     print("INTEGRATION 3: Windowed Real-Time Processing")
     print("=" * 70)
     
-    # Setup simulator
+    # Siapkan simulator.
     sim = AlertStreamSimulator(
         csv_path="data/raw/rbta_ready_all.csv",
         speed_factor=100,
@@ -161,40 +158,40 @@ def main():
         log_frequency=50000,
     )
     
-    # Try to load IF engine
+    # Coba muat engine IF.
     if_engine = None
     try:
-        # Just store the function reference
+        # Cukup simpan referensi fungsinya.
         if_engine = run_isolation_forest
         print("✓ IF engine available (run_pipeline)")
     except Exception as e:
         print(f"⚠ IF engine not available ({e})")
         print("  → Will run RBTA only (no anomaly scoring)")
     
-    # Setup windowed processor
+    # Siapkan processor berbasis window.
     processor = WindowedProcessingEngine(
-        window_sec=600,      # 10-minute window
-        update_freq=500,     # Update every 500 alerts
+        window_sec=600,      # window 10 menit
+        update_freq=500,     # update setiap 500 alert
         if_engine=if_engine,
     )
     
-    # PHASE 1: STREAMING WITH WINDOWED UPDATES
+    # Tahap 1: streaming dengan update per window.
     print("\n[PHASE 1] Streaming with windowed RBTA updates...")
     start = datetime.now()
     stats = sim.replay(on_alert_callback=processor.process_alert)
-    processor.finalize()  # Process final window
+    processor.finalize()  # proses window terakhir
     duration = (datetime.now() - start).total_seconds()
     
     print(f"✓ Processed {processor.processed_count:,} alerts in {duration:.1f} sec")
     print(f"  Rate: {processor.processed_count/duration:.0f} alerts/sec")
     
-    # PHASE 2: RESULTS
+    # Tahap 2: hasil.
     print(f"\n[PHASE 2] Windowed Processing Results:")
     print(f"  Total RBTA buckets: {processor.bucket_count:,}")
     if if_engine:
         print(f"  Anomalies detected: {processor.anomaly_count:,}")
     
-    # PHASE 3: EXPORT
+    # Tahap 3: export.
     print(f"\n[PHASE 3] Exporting results...")
     output_file = Path("output/07_windowed_anomalies.json")
     
@@ -203,7 +200,7 @@ def main():
     
     print(f"✓ Exported {len(processor.results):,} detections to {output_file.name}")
     
-    # PHASE 4: RECOMMENDATIONS
+    # Tahap 4: rekomendasi.
     print(f"\n[PHASE 4] Integration Notes:")
     print(f"""
   This pattern is best for:

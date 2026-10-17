@@ -1,4 +1,4 @@
-"""Unit tests for production server bootstrap and configuration validation."""
+"""Unit test bootstrap server produksi dan validasi konfigurasi."""
 
 from datetime import datetime, timedelta, timezone
 import json
@@ -41,7 +41,7 @@ def publish_test_model(registry_dir: Path, version: str = "boot-v1") -> None:
 
 
 def test_bootstrap_with_valid_config_and_model(tmp_path: Path):
-    """Production bootstrap successfully loads configured model and exposes /health and /ready 200."""
+    """Bootstrap produksi berhasil memuat model yang dikonfigurasi dan /health serta /ready mengembalikan 200."""
     reg_dir = tmp_path / "models"
     state_file = tmp_path / "runtime" / "state.json"
     publish_test_model(reg_dir, "boot-v1")
@@ -56,19 +56,19 @@ def test_bootstrap_with_valid_config_and_model(tmp_path: Path):
     app = create_production_app(env=env)
     client = TestClient(app)
 
-    # 1. Health check
+    # Health check.
     h_resp = client.get("/health")
     assert h_resp.status_code == 200
     assert h_resp.json() == {"status": "ok", "service": "rbta-security-analytics"}
 
-    # 2. Readiness check
+    # Readiness check.
     r_resp = client.get("/ready")
     assert r_resp.status_code == 200
     r_data = r_resp.json()
     assert r_data["ready"] is True
     assert r_data["active_model_version"] == "boot-v1"
 
-    # 3. Authenticated stats endpoint
+    # Endpoint statistik terautentikasi.
     s_resp = client.get("/runtime/stats", headers={"Authorization": "Bearer test-secret-key-123"})
     assert s_resp.status_code == 200
     s_data = s_resp.json()
@@ -77,7 +77,7 @@ def test_bootstrap_with_valid_config_and_model(tmp_path: Path):
 
 
 def test_bootstrap_missing_model_version_reports_ready_503(tmp_path: Path):
-    """When no active model version is configured, /health is 200 but /ready is 503."""
+    """Tanpa versi model aktif, /health 200 tetapi /ready 503."""
     reg_dir = tmp_path / "models"
     state_file = tmp_path / "runtime" / "state.json"
     reg_dir.mkdir(parents=True)
@@ -98,7 +98,7 @@ def test_bootstrap_missing_model_version_reports_ready_503(tmp_path: Path):
 
 
 def test_bootstrap_invalid_model_version_reports_ready_503(tmp_path: Path):
-    """When configured model version does not exist, /ready returns 503."""
+    """Bila versi model yang dikonfigurasi tidak ada, /ready mengembalikan 503."""
     reg_dir = tmp_path / "models"
     state_file = tmp_path / "runtime" / "state.json"
     reg_dir.mkdir(parents=True)
@@ -118,7 +118,7 @@ def test_bootstrap_invalid_model_version_reports_ready_503(tmp_path: Path):
 
 
 def test_bootstrap_inference_only_no_model_fitting(tmp_path: Path):
-    """Bootstrap and server execution perform zero model training or fitting."""
+    """Bootstrap dan eksekusi server sama sekali tidak melakukan training atau fitting model."""
     reg_dir = tmp_path / "models"
     state_file = tmp_path / "runtime" / "state.json"
     publish_test_model(reg_dir, "boot-v1")
@@ -137,7 +137,7 @@ def test_bootstrap_inference_only_no_model_fitting(tmp_path: Path):
 
 
 def test_strict_bootstrap_missing_api_key_raises_runtime_error(tmp_path: Path):
-    """Strict bootstrap fails closed when RBTA_API_KEY is missing or empty."""
+    """Bootstrap strict gagal tertutup bila RBTA_API_KEY tidak ada atau kosong."""
     reg_dir = tmp_path / "models"
     state_file = tmp_path / "runtime" / "state.json"
     publish_test_model(reg_dir, "boot-v1")
@@ -154,7 +154,7 @@ def test_strict_bootstrap_missing_api_key_raises_runtime_error(tmp_path: Path):
 
 
 def test_strict_bootstrap_missing_model_version_raises_runtime_error(tmp_path: Path):
-    """Strict bootstrap fails closed when RBTA_MODEL_VERSION is missing or empty."""
+    """Bootstrap strict gagal tertutup bila RBTA_MODEL_VERSION tidak ada atau kosong."""
     reg_dir = tmp_path / "models"
     state_file = tmp_path / "runtime" / "state.json"
 
@@ -183,14 +183,14 @@ def _bootstrap_env(tmp_path: Path, extra: dict) -> dict:
 
 
 def test_worker_and_dispatcher_absent_by_default(tmp_path: Path):
-    """Without opt-in, no worker thread and no dispatcher are attached."""
+    """Tanpa opt-in, tidak ada thread worker maupun dispatcher yang terpasang."""
     app = create_production_app(env=_bootstrap_env(tmp_path, {}))
     assert app.state.live_worker is None
     assert app.state.telegram_dispatcher is None
 
 
 def test_worker_enabled_attaches_disabled_dispatcher_without_creds(tmp_path: Path, monkeypatch):
-    """Worker opt-in attaches a dispatcher that stays thread-stopped without credentials."""
+    """Opt-in worker memasang dispatcher yang thread-nya tetap berhenti tanpa kredensial."""
     monkeypatch.delenv("RBTA_TELEGRAM_BOT_TOKEN", raising=False)
     monkeypatch.delenv("RBTA_TELEGRAM_CHAT_ID", raising=False)
     app = create_production_app(
@@ -203,7 +203,7 @@ def test_worker_enabled_attaches_disabled_dispatcher_without_creds(tmp_path: Pat
 
 
 def test_worker_enabled_with_creds_attaches_enabled_dispatcher(tmp_path: Path):
-    """Explicit Telegram credentials enable the dispatcher (thread starts in lifespan)."""
+    """Kredensial Telegram eksplisit mengaktifkan dispatcher (thread mulai di lifespan)."""
     app = create_production_app(
         env=_bootstrap_env(
             tmp_path,
@@ -219,10 +219,10 @@ def test_worker_enabled_with_creds_attaches_enabled_dispatcher(tmp_path: Path):
     assert dispatcher.enabled is True
 
 
-# --- F13-server ---
+# Mode dry-run Telegram.
 
 def test_telegram_dry_run_env_forces_disabled_dispatcher(tmp_path: Path):
-    """RBTA_TELEGRAM_DRY_RUN=true forces dry-run even when credentials exist."""
+    """RBTA_TELEGRAM_DRY_RUN=true memaksa dry-run meski kredensial ada."""
     app = create_production_app(
         env=_bootstrap_env(
             tmp_path,
@@ -240,8 +240,9 @@ def test_telegram_dry_run_env_forces_disabled_dispatcher(tmp_path: Path):
 
 
 def test_worker_enabled_defaults_source_mode_live(tmp_path: Path):
-    """Without explicit RBTA_SOURCE_MODE, the live service uses LIVE when the
-    worker is enabled (replay controller keeps its own REPLAY mode)."""
+    """Tanpa RBTA_SOURCE_MODE eksplisit, live service memakai LIVE bila worker aktif
+    (replay controller tetap memakai mode REPLAY sendiri).
+    """
     app = create_production_app(env=_bootstrap_env(tmp_path, {"RBTA_LIVE_WORKER_ENABLED": "true"}))
     assert app.state.live_worker is not None
     assert app.state.live_worker.service.source_mode == "LIVE"
@@ -259,7 +260,7 @@ def test_worker_enabled_respects_explicit_source_mode(tmp_path: Path):
 
 
 def test_tls_verify_false_warns_and_persists(tmp_path: Path, caplog):
-    """WAZUH_INDEXER_VERIFY_TLS=false warns at startup and records tls_verify=false."""
+    """WAZUH_INDEXER_VERIFY_TLS=false memberi peringatan saat startup dan mencatat tls_verify=false."""
     import logging
 
     with caplog.at_level(logging.WARNING, logger="rbta.server"):
@@ -280,14 +281,14 @@ def test_tls_verify_false_warns_and_persists(tmp_path: Path, caplog):
 
 
 def test_worker_drain_defaults_to_false_in_bootstrap(tmp_path: Path):
-    """Bootstrap wires drain_on_stop=False unless explicitly opted in."""
+    """Bootstrap memasang drain_on_stop=False kecuali diaktifkan eksplisit."""
     base_env = _bootstrap_env(tmp_path, {"RBTA_LIVE_WORKER_ENABLED": "true"})
     app = create_production_app(env=base_env)
     assert app.state.live_worker is not None
     assert app.state.live_worker.drain_on_stop is False
 
-    # NOTE: separate directory — the OS state lock is held process-wide, so a
-    # second bootstrap on the same state file must fail fast (see F12).
+    # CATATAN: direktori terpisah — lock state OS ditahan untuk seluruh proses, jadi bootstrap
+    # kedua pada file state yang sama harus langsung gagal (lihat test di bawah).
     opt_dir = tmp_path / "opt-in"
     opt_dir.mkdir()
     env_opt_in = _bootstrap_env(
@@ -299,7 +300,7 @@ def test_worker_drain_defaults_to_false_in_bootstrap(tmp_path: Path):
 
 
 def test_second_bootstrap_on_same_state_file_fails_fast(tmp_path: Path):
-    """F12: a second live writer on the same state file is rejected."""
+    """Writer live kedua pada file state yang sama ditolak."""
     import pytest as _pytest
 
     from src.runtime.live_worker import acquire_state_lock
@@ -312,13 +313,13 @@ def test_second_bootstrap_on_same_state_file_fails_fast(tmp_path: Path):
 
 
 def test_order_buffer_off_by_default(tmp_path: Path):
-    """Buffer stays off unless explicitly enabled (honest null in status)."""
+    """Buffer tetap mati kecuali diaktifkan eksplisit (null yang jujur di status)."""
     app = create_production_app(env=_bootstrap_env(tmp_path, {"RBTA_LIVE_WORKER_ENABLED": "true"}))
     assert app.state.live_worker.coordinator.order_buffer is None
 
 
 def test_order_buffer_enabled_via_env(tmp_path: Path):
-    """RBTA_ORDER_BUFFER_ENABLED=true wires the waiting-room sorter."""
+    """RBTA_ORDER_BUFFER_ENABLED=true memasang order buffer."""
     app = create_production_app(
         env=_bootstrap_env(
             tmp_path,
@@ -328,10 +329,10 @@ def test_order_buffer_enabled_via_env(tmp_path: Path):
     assert app.state.live_worker.coordinator.order_buffer is not None
 
 
-# --- N4: state lock applies to every bootstrap, not only worker-enabled ---
+# Lock state berlaku untuk setiap bootstrap, bukan hanya saat worker aktif.
 
 def test_state_lock_applies_without_worker_enabled(tmp_path: Path):
-    """Bootstrapping without the worker still takes the state lock (fail fast)."""
+    """Bootstrap tanpa worker tetap mengambil lock state (langsung gagal bila dipegang)."""
     from src.runtime.live_worker import acquire_state_lock, release_state_lock
 
     base_env = _bootstrap_env(tmp_path, {})
@@ -342,17 +343,17 @@ def test_state_lock_applies_without_worker_enabled(tmp_path: Path):
             acquire_state_lock(state_file)
     finally:
         release_state_lock(state_file)
-    # After release the same state file can be acquired again.
+    # Setelah dilepas, file state yang sama bisa diambil lagi.
     try:
         acquire_state_lock(state_file)
     finally:
         release_state_lock(state_file)
 
 
-# --- N6-worker: server forwards raw override values from env_map ---
+# Server meneruskan nilai override mentah dari env_map.
 
 def test_server_forwards_raw_model_override(tmp_path: Path):
-    """RBTA_LIVE_MODEL_OVERRIDE is forwarded verbatim to the worker."""
+    """RBTA_LIVE_MODEL_OVERRIDE diteruskan apa adanya ke worker."""
     app = create_production_app(
         env=_bootstrap_env(
             tmp_path,
@@ -367,7 +368,7 @@ def test_server_forwards_raw_model_override(tmp_path: Path):
 
 
 def test_tls_verify_choice_always_recorded_in_source_state(tmp_path: Path):
-    """tls_verify is recorded for both secure and insecure choices (fail-visible)."""
+    """tls_verify dicatat untuk pilihan aman maupun tidak aman (selalu terlihat)."""
     app_secure = create_production_app(env=_bootstrap_env(tmp_path / "s", {}))
     app_insecure = create_production_app(
         env=_bootstrap_env(tmp_path / "i", {"WAZUH_INDEXER_VERIFY_TLS": "false"})
@@ -376,27 +377,28 @@ def test_tls_verify_choice_always_recorded_in_source_state(tmp_path: Path):
     assert app_insecure.state.runtime_resolver.live_service.get_live_source_state()["tls_verify"] is False
 
 
-# --- M3-server: lifespan always starts the dispatcher thread when a worker exists ---
+# Lifespan selalu menjalankan thread dispatcher bila worker ada.
 
 def test_lifespan_starts_disabled_dispatcher_thread(tmp_path: Path):
-    """Without credentials the dispatcher stays disabled, but lifespan must
-    still run its thread (disabled/dry-run drains outbox + logs)."""
+    """Tanpa kredensial dispatcher tetap nonaktif, tetapi lifespan tetap harus menjalankan
+    thread-nya (mode nonaktif/dry-run menguras outbox + mencatat log).
+    """
     app = create_production_app(env=_bootstrap_env(tmp_path, {"RBTA_LIVE_WORKER_ENABLED": "true"}))
     dispatcher = app.state.telegram_dispatcher
     assert dispatcher is not None
     assert dispatcher.enabled is False
-    # Stub only the worker start (would spawn a network-polling thread);
-    # the dispatcher thread under test is real.
+    # Hanya start worker yang di-stub (kalau tidak, akan menjalankan thread polling jaringan);
+    # thread dispatcher yang diuji tetap asli.
     with patch.object(app.state.live_worker, "start", return_value=False):
         with TestClient(app):
             assert dispatcher._thread is not None and dispatcher._thread.is_alive()
     assert dispatcher._thread is None
     assert not app.state.live_worker.is_alive()
-    dispatcher.stop()  # idempotent: safe to stop twice
+    dispatcher.stop()  # idempoten: aman dihentikan dua kali
 
 
 def test_production_bootstrap_suppresses_and_dryrun_drains_old_escalate(tmp_path: Path):
-    """M1+M3 wiring: first-started pin suppresses bootstrap backlog; dry-run drains + records."""
+    """Pin waktu mulai pertama menahan backlog bootstrap; dry-run menguras dan mencatat."""
     import time as _time
 
     from tests.unit.runtime.test_telegram_dispatcher import _scored
@@ -433,7 +435,7 @@ def test_production_bootstrap_suppresses_and_dryrun_drains_old_escalate(tmp_path
 
 
 def test_breaker_ack_env_reaches_coordinator(tmp_path: Path):
-    """P1 latch: RBTA_QUARANTINE_BREAKER_ACK is forwarded to the coordinator."""
+    """RBTA_QUARANTINE_BREAKER_ACK diteruskan ke coordinator."""
     app = create_production_app(
         env=_bootstrap_env(
             tmp_path,

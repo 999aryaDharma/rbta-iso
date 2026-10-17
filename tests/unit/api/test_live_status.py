@@ -1,4 +1,4 @@
-"""L3: read-only live status API contract (TDD RED)."""
+"""Kontrak API status live yang read-only."""
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 from unittest.mock import MagicMock
@@ -42,7 +42,7 @@ def _auth():
 
 
 def test_live_status_contract_shape(tmp_path):
-    """GET /api/v1/live/status returns 200 with the locked L3 response shape."""
+    """GET /api/v1/live/status mengembalikan 200 dengan bentuk response yang sudah dikunci."""
     cursor = (datetime.now(timezone.utc) - timedelta(seconds=30)).isoformat()
     service = _make_service(
         tmp_path,
@@ -81,12 +81,12 @@ def test_live_status_contract_shape(tmp_path):
     assert data["live_model_version"] == "v-test-1"
     assert data["recent_poll_cursor"] == cursor
     assert data["lag_sec"] is not None and data["lag_sec"] >= 0
-    assert data["buffer_size"] is None  # F11: disabled/absent buffer is unmeasured, not empty
+    assert data["buffer_size"] is None  # buffer nonaktif/tidak ada berarti tidak diukur, bukan kosong
     assert data["outbox_pending"] == 0
 
 
 def test_live_status_worker_none_null_safe(tmp_path):
-    """Worker disabled (None) still returns 200 with null-safe worker fields."""
+    """Worker nonaktif (None) tetap mengembalikan 200 dengan field worker yang aman-null."""
     service = _make_service(tmp_path, {})
     client = _client(service, None)
     resp = client.get("/api/v1/live/status", headers=_auth())
@@ -97,12 +97,12 @@ def test_live_status_worker_none_null_safe(tmp_path):
     assert data["consecutive_failures"] == 0
     assert data["last_error"] is None
     assert data["last_cycle_at"] is None
-    assert data["buffer_size"] is None  # F11: disabled/absent buffer is unmeasured, not empty
+    assert data["buffer_size"] is None  # buffer nonaktif/tidak ada berarti tidak diukur, bukan kosong
     assert data["outbox_pending"] == 0
 
 
 def test_live_status_read_only(tmp_path):
-    """Calling the endpoint repeatedly must not mutate service state."""
+    """Memanggil endpoint berulang kali tidak boleh mengubah state service."""
     cursor = (datetime.now(timezone.utc) - timedelta(seconds=10)).isoformat()
     service = _make_service(
         tmp_path,
@@ -128,7 +128,7 @@ def test_live_status_read_only(tmp_path):
 
 
 def test_live_status_lag_null_when_cursor_empty(tmp_path):
-    """lag_sec is null when there is no poll cursor yet."""
+    """lag_sec bernilai null bila belum ada cursor poll."""
     service = _make_service(tmp_path, {})
     worker = _make_worker(
         {
@@ -148,7 +148,7 @@ def test_live_status_lag_null_when_cursor_empty(tmp_path):
 
 
 def test_live_status_auth_rejected_without_key(tmp_path):
-    """Requests without a valid key are rejected like other endpoints."""
+    """Request tanpa key yang valid ditolak seperti endpoint lain."""
     service = _make_service(tmp_path, {})
     worker = _make_worker(
         {
@@ -164,10 +164,10 @@ def test_live_status_auth_rejected_without_key(tmp_path):
     assert resp.status_code == 401
 
 
-# --- F11 honest telemetry (TDD) ---
+# Telemetri harus jujur.
 
 def _make_buffer_worker(status_dict, held_size):
-    """Worker whose coordinator exposes an enabled OrderBuffer of held_size."""
+    """Worker yang coordinator-nya punya OrderBuffer aktif sebesar held_size."""
     buf = MagicMock()
     buf.status.return_value = {"size": held_size}
     coord = SimpleNamespace(order_buffer=buf)
@@ -177,7 +177,7 @@ def _make_buffer_worker(status_dict, held_size):
 
 
 def test_live_status_buffer_size_none_when_disabled(tmp_path):
-    """F11/F5: absent buffer reports None (unmeasured), never fake 0."""
+    """Buffer yang tidak ada dilaporkan None (tidak diukur), bukan 0 palsu."""
     service = _make_service(tmp_path, {})
     worker = _make_worker(
         {"alive": False, "cycles_completed": 0, "consecutive_failures": 0,
@@ -190,7 +190,7 @@ def test_live_status_buffer_size_none_when_disabled(tmp_path):
 
 
 def test_live_status_buffer_size_reports_held_count_when_enabled(tmp_path):
-    """F11: enabled buffer reports real held size via worker.coordinator.order_buffer."""
+    """Buffer aktif melaporkan ukuran tahanan sebenarnya lewat worker.coordinator.order_buffer."""
     service = _make_service(tmp_path, {})
     worker = _make_buffer_worker(
         {"alive": True, "cycles_completed": 1, "consecutive_failures": 0,
@@ -203,7 +203,7 @@ def test_live_status_buffer_size_reports_held_count_when_enabled(tmp_path):
 
 
 def test_live_status_dispatcher_null_when_absent(tmp_path):
-    """F11: no dispatcher wired -> dispatcher block is null (guarded getattr)."""
+    """Tanpa dispatcher terpasang -> blok dispatcher null (getattr dijaga)."""
     service = _make_service(tmp_path, {})
     client = _client(service, _make_worker({"alive": False}))
     data = client.get("/api/v1/live/status", headers=_auth()).json()
@@ -212,7 +212,7 @@ def test_live_status_dispatcher_null_when_absent(tmp_path):
 
 
 def test_live_status_dispatcher_status_passthrough(tmp_path):
-    """F11: wired dispatcher with .status() is passed through; errors -> null."""
+    """Dispatcher terpasang dengan .status() diteruskan; error -> null."""
     service = _make_service(tmp_path, {})
     client = _client(service, _make_worker({"alive": False}))
     client.app.state.telegram_dispatcher = SimpleNamespace(
@@ -229,7 +229,7 @@ def test_live_status_dispatcher_status_passthrough(tmp_path):
 
 
 def test_live_status_quarantine_null_when_unsupported(tmp_path, monkeypatch):
-    """F11: state_manager without quarantine_list -> quarantine_total null."""
+    """state_manager tanpa quarantine_list -> quarantine_total null."""
     service = _make_service(tmp_path, {})
     monkeypatch.delattr(type(service.state_manager), "quarantine_list", raising=False)
     monkeypatch.delattr(type(service.state_manager), "quarantine_count", raising=False)
@@ -241,7 +241,7 @@ def test_live_status_quarantine_null_when_unsupported(tmp_path, monkeypatch):
 
 
 def test_live_status_quarantine_total_when_supported(tmp_path):
-    """F11: state_manager with quarantine_list -> real count."""
+    """state_manager dengan quarantine_list -> jumlah sebenarnya."""
     service = _make_service(tmp_path, {})
     service.state_manager.quarantine_count = lambda: 2
     client = _client(service, _make_worker({"alive": False}))
@@ -250,7 +250,7 @@ def test_live_status_quarantine_total_when_supported(tmp_path):
 
 
 def test_live_status_event_lag_null_when_no_scored_events(tmp_path):
-    """F11: empty history+outbox -> newest_scored_event_time/event_lag_sec null."""
+    """History+outbox kosong -> newest_scored_event_time/event_lag_sec null."""
     service = _make_service(tmp_path, {})
     client = _client(service, _make_worker({"alive": False}))
     data = client.get("/api/v1/live/status", headers=_auth()).json()
@@ -259,7 +259,7 @@ def test_live_status_event_lag_null_when_no_scored_events(tmp_path):
 
 
 def test_live_status_event_lag_from_history_end_time(tmp_path):
-    """F11: newest end_time across history/outbox drives event_lag_sec."""
+    """end_time terbaru di history/outbox menentukan event_lag_sec."""
     from types import SimpleNamespace as SN
 
     now = datetime.now(timezone.utc)
@@ -279,7 +279,7 @@ def test_live_status_event_lag_from_history_end_time(tmp_path):
 
 
 def test_live_status_last_error_redacts_host(tmp_path):
-    """F11: host/credentials stripped from last_error (no scheme://host leak)."""
+    """Host/kredensial dibuang dari last_error (scheme://host tidak bocor)."""
     service = _make_service(tmp_path, {})
     worker = _make_worker(
         {"alive": True, "cycles_completed": 1, "consecutive_failures": 1,
@@ -294,7 +294,7 @@ def test_live_status_last_error_redacts_host(tmp_path):
 
 
 def test_live_status_quarantine_prefers_count_over_list(tmp_path):
-    """Minor: quarantine_total prefers COUNT(*) helper over loading rows."""
+    """quarantine_total mengutamakan helper COUNT(*) daripada memuat baris."""
     service = _make_service(tmp_path, {})
     service.state_manager.quarantine_count = lambda: 41
     service.state_manager.quarantine_list = lambda: (_ for _ in ()).throw(
@@ -306,7 +306,7 @@ def test_live_status_quarantine_prefers_count_over_list(tmp_path):
 
 
 def test_live_status_buffer_stats_block(tmp_path):
-    """Minor: full buffer counters exposed when the buffer is enabled."""
+    """Counter buffer lengkap tampil bila buffer aktif."""
     service = _make_service(tmp_path, {})
     worker = _make_worker({"alive": True})
     worker.coordinator = SimpleNamespace(
@@ -331,7 +331,7 @@ def test_live_status_buffer_stats_block(tmp_path):
 
 
 def test_live_status_buffer_stats_null_when_disabled(tmp_path):
-    """Minor: buffer_stats null (not zeros) when the buffer is disabled."""
+    """buffer_stats null (bukan nol) bila buffer nonaktif."""
     service = _make_service(tmp_path, {})
     client = _client(service, _make_worker({"alive": False}))
     data = client.get("/api/v1/live/status", headers=_auth()).json()
@@ -340,7 +340,7 @@ def test_live_status_buffer_stats_null_when_disabled(tmp_path):
 
 
 def test_live_status_event_lag_from_ingested_time(tmp_path):
-    """Minor: event_lag_sec measured from newest ingested event, not scored flush."""
+    """event_lag_sec diukur dari event terbaru yang di-ingest, bukan dari flush skor."""
     now = datetime.now(timezone.utc)
     service = _make_service(
         tmp_path,
@@ -353,7 +353,7 @@ def test_live_status_event_lag_from_ingested_time(tmp_path):
 
 
 def test_live_status_tls_verify_passthrough(tmp_path):
-    """Minor: tls_verify operator choice visible in status."""
+    """Pilihan operator tls_verify terlihat di status."""
     service = _make_service(tmp_path, {"tls_verify": False})
     client = _client(service, _make_worker({"alive": False}))
     data = client.get("/api/v1/live/status", headers=_auth()).json()
@@ -361,7 +361,7 @@ def test_live_status_tls_verify_passthrough(tmp_path):
 
 
 def test_live_status_ingested_total_counts_seen_ids(tmp_path):
-    """ingested_total exposes durable unique-alert count (follows F11 honesty)."""
+    """ingested_total menampilkan jumlah alert unik yang durable."""
     service = _make_service(tmp_path, {})
     service.state_manager.count_seen_alert_ids = lambda: 1899
     client = _client(service, _make_worker({"alive": True}))
@@ -370,7 +370,7 @@ def test_live_status_ingested_total_counts_seen_ids(tmp_path):
 
 
 def test_live_status_ingested_total_null_when_unsupported(tmp_path, monkeypatch):
-    """ingested_total null (not 0) when the counter is unavailable."""
+    """ingested_total null (bukan 0) bila counter tidak tersedia."""
     service = _make_service(tmp_path, {})
     monkeypatch.delattr(type(service.state_manager), "count_seen_alert_ids", raising=False)
     client = _client(service, _make_worker({"alive": False}))

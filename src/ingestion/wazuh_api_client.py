@@ -1,10 +1,9 @@
-"""Custom intermediary API client for frozen flat event shape.
+"""Client API perantara kustom untuk bentuk event flat yang sudah dibekukan.
 
-Hits the campus intermediary (``GET /events?limit&offset``) returning
-``{events, total, limit, offset}`` — NOT the Indexer ``:9200/_search``
-and NOT the collector push path. Each flat event is translated via
-``flat_api_adapter`` into the nested raw dict the frozen canonicalizer
-accepts, so the Research Core stays untouched.
+Memanggil API perantara kampus (``GET /events?limit&offset``) yang mengembalikan
+``{events, total, limit, offset}`` — BUKAN ``:9200/_search`` milik Indexer dan BUKAN
+jalur push collector. Setiap event flat diterjemahkan lewat ``flat_api_adapter``
+menjadi dict raw bersarang yang diterima canonicalizer, sehingga Research Core tidak berubah.
 """
 
 import logging
@@ -22,15 +21,15 @@ logger = logging.getLogger(__name__)
 
 
 class WazuhAPIError(RuntimeError):
-    """Base error for custom API operations."""
+    """Error dasar untuk operasi custom API."""
 
 
 class WazuhAPIAuthError(WazuhAPIError):
-    """Raised on 401/403 without retry and without response body."""
+    """Dilempar saat 401/403, tanpa retry dan tanpa response body."""
 
 
 class WazuhAPIClient:
-    """Minimal client for the frozen flat API (limit/offset pagination)."""
+    """Client minimal untuk flat API (paginasi limit/offset)."""
 
     def __init__(
         self,
@@ -90,14 +89,13 @@ class WazuhAPIClient:
         self._session = requests.Session()
         self._load_session_file()
 
-    # -- session-cookie file store + watcher (option C) --------------------
+    # Penyimpanan cookie sesi di file + watcher.
 
     def _load_session_file(self) -> Optional[str]:
-        """Adopt cookie from the session file when it differs from memory.
+        """Pakai cookie dari file sesi bila berbeda dengan yang ada di memori.
 
-        Called on init and before every request, so an externally refreshed
-        file (operator/cron) is picked up without a restart. Never logs
-        the cookie value.
+        Dipanggil saat init dan sebelum setiap request, jadi file yang diperbarui dari luar
+        (operator/cron) langsung terpakai tanpa restart. Nilai cookie tidak pernah di-log.
         """
         if not self.session_file:
             return self.session_cookie
@@ -118,7 +116,7 @@ class WazuhAPIClient:
         return self.session_cookie
 
     def _save_session_file(self, cookie: str) -> None:
-        """Persist a freshly logged-in cookie (best effort, 0o600 on POSIX)."""
+        """Simpan cookie hasil login baru (best effort, 0o600 di POSIX)."""
         self.session_cookie = cookie
         if not self.session_file:
             return
@@ -139,13 +137,13 @@ class WazuhAPIClient:
         except Exception as exc:
             logger.warning("Could not persist custom API session file: %s", type(exc).__name__)
 
-    # -- auth ---------------------------------------------------------------
+    # Autentikasi.
 
     def login(self) -> str:
-        """POST the frozen login contract, persist the Set-Cookie session.
+        """POST ke kontrak login, simpan sesi dari Set-Cookie.
 
-        Returns the fresh cookie value. Raises :class:`WazuhAPIAuthError`
-        when the service credential itself is rejected (no retry loop).
+        Mengembalikan nilai cookie baru. Melempar :class:`WazuhAPIAuthError` bila
+        kredensial service itu sendiri ditolak (tanpa loop retry).
         """
         if not self.username or not self.password:
             raise WazuhAPIAuthError("Custom API login requires WAZUH_API_USERNAME and WAZUH_API_PASSWORD")
@@ -204,7 +202,7 @@ class WazuhAPIClient:
         return headers
 
     def fetch_page(self, limit: int = 50, offset: int = 0) -> Dict[str, Any]:
-        """Fetch one paginated page; one auto-relogin on 401, else fail-fast."""
+        """Ambil satu halaman; satu kali auto-relogin saat 401, selain itu langsung gagal."""
         url = f"{self.base_url}/{self.events_path.lstrip('/')}"
         last_exc: Optional[Exception] = None
         refreshed = False
@@ -254,7 +252,7 @@ class WazuhAPIClient:
         raise WazuhAPIError(f"Exceeded max retries calling custom API at {self.base_url}") from last_exc
 
     def fetch_all_canonical(self, limit: int = 50) -> List[CanonicalRawAlert]:
-        """Paginate limit/offset until offset >= total; return canonical alerts."""
+        """Paginasi limit/offset sampai offset >= total; kembalikan alert kanonis."""
         out: List[CanonicalRawAlert] = []
         offset = 0
         while True:

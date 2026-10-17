@@ -1,4 +1,4 @@
-"""Unit tests for Runtime Complexity and Throughput Evaluation (Sprint 8)."""
+"""Unit test evaluasi kompleksitas runtime dan throughput."""
 from datetime import datetime, timedelta, timezone
 import pytest
 import pandas as pd
@@ -23,7 +23,7 @@ def make_alert(idx: int, ts: datetime, agent_id: str = "001", group: str = "pam"
 
 
 def test_runtime_complexity_uses_repeated_median_measurements():
-    """Runtime evidence uses five samples per subset and robust summary statistics."""
+    """Bukti runtime memakai lima sampel per subset dan statistik ringkasan yang robust."""
     base_t = datetime(2026, 8, 28, 10, 0, 0, tzinfo=timezone.utc)
     alerts = [make_alert(i, base_t + timedelta(seconds=i * 5)) for i in range(160)]
 

@@ -1,4 +1,4 @@
-"""Governance tests for model package (Sprint 4)."""
+"""Test batas tanggung jawab paket model."""
 from pathlib import Path
 import re
 
@@ -6,7 +6,7 @@ MODEL_SRC = Path(__file__).resolve().parent.parent.parent.parent / "src" / "mode
 
 
 def test_no_dynamic_contamination_or_ground_truth_in_model_src():
-    """Verify that src/model does not contain dynamic contamination or ground truth parameterization."""
+    """src/model tidak boleh berisi contamination dinamis atau parameter ground truth."""
     forbidden = ["compute_dynamic_contamination", "ground_truth", "is_synthetic", "scenario_id"]
 
     for py_file in MODEL_SRC.glob("*.py"):
@@ -16,10 +16,10 @@ def test_no_dynamic_contamination_or_ground_truth_in_model_src():
 
 
 def test_no_fit_in_scoring_pipeline_inference_methods():
-    """Verify that score_single and score_meta_alerts in scoring_pipeline.py do not call fit or fit_transform."""
+    """score_single dan score_meta_alerts di scoring_pipeline.py tidak boleh memanggil fit atau fit_transform."""
     pipeline_file = MODEL_SRC / "scoring_pipeline.py"
     if pipeline_file.exists():
         content = pipeline_file.read_text(encoding="utf-8")
-        # Check that score_single and score_meta_alerts use transform only
+        # score_single dan score_meta_alerts hanya boleh memakai transform.
         assert "self.scaler.transform(" in content or "scaler.transform(" in content
         assert "fit_transform" not in content

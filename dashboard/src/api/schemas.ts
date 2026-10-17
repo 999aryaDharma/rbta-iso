@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { AnalystVerdictSchema } from './review';
 
 export const DashboardSummarySchema = z.object({
   raw_alert_count: z.number(),
@@ -69,6 +70,10 @@ export const MetaAlertSchema = z.object({
   score_calibration_version: z.string(),
   source_alert_ids: z.array(z.string()).default([]),
   metadata: z.record(z.string(), z.unknown()).optional(),
+  // Hanya di detail live (T8); null = belum dilabel.
+  analyst_verdict: AnalystVerdictSchema.nullable().optional(),
+  // T11: dua fitur dengan |nilai RobustScaler| terbesar; null untuk record lama.
+  top_deviations: z.array(z.tuple([z.string(), z.number()])).nullable().optional(),
 });
 
 export type MetaAlert = z.infer<typeof MetaAlertSchema>;

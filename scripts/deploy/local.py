@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Cross-platform Docker Desktop launcher for the local RBTA demonstration."""
+"""Launcher Docker Desktop lintas platform untuk demo RBTA lokal."""
 
 import argparse
 import json
 import os
-from pathlib import Path, PureWindowsPath
+from pathlib import Path, PurePosixPath, PureWindowsPath
 import subprocess
 import sys
 import time
@@ -24,20 +24,23 @@ LOCAL_DEPLOY_DIR = REPO_ROOT / "deploy" / "local"
 
 
 class LocalConfigurationError(RuntimeError):
-    """Raised before Docker starts when local configuration is unsafe or incomplete."""
+    """Dilempar sebelum Docker dijalankan bila konfigurasi lokal tidak aman atau tidak lengkap."""
 
 
 def normalize_docker_host_path(value: str, platform: Optional[str] = None) -> str:
-    """Normalize a host path for Compose without corrupting Windows drive letters."""
+    """Normalisasi path host untuk Compose tanpa merusak huruf drive Windows."""
     active_platform = platform or sys.platform
     expanded = os.path.expandvars(value.strip())
     if active_platform.startswith("win"):
         return PureWindowsPath(expanded).as_posix()
+    if os.name == "nt":
+        # Host Windows mensimulasikan platform POSIX: resolve() akan menempelkan huruf drive.
+        return PurePosixPath(os.path.expanduser(expanded)).as_posix()
     return str(Path(expanded).expanduser().resolve())
 
 
 def discover_replay_files(directory: Path) -> List[Path]:
-    """Discover alert inputs only; `.meta` sidecars are intentionally excluded."""
+    """Cari input alert saja; sidecar `.meta` sengaja tidak diikutkan."""
     if not directory.is_dir():
         raise LocalConfigurationError(f"Replay directory does not exist: {directory}")
     return sorted(
@@ -47,7 +50,7 @@ def discover_replay_files(directory: Path) -> List[Path]:
 
 
 def validate_local_configuration(config: Dict[str, str], platform: Optional[str] = None) -> Dict[str, str]:
-    """Validate and normalize the complete local runtime contract."""
+    """Validasi dan normalisasi seluruh kontrak runtime lokal."""
     required = ("RBTA_API_KEY", "RBTA_MODEL_VERSION", "RBTA_HOST_PORT", "RBTA_REPLAY_HOST_DIR", "RBTA_MODEL_HOST_DIR")
     missing = [key for key in required if not config.get(key, "").strip()]
     if missing:

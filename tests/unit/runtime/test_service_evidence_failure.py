@@ -32,7 +32,7 @@ def test_evidence_conflict_prevents_core_rbta_mutation(tmp_path: Path):
     db_path = tmp_path / "evidence.sqlite3"
     state_path = tmp_path / "state.json"
 
-    # Train reference bundle for pipeline
+    # Latih bundle reference untuk pipeline.
     base_t = datetime(2026, 8, 29, 10, 0, 0, tzinfo=timezone.utc)
     sample_alerts = [
         make_alert(f"init-{i}", rule_level=(i % 12) + 1)
@@ -60,12 +60,12 @@ def test_evidence_conflict_prevents_core_rbta_mutation(tmp_path: Path):
     assert "aid-100" in seen_before
     meta_counter_before = service.engine._meta_id_counter
 
-    # Conflicting alert with same ID but different level
+    # Alert bertentangan: ID sama tetapi level berbeda.
     conflicting_alert = make_alert("aid-100", rule_level=15)
 
     with pytest.raises(RawEvidenceConflictError):
         service.ingest_alert(conflicting_alert)
 
-    # Core engine state must be strictly unchanged
+    # State engine inti harus tidak berubah sama sekali.
     assert set(service.engine._seen_alert_ids) == seen_before
     assert service.engine._meta_id_counter == meta_counter_before

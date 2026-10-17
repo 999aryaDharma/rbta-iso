@@ -62,18 +62,18 @@ describe('ReplayPipelineVisualizer component', () => {
     );
 
     expect(screen.getByText('1. Dataset')).toBeDefined();
-    expect(screen.getByText('2. Canonicalize')).toBeDefined();
-    expect(screen.getByText('3. Raw Evidence')).toBeDefined();
-    expect(screen.getByText('4. RBTA Window')).toBeDefined();
-    expect(screen.getByText('5. MetaAlert')).toBeDefined();
-    expect(screen.getByText('6. 7 Features')).toBeDefined();
+    expect(screen.getByText('2. Standarisasi')).toBeDefined();
+    expect(screen.getByText('3. Bukti asli')).toBeDefined();
+    expect(screen.getByText('4. Jendela RBTA')).toBeDefined();
+    expect(screen.getByText('5. Meta-alert')).toBeDefined();
+    expect(screen.getByText('6. 7 fitur')).toBeDefined();
     expect(screen.getByText('7. IsoForest')).toBeDefined();
     expect(screen.getByText('8. Level')).toBeDefined();
-    expect(screen.getByText('9. Output Sink')).toBeDefined();
+    expect(screen.getByText('9. Keluaran')).toBeDefined();
 
-    expect(screen.getByText('RUNNING')).toBeDefined();
+    expect(screen.getByText('Berjalan')).toBeDefined();
 
-    const featuresNode = screen.getByText('6. 7 Features');
+    const featuresNode = screen.getByText('6. 7 fitur');
     fireEvent.click(featuresNode);
     expect(handleSelect).toHaveBeenCalledWith('FEATURES');
   });

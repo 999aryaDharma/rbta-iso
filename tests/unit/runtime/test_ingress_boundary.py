@@ -1,4 +1,4 @@
-"""Unit tests for CollectorIngressBoundary (Sprint 7)."""
+"""Unit test CollectorIngressBoundary."""
 from datetime import datetime, timezone
 import pytest
 
@@ -16,10 +16,10 @@ def make_valid_raw_event(alert_id: str) -> dict:
 
 
 def test_ingress_boundary_accepts_valid_payload_and_detects_duplicates():
-    """Ingress accepts valid payload and flags duplicate without failing."""
+    """Ingress menerima payload valid dan menandai duplikat tanpa gagal."""
     ingress = CollectorIngressBoundary(api_key="secret-key")
 
-    # Valid payload with auth
+    # Payload valid dengan auth.
     event = make_valid_raw_event("alert_100")
     res1 = ingress.process_incoming(event, auth_header="Bearer secret-key")
     assert res1.status == "accepted"
@@ -27,7 +27,7 @@ def test_ingress_boundary_accepts_valid_payload_and_detects_duplicates():
     assert isinstance(res1.canonical_alert, CanonicalRawAlert)
     assert res1.canonical_alert.wazuh_alert_id == "alert_100"
 
-    # Same alert sent again -> accepted, still not duplicate from boundary's perspective
+    # Alert yang sama dikirim lagi -> diterima; dari sisi boundary belum dianggap duplikat.
     res2 = ingress.process_incoming(event, auth_header="Bearer secret-key")
     assert res2.status == "accepted"
     assert res2.is_duplicate is False
@@ -35,7 +35,7 @@ def test_ingress_boundary_accepts_valid_payload_and_detects_duplicates():
 
 
 def test_ingress_boundary_rejects_unauthorized():
-    """Ingress rejects unauthorized request."""
+    """Ingress menolak request tanpa otorisasi."""
     ingress = CollectorIngressBoundary(api_key="secret-key")
     event = make_valid_raw_event("alert_100")
 
@@ -44,9 +44,9 @@ def test_ingress_boundary_rejects_unauthorized():
 
 
 def test_ingress_boundary_rejects_malformed_schema():
-    """Ingress rejects malformed payload with clear IngressPayloadError."""
+    """Ingress menolak payload rusak dengan IngressPayloadError yang jelas."""
     ingress = CollectorIngressBoundary(api_key="secret-key")
 
-    bad_event = {"agent": {"id": "001"}}  # Missing id, timestamp, rule
+    bad_event = {"agent": {"id": "001"}}  # id, timestamp, rule tidak ada
     with pytest.raises(IngressPayloadError, match="Malformed raw alert"):
         ingress.process_incoming(bad_event, auth_header="Bearer secret-key")

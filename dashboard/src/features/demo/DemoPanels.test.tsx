@@ -108,10 +108,10 @@ describe('thesis Demo explanation panels', () => {
       />
     );
     expect(screen.getByText(/evaluasi lengkap rbta/i)).toBeInTheDocument();
-    expect(screen.getByText(/time-only fixed/i)).toBeInTheDocument();
-    expect(screen.getByText(/pemisahan struktural internal/i)).toBeInTheDocument();
-    expect(screen.getByRole('img', { name: /histogram distribusi null permutation silhouette/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /unduh artifact/i })).toBeInTheDocument();
+    expect(screen.getByText(/hanya waktu, jendela tetap/i)).toBeInTheDocument();
+    expect(screen.getByText(/pemisahan kelompok secara internal/i)).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: /histogram pembanding acak silhouette/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /unduh hasil/i })).toBeInTheDocument();
   });
 
   it('uses plain-language labels and keeps the score distribution readable without color alone', () => {

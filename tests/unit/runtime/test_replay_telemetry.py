@@ -1,4 +1,4 @@
-"""Unit tests for ReplayController pipeline telemetry, trace ring buffer, and deferred Telegram integration."""
+"""Unit test telemetri pipeline ReplayController, ring buffer trace, dan integrasi Telegram tertunda."""
 
 import json
 from pathlib import Path
@@ -11,7 +11,7 @@ from src.runtime.replay_controller import ReplayController
 
 
 def _create_sample_dataset(dataset_path: Path, count: int = 15):
-    """Generate sample wazuh alert JSONL file for testing."""
+    """Bangkitkan file JSONL alert Wazuh contoh untuk test."""
     records = []
     for i in range(count):
         records.append({
@@ -35,7 +35,7 @@ def _create_sample_dataset(dataset_path: Path, count: int = 15):
 
 @pytest.fixture
 def trained_pipeline():
-    """Create minimal trained scoring pipeline for testing."""
+    """Buat scoring pipeline terlatih yang minimal untuk test."""
     from datetime import datetime, timezone
     sample_metas = [
         MetaAlert(
@@ -76,7 +76,7 @@ def test_replay_telemetry_structure_and_trace(tmp_path: Path, trained_pipeline):
         replay_runs_dir=runs_dir,
     )
 
-    # Initial state has empty telemetry
+    # State awal dengan telemetri kosong.
     init_status = controller.get_status()
     assert "telemetry" in init_status
     telemetry = init_status["telemetry"]
@@ -84,10 +84,10 @@ def test_replay_telemetry_structure_and_trace(tmp_path: Path, trained_pipeline):
     assert telemetry["decision_counts"]["ESCALATE"] == 0
     assert isinstance(telemetry["trace"], list)
 
-    # Start replay and wait to complete
+    # Mulai replay dan tunggu sampai selesai.
     controller.start(dataset_name="telemetry_sample.jsonl", speed_factor="MAX")
     
-    # Wait for thread to finish
+    # Tunggu thread selesai.
     if controller._thread:
         controller._thread.join(timeout=10.0)
 
@@ -107,18 +107,18 @@ def test_replay_telemetry_structure_and_trace(tmp_path: Path, trained_pipeline):
     assert live_eval["model_provenance"]["model_version"] == "rbta-if-v1"
     assert live_eval["claim_boundary"]["accuracy_available"] is False
 
-    # Decision counts sum to finalized count
+    # Jumlah per decision sama dengan jumlah yang difinalkan.
     dec_counts = final_telemetry["decision_counts"]
     total_decisions = sum(dec_counts.values())
     assert total_decisions == final_telemetry["rbta"]["finalized_meta_alerts"]
 
-    # Trace ring buffer contains operations
+    # Ring buffer trace berisi operasi.
     trace = final_telemetry["trace"]
     assert len(trace) > 0
     stages = {item["stage"] for item in trace}
     assert "RAW" in stages or "FINALIZE" in stages or "DECISION" in stages
 
-    # Check latest_meta_alert has exact 7 features and scores
+    # latest_meta_alert punya tepat 7 fitur beserta skornya.
     latest_meta = final_telemetry["latest_meta_alert"]
     if latest_meta:
         assert "seven_features" in latest_meta
@@ -127,7 +127,7 @@ def test_replay_telemetry_structure_and_trace(tmp_path: Path, trained_pipeline):
         assert "decision" in latest_meta
         assert "action" in latest_meta
 
-    # Check telegram payloads endpoint
+    # Cek endpoint payload Telegram.
     payloads_dto = controller.get_telegram_payloads(limit=10)
     assert "items" in payloads_dto
     assert "total_count" in payloads_dto

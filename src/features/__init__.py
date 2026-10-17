@@ -1,4 +1,4 @@
-"""Feature engineering package for RBTA + Isolation Forest pipeline."""
+"""Paket feature engineering untuk pipeline RBTA + Isolation Forest."""
 
 from src.features.extractor import (
     FEATURE_COLUMNS,

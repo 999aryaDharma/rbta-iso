@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import type { ReplayStatus, PipelineTelemetry } from '@/api/schemas';
 import { formatNumber } from '@/lib/formatters';
+import { decisionLabel } from '@/lib/labels';
 import {
   Database,
   ArrowsSplit,
@@ -69,98 +70,98 @@ export function ReplayPipelineVisualizer({
 
   const phases = [
     {
-      phaseName: 'PHASE 1: INGESTION & DURABILITY',
+      phaseName: 'Tahap 1: Penerimaan & penyimpanan alert',
       stages: [
         {
           id: 'DATASET' as PipelineStageId,
           num: '01',
           title: '1. Dataset',
-          sublabel: status?.dataset_mode === 'all' ? 'All Datasets' : (status?.dataset ? 'Single .jsonl' : 'Historical Source'),
+          sublabel: status?.dataset_mode === 'all' ? 'Semua dataset' : (status?.dataset ? 'Satu file .jsonl' : 'Sumber historis'),
           icon: Database,
           metric: `${formatNumber(rawProcessed)} / ${formatNumber(rawTotal)}`,
-          metricLabel: 'Processed',
+          metricLabel: 'Diproses',
         },
         {
           id: 'CANONICAL' as PipelineStageId,
           num: '02',
-          title: '2. Canonicalize',
-          sublabel: 'RawAlert Schema',
+          title: '2. Standarisasi',
+          sublabel: 'Data terstandar',
           icon: ArrowsSplit,
-          metric: `${formatNumber(rawProcessed)} ev`,
-          metricLabel: 'Validated',
+          metric: `${formatNumber(rawProcessed)} alert`,
+          metricLabel: 'Tervalidasi',
         },
         {
           id: 'EVIDENCE' as PipelineStageId,
           num: '03',
-          title: '3. Raw Evidence',
-          sublabel: 'SQLite Storage',
+          title: '3. Bukti asli',
+          sublabel: 'Disimpan di SQLite',
           icon: HardDrives,
-          metric: `${formatNumber(evidenceCount)} rows`,
-          metricLabel: 'Indexed',
+          metric: `${formatNumber(evidenceCount)} baris`,
+          metricLabel: 'Terindeks',
         },
       ],
     },
     {
-      phaseName: 'PHASE 2: TEMPORAL AGGREGATION & FEATURES',
+      phaseName: 'Tahap 2: Pengelompokan waktu & fitur',
       stages: [
         {
           id: 'RBTA' as PipelineStageId,
           num: '04',
-          title: '4. RBTA Window',
-          sublabel: 'Adaptive ETW Clust.',
+          title: '4. Jendela RBTA',
+          sublabel: 'Pengelompokan adaptif',
           icon: ClockAfternoon,
-          metric: `${activeBuckets} active / ${activeAgents} agents`,
-          metricLabel: 'In-Flight',
+          metric: `${activeBuckets} terbuka / ${activeAgents} agen`,
+          metricLabel: 'Aktif',
         },
         {
           id: 'META_ALERT' as PipelineStageId,
           num: '05',
-          title: '5. MetaAlert',
-          sublabel: 'Temporal Cluster',
+          title: '5. Meta-alert',
+          sublabel: 'Kelompok alert',
           icon: Stack,
-          metric: `${formatNumber(finalizedCount)} finalized`,
-          metricLabel: 'Episodes',
+          metric: `${formatNumber(finalizedCount)} selesai`,
+          metricLabel: 'Kelompok',
         },
         {
           id: 'FEATURES' as PipelineStageId,
           num: '06',
-          title: '6. 7 Features',
-          sublabel: 'Canonical 7D Vector',
+          title: '6. 7 fitur',
+          sublabel: 'Vektor 7 fitur',
           icon: ChartBarHorizontal,
-          metric: `Max Sev: ${latestMeta?.max_severity ?? 0}/15`,
-          metricLabel: 'Extracted',
+          metric: `Keparahan maks.: ${latestMeta?.max_severity ?? 0}/15`,
+          metricLabel: 'Diekstrak',
         },
       ],
     },
     {
-      phaseName: 'PHASE 3: ISOLATION FOREST & DISPATCH',
+      phaseName: 'Tahap 3: Isolation Forest & pengiriman',
       stages: [
         {
           id: 'ISOLATION_FOREST' as PipelineStageId,
           num: '07',
           title: '7. IsoForest',
-          sublabel: '200 Tree Ensemble',
+          sublabel: '200 pohon',
           icon: TreeStructure,
           metric: latestMeta?.anomaly_score !== undefined ? latestMeta.anomaly_score.toFixed(4) : '-',
-          metricLabel: 'Score',
+          metricLabel: 'Skor',
         },
         {
           id: 'DECISION' as PipelineStageId,
           num: '08',
           title: '8. Level',
-          sublabel: 'Tukey IQR Matrix',
+          sublabel: 'Batas Tukey + matriks keputusan',
           icon: Scales,
-          metric: latestMeta?.decision ?? 'NOISE',
+          metric: decisionLabel(latestMeta?.decision ?? 'NOISE')?.label ?? latestMeta?.decision ?? '-',
           metricLabel: 'Level',
         },
         {
           id: 'OUTPUT_SINK' as PipelineStageId,
           num: '09',
-          title: '9. Output Sink',
-          sublabel: 'Deferred Telegram',
+          title: '9. Keluaran',
+          sublabel: 'Telegram (belum aktif)',
           icon: PaperPlaneRight,
-          metric: `${telegramCount} queued`,
-          metricLabel: 'Payloads',
+          metric: `${telegramCount} antre`,
+          metricLabel: 'Pesan',
         },
       ],
     },
@@ -168,74 +169,69 @@ export function ReplayPipelineVisualizer({
 
   return (
     <div className="rounded-xl border border-kumo-hairline bg-kumo-canvas p-6 shadow-xs space-y-6">
-      {/* Header & Status Indicator */}
       <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-kumo-hairline">
         <div className="space-y-1">
           <div className="flex items-center gap-3">
             <h2 className="text-sm font-semibold uppercase tracking-wider text-kumo-strong">
-              Operational Processing Pipeline
+              Alur pemrosesan
             </h2>
             <span className="text-[11px] font-mono px-2 py-0.5 rounded border border-kumo-hairline bg-kumo-recessed text-kumo-subtle">
-              9-STAGE FLOWCHART ARCHITECTURE
+              9 TAHAP
             </span>
           </div>
           <p className="text-xs text-kumo-subtle">
-            Interactive visual pipeline streaming events through validation, aggregation, 7-feature extraction, and anomaly scoring
+            Alur visual: alert masuk, validasi, pengelompokan, 7 fitur, lalu skor keanehan. Klik tahap untuk melihat detail
           </p>
         </div>
 
-        {/* Runtime State Badge */}
         <div className="flex items-center gap-2 font-mono text-xs">
           {isRunning && (
             <span className="flex items-center gap-1.5 px-3 py-1 rounded-md bg-kumo-recessed text-kumo-strong border border-kumo-hairline font-semibold">
               <PlayCircle size={14} weight="fill" className="text-emerald-500 animate-pulse" />
-              <span>RUNNING</span>
+              <span>Berjalan</span>
             </span>
           )}
           {isPaused && (
             <span className="flex items-center gap-1.5 px-3 py-1 rounded-md bg-kumo-recessed text-kumo-strong border border-kumo-hairline font-semibold">
               <PauseCircle size={14} weight="fill" className="text-amber-500" />
-              <span>PAUSED</span>
+              <span>Dijeda</span>
             </span>
           )}
           {isCompleted && (
             <span className="flex items-center gap-1.5 px-3 py-1 rounded-md bg-kumo-recessed text-kumo-strong border border-kumo-hairline font-semibold">
               <CheckCircle size={14} weight="fill" className="text-emerald-500" />
-              <span>COMPLETED</span>
+              <span>Selesai</span>
             </span>
           )}
           {isError && (
             <span className="flex items-center gap-1.5 px-3 py-1 rounded-md bg-kumo-recessed text-rose-500 border border-rose-500/30 font-semibold">
               <WarningCircle size={14} weight="fill" />
-              <span>ERROR</span>
+              <span>Gagal</span>
             </span>
           )}
           {!isRunning && !isPaused && !isCompleted && !isError && (
             <span className="flex items-center gap-1.5 px-3 py-1 rounded-md bg-kumo-recessed text-kumo-subtle border border-kumo-hairline">
-              <span>IDLE</span>
+              <span>Belum berjalan</span>
             </span>
           )}
         </div>
       </div>
 
-      {/* Structured Flowchart Architecture: 3 Connected Phases */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         {phases.map((phase, pIdx) => (
           <div
             key={phase.phaseName}
             className="p-4 rounded-lg border border-kumo-hairline/80 bg-kumo-recessed/20 space-y-3 relative"
           >
-            {/* Phase Header */}
             <div className="flex items-center justify-between px-1">
               <span className="text-[10px] font-bold text-kumo-subtle tracking-wider uppercase">
                 {phase.phaseName}
               </span>
               <span className="text-[10px] font-mono text-kumo-subtle">
-                Nodes {pIdx * 3 + 1}–{pIdx * 3 + 3}
+                Tahap {pIdx * 3 + 1}–{pIdx * 3 + 3}
               </span>
             </div>
 
-            {/* Phase Stage Cards (Connected Flowchart) */}
             <div className="space-y-2.5">
               {phase.stages.map((st, sIdx) => {
                 const isSelected = activeStage === st.id;
@@ -293,11 +289,10 @@ export function ReplayPipelineVisualizer({
                       )}
                     </button>
 
-                    {/* Flow Connector Arrow between intra-phase nodes */}
                     {sIdx < phase.stages.length - 1 && (
                       <div className="flex justify-center text-kumo-hairline py-0.5">
                         <span className="text-[10px] font-mono text-kumo-subtle flex items-center gap-1">
-                          ↓ <span className="text-[9px] uppercase tracking-wider">FLOW</span>
+                          ↓ <span className="text-[9px] uppercase tracking-wider">ALUR</span>
                         </span>
                       </div>
                     )}

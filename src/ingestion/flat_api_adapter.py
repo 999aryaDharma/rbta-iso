@@ -1,18 +1,17 @@
-"""Adapter for frozen flat custom-API event shape (FLAT-API-FREEZE).
+"""Adapter untuk bentuk event flat dari custom API (lihat FLAT-API-FREEZE).
 
-Translates the researcher's frozen flat JSON (id/timestamp/agent_id/
-agent_name/rule_id/rule_level/rule_groups/...) into the nested raw
-Wazuh dict that ``canonicalize_wazuh_alert`` already accepts.
+Menerjemahkan JSON flat yang sudah dibekukan (id/timestamp/agent_id/agent_name/
+rule_id/rule_level/rule_groups/...) menjadi dict raw Wazuh bersarang yang sudah
+diterima ``canonicalize_wazuh_alert``.
 
-The nested canonicalizer is intentionally untouched; this module is the
-only place that knows the flat shape.
+Canonicalizer bersarang sengaja tidak diubah; hanya modul ini yang mengenal bentuk flat.
 """
 
 from typing import Any, Mapping
 
 
 def flat_api_event_to_raw(event: Mapping[str, Any]) -> dict[str, Any]:
-    """Map one frozen flat API event to nested raw Wazuh dict."""
+    """Petakan satu event flat API ke dict raw Wazuh bersarang."""
     if not isinstance(event, Mapping):
         raise ValueError(f"Expected flat event mapping, got {type(event)}")
 
@@ -69,7 +68,7 @@ def flat_api_event_to_raw(event: Mapping[str, Any]) -> dict[str, Any]:
             data_block = dict(data)
     if manager_name is not None:
         raw["manager"] = {"name": manager_name}
-    # srcip passthrough when the intermediary forwards it.
+    # srcip diteruskan bila perantara mengirimkannya.
     srcip = event.get("srcip")
     if srcip is None and isinstance(data_block, dict):
         srcip = data_block.get("srcip")
@@ -84,7 +83,7 @@ def flat_api_event_to_raw(event: Mapping[str, Any]) -> dict[str, Any]:
 
 
 def flat_api_page_to_raw_list(page: Mapping[str, Any]) -> list[dict[str, Any]]:
-    """Map one paginated API response ({events,total,limit,offset}) to raw list."""
+    """Petakan satu response API berhalaman ({events,total,limit,offset}) ke list raw."""
     if not isinstance(page, Mapping):
         raise ValueError(f"Expected page mapping, got {type(page)}")
     events = page.get("events", [])

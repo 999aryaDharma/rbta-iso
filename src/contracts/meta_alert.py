@@ -1,4 +1,4 @@
-"""Meta-alert contract for aggregated temporal bucket representations."""
+"""Kontrak meta-alert untuk representasi bucket temporal hasil agregasi."""
 
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -9,40 +9,40 @@ from src.contracts.immutability import freeze_value
 
 @dataclass(frozen=True, slots=True)
 class MetaAlert:
-    """Immutable domain representation of an aggregated Meta-Alert produced by RBTA.
+    """Representasi domain immutable dari Meta-Alert hasil agregasi RBTA.
 
     Attributes
     ----------
     meta_id : int
-        Unique identifier for the meta-alert.
+        ID unik meta-alert.
     agent_id : str
-        Agent identifier.
+        ID agent.
     agent_name : str
-        Agent host name.
+        Nama host agent.
     rule_group_primary : str
-        Primary rule group key of the RBTA bucket.
+        Kunci rule group primer dari bucket RBTA.
     start_time : datetime
-        Timezone-aware start timestamp of the aggregation window.
+        Timestamp awal jendela agregasi (timezone-aware).
     end_time : datetime
-        Timezone-aware end timestamp of the aggregation window.
+        Timestamp akhir jendela agregasi (timezone-aware).
     alert_count : int
-        Total number of raw alerts aggregated in this bucket (>= 1).
+        Jumlah raw alert yang diagregasi dalam bucket ini (>= 1).
     max_severity : int
-        Maximum Wazuh rule level observed in this bucket [0, 15].
+        Rule level Wazuh tertinggi dalam bucket ini [0, 15].
     rule_id_distribution : Mapping[str, int]
-        Recursively immutable distribution map of rule IDs to counts.
+        Distribusi rule ID ke jumlahnya (immutable).
     severity_distribution : Mapping[int, int]
-        Recursively immutable distribution map of severity levels to counts.
+        Distribusi level severity ke jumlahnya (immutable).
     mitre_tactics_unique : tuple[str, ...]
-        Unique MITRE ATT&CK tactics seen across all alerts in the bucket.
+        Taktik MITRE ATT&CK unik dari seluruh alert dalam bucket.
     critical_mitre_present : bool
-        Flag indicating if any critical MITRE tactic was triggered.
+        Penanda apakah ada taktik MITRE kritis yang muncul.
     agent_criticality : int
-        Criticality score of the host asset [1, 4].
+        Skor kritikalitas aset host [1, 4].
     wazuh_alert_ids : tuple[str, ...]
-        Traceable tuple of all member Wazuh alert IDs.
+        Tuple semua ID alert Wazuh anggota, untuk penelusuran.
     metadata : Mapping[str, Any]
-        Recursively immutable audit metadata.
+        Metadata audit (immutable).
     """
 
     meta_id: int
@@ -92,5 +92,5 @@ class MetaAlert:
 
     @property
     def duration_sec(self) -> float:
-        """Window duration in seconds."""
+        """Durasi jendela dalam detik."""
         return max(0.0, (self.end_time - self.start_time).total_seconds())

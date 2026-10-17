@@ -1,10 +1,10 @@
-# SPRINT 11 SPECIFICATION: DASHBOARD, RAW ALERT INVESTIGATION & DETERMINISTIC DEMONSTRATION LAYER
+# Dashboard, Investigasi Raw Alert, dan Lapisan Demonstrasi Deterministik
 
 ## 1. Architectural Overview
 
-Sprint 11 introduces the complete operator and investigation layer on top of the validated S1–S9 research runtime and S10 pre-deployment foundation.
+Lapisan operator dan investigasi dibangun di atas runtime penelitian (ingestion, RBTA, fitur, model, evaluasi) tanpa mengubah metodologinya.
 
-The primary capabilities added in this sprint are:
+Komponen utamanya:
 1. **RawAlertEvidenceStore**: Immutable SQLite persistence layer for full raw alert evidence, written strictly *before* core RBTA mutation during ingestion.
 2. **RBTAEngine Observability**: Pure read-only snapshot methods (\snapshot_agents()\, \snapshot_buckets()\) enabling zero-mutation visibility into per-agent EMA adaptation and active bucket states.
 3. **REST Dashboard APIs**: Secure, authenticated endpoints providing KPIs, time series reduction, agent/bucket introspection, paginated MetaAlert lists, raw alert member resolution, and single-alert forensic JSON view.
@@ -16,7 +16,7 @@ The primary capabilities added in this sprint are:
 
 ## 2. Research Integrity & Invariant Preservation
 
-Sprint 11 operates strictly under the locked research invariants:
+Lapisan ini tunduk pada invarian penelitian yang dikunci:
 - **Zero Alert Drops**: All valid incoming events are preserved without timestamp or watermark drops.
 - **Evidence-Before-Mutation Order**: Raw alert evidence is persisted to the SQLite store prior to mutating the RBTA aggregation bucket.
 - **Authoritative Backend Calculation**: The frontend never calculates ARR, feature normalization, anomaly scores, or quadrant decisions.
@@ -49,9 +49,9 @@ Sprint 11 operates strictly under the locked research invariants:
 
 ## 4. Verification Suite
 
-The S11 implementation is verified by 271 unit and integration tests covering:
+Cakupan unit dan integration test untuk lapisan ini:
 - Raw alert persistence, idempotency, search filters, and partial resolution.
 - RBTAEngine snapshot correctness across empty and active states.
 - FastAPI dashboard route governance, auth validation, and pagination.
 - Deterministic replay lifecycle, state transitions, and thread safety.
-- Complete regression across all prior sprint test suites (S1–S10).
+- Regresi penuh atas seluruh test suite backend.

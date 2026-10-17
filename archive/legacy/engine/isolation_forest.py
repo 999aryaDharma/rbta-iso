@@ -51,9 +51,7 @@ from sklearn.decomposition import PCA
 log = logging.getLogger(__name__)
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # Konstanta — sinkron dengan rbta_algorithm_02.py
-# ══════════════════════════════════════════════════════════════════════════════
 
 from src.config.domain import (
     AGENT_CRITICALITY,
@@ -101,7 +99,7 @@ RULE_GROUP_SEVERITY_ENC: dict[str, int] = {
 }
 DEFAULT_GROUP_ENC = 2
 
-# ── 11 Fitur Isolation Forest (HIDS-optimized v2) ─────────────────────────
+# 11 Fitur Isolation Forest (HIDS-optimized v2)
 # Synchronized with feature_engineering.py v2
 # Removed features (v1 → v2):
 #   - unique_rules_triggered : 92.9% = 1 (IQR=0, zero variance)
@@ -161,9 +159,7 @@ BG_COLOR     = "#FAFAFA"
 ACCENT       = "#2C4F7C"
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # Load & Feature Engineering
-# ══════════════════════════════════════════════════════════════════════════════
 
 def load_alerts(csv_path: str) -> pd.DataFrame:
     df = pd.read_csv(csv_path)
@@ -291,9 +287,7 @@ def add_if_features(df_meta: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # Training & Scoring
-# ══════════════════════════════════════════════════════════════════════════════
 
 def train_isolation_forest(
     df:            pd.DataFrame,
@@ -336,9 +330,7 @@ def normalize_scores(raw_scores: np.ndarray) -> np.ndarray:
     return ((inv - vmin) / (vmax - vmin)).clip(0, 1)
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # Threshold
-# ══════════════════════════════════════════════════════════════════════════════
 
 def find_optimal_threshold(scores: np.ndarray, method: str = "iqr") -> float:
     if method == "iqr":
@@ -351,9 +343,7 @@ def find_optimal_threshold(scores: np.ndarray, method: str = "iqr") -> float:
     return round(float(theta), 4)
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # Decision Matrix + False Positive Gate
-# ══════════════════════════════════════════════════════════════════════════════
 
 def _false_positive_gate(row: pd.Series, score: float, theta: float) -> bool:
     """
@@ -427,9 +417,7 @@ def apply_decision_matrix(
     return df
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # SOAR Payload
-# ══════════════════════════════════════════════════════════════════════════════
 
 def build_soar_payload(row: pd.Series) -> dict:
     """JSON webhook payload standar untuk SOAR Shuffle."""
@@ -458,9 +446,7 @@ def build_soar_payload(row: pd.Series) -> dict:
     }
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # Report
-# ══════════════════════════════════════════════════════════════════════════════
 
 def print_report(df: pd.DataFrame, theta: float) -> str:
     n_total    = len(df)
@@ -525,9 +511,7 @@ def print_report(df: pd.DataFrame, theta: float) -> str:
     return report
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # Visualisasi (6 panel)
-# ══════════════════════════════════════════════════════════════════════════════
 
 def _style_ax(ax, title: str) -> None:
     ax.set_facecolor(BG_COLOR)
@@ -696,9 +680,7 @@ def visualize(
     plt.close(fig)
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # FIX-2: DYNAMIC CONTAMINATION COMPUTATION
-# ══════════════════════════════════════════════════════════════════════════════
 
 def compute_dynamic_contamination(
     df_meta: pd.DataFrame,
@@ -743,9 +725,7 @@ def compute_dynamic_contamination(
     return contamination
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # Main Pipeline
-# ══════════════════════════════════════════════════════════════════════════════
 
 def run_pipeline(
     csv_path:       str        = "output/meta_alerts_rbta.csv",

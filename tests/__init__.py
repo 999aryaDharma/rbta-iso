@@ -1,1 +1,1 @@
-"""Root test package."""
+"""Paket test root."""

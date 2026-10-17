@@ -1,4 +1,4 @@
-"""Unit tests for LosslessReorderBuffer (Task 2.2)."""
+"""Unit test LosslessReorderBuffer."""
 from collections import Counter
 from datetime import datetime, timedelta, timezone
 import pytest
@@ -8,7 +8,7 @@ from src.rbta.reorder_buffer import LosslessReorderBuffer
 
 
 def make_alert(alert_id: str, ts: datetime, agent_id: str = "001") -> CanonicalRawAlert:
-    """Helper to create minimal valid CanonicalRawAlert."""
+    """Helper untuk membuat CanonicalRawAlert minimal yang valid."""
     return CanonicalRawAlert(
         wazuh_alert_id=alert_id,
         timestamp=ts,
@@ -24,7 +24,7 @@ def make_alert(alert_id: str, ts: datetime, agent_id: str = "001") -> CanonicalR
 
 
 def test_reorder_buffer_invalid_capacity():
-    """Buffer capacity must be at least 1."""
+    """Kapasitas buffer minimal 1."""
     with pytest.raises(ValueError, match="capacity"):
         LosslessReorderBuffer(capacity=0)
 
@@ -33,7 +33,7 @@ def test_reorder_buffer_invalid_capacity():
 
 
 def test_reorder_buffer_ordered_sequence():
-    """Ordered input sequence is preserved and emitted lossless upon capacity overflow and drain."""
+    """Urutan input yang sudah terurut dipertahankan dan dikeluarkan tanpa kehilangan saat kapasitas penuh dan saat drain."""
     buf = LosslessReorderBuffer(capacity=3)
     base_t = datetime(2026, 8, 28, 10, 0, 0, tzinfo=timezone.utc)
 
@@ -48,17 +48,17 @@ def test_reorder_buffer_ordered_sequence():
     out.extend(buf.push(a3))  # len 3 <= 3
     assert out == []
 
-    # 4th push exceeds capacity 3 -> emits earliest (a1)
+    # Push ke-4 melebihi kapasitas 3 -> keluarkan yang paling awal (a1).
     out.extend(buf.push(a4))
     assert [a.wazuh_alert_id for a in out] == ["1"]
 
-    # Drain emits remaining [a2, a3, a4]
+    # Drain mengeluarkan sisanya [a2, a3, a4].
     out.extend(buf.drain())
     assert [a.wazuh_alert_id for a in out] == ["1", "2", "3", "4"]
 
 
 def test_reorder_buffer_disordered_sequence():
-    """Disordered input sequence [t3, t1, t4, t2] is emitted in correct ascending event-time order."""
+    """Input tidak berurutan [t3, t1, t4, t2] dikeluarkan dengan urutan event-time naik yang benar."""
     buf = LosslessReorderBuffer(capacity=4)
     base_t = datetime(2026, 8, 28, 10, 0, 0, tzinfo=timezone.utc)
 
@@ -67,7 +67,7 @@ def test_reorder_buffer_disordered_sequence():
     a3 = make_alert("3", base_t + timedelta(seconds=30))
     a4 = make_alert("4", base_t + timedelta(seconds=40))
 
-    # Push in disordered order: a3, a1, a4, a2
+    # Push dengan urutan acak: a3, a1, a4, a2.
     out = []
     out.extend(buf.push(a3))
     out.extend(buf.push(a1))
@@ -80,7 +80,7 @@ def test_reorder_buffer_disordered_sequence():
 
 
 def test_reorder_buffer_identical_timestamps_preserves_arrival_order():
-    """Alerts with identical timestamps preserve deterministic arrival (FIFO) tie order."""
+    """Alert dengan timestamp identik mempertahankan urutan kedatangan (FIFO) yang deterministik."""
     buf = LosslessReorderBuffer(capacity=3)
     same_t = datetime(2026, 8, 28, 10, 0, 0, tzinfo=timezone.utc)
 
@@ -97,7 +97,7 @@ def test_reorder_buffer_identical_timestamps_preserves_arrival_order():
 
 
 def test_reorder_buffer_drain_is_idempotent():
-    """First drain returns all remaining alerts; subsequent drains return empty lists."""
+    """Drain pertama mengembalikan semua alert yang tersisa; drain berikutnya mengembalikan list kosong."""
     buf = LosslessReorderBuffer(capacity=2)
     base_t = datetime(2026, 8, 28, 10, 0, 0, tzinfo=timezone.utc)
 
@@ -115,11 +115,11 @@ def test_reorder_buffer_drain_is_idempotent():
 
 
 def test_reorder_buffer_conservation():
-    """Every pushed alert must be emitted exactly once (Counter equality, zero loss)."""
+    """Setiap alert yang di-push harus keluar tepat sekali (Counter sama, tidak ada yang hilang)."""
     buf = LosslessReorderBuffer(capacity=5)
     base_t = datetime(2026, 8, 28, 10, 0, 0, tzinfo=timezone.utc)
 
-    # 100 alerts with various timestamps and disordered arrivals
+    # 100 alert dengan timestamp beragam dan kedatangan tidak berurutan.
     import random
     rng = random.Random(42)
     timestamps = [base_t + timedelta(seconds=rng.randint(0, 500)) for _ in range(100)]
@@ -138,20 +138,20 @@ def test_reorder_buffer_conservation():
 
 
 def test_reorder_buffer_late_residual_event_never_dropped():
-    """An extremely late event pushed into the buffer is never dropped and eventually emitted."""
+    """Event yang sangat terlambat di dalam buffer tidak pernah dibuang dan akhirnya tetap dikeluarkan."""
     buf = LosslessReorderBuffer(capacity=2)
     base_t = datetime(2026, 8, 28, 10, 0, 0, tzinfo=timezone.utc)
 
-    # Push normal future alerts
+    # Push alert normal yang lebih baru.
     a_future1 = make_alert("F1", base_t + timedelta(hours=5))
     a_future2 = make_alert("F2", base_t + timedelta(hours=6))
-    # Push late event far in the past
+    # Push event terlambat yang jauh ke belakang.
     a_late = make_alert("LATE", base_t)
 
     out = []
     out.extend(buf.push(a_future1))
     out.extend(buf.push(a_future2))
-    # Pushing late event exceeds capacity 2 -> emits earliest (LATE)
+    # Push event terlambat melebihi kapasitas 2 -> keluarkan yang paling awal (LATE).
     out.extend(buf.push(a_late))
 
     assert len(out) == 1

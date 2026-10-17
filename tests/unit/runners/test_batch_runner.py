@@ -1,4 +1,4 @@
-"""Unit tests for BatchResearchRunner (Sprint 6)."""
+"""Unit test BatchResearchRunner."""
 from datetime import datetime, timedelta, timezone
 import pytest
 import pandas as pd
@@ -25,7 +25,7 @@ def make_alert(idx: int, ts: datetime, group: str = "pam", level: int = 3, agent
 
 
 def test_batch_runner_aggregates_and_extracts_features():
-    """Batch runner processes stream into MetaAlerts and extracts canonical 7-feature DataFrame."""
+    """Batch runner memproses aliran menjadi MetaAlert dan mengekstrak DataFrame 7 fitur kanonis."""
     base_t = datetime(2026, 8, 28, 10, 0, 0, tzinfo=timezone.utc)
     alerts = [make_alert(i, base_t + timedelta(minutes=i)) for i in range(10)]
 
@@ -41,9 +41,9 @@ def test_batch_runner_aggregates_and_extracts_features():
 
 
 def test_batch_runner_with_scoring_pipeline():
-    """Batch runner with loaded scoring pipeline produces scored meta-alerts."""
+    """Batch runner dengan scoring pipeline menghasilkan meta-alert terskor."""
     base_t = datetime(2026, 8, 28, 10, 0, 0, tzinfo=timezone.utc)
-    # Generate 40 alerts with varying levels, agents, and mitre tactics
+    # Bangkitkan 40 alert dengan level, agent, dan taktik MITRE yang bervariasi.
     alerts = [
         make_alert(
             i,
@@ -55,16 +55,16 @@ def test_batch_runner_with_scoring_pipeline():
         for i in range(40)
     ]
 
-    # 1. Run batch without scoring to get training metas
+    # Jalankan batch tanpa scoring untuk mendapatkan meta training.
     runner = BatchResearchRunner(base_delta_t=timedelta(minutes=15), adaptive=False)
     unscored_result = runner.run(alerts)
     assert len(unscored_result.meta_alerts) == 40
 
-    # 2. Train model bundle
+    # Latih bundle model.
     bundle = train_reference_pipeline(unscored_result.meta_alerts, random_state=42, model_version="batch-v1")
     scoring_pipe = ScoringPipeline(bundle)
 
-    # 3. Run batch with scoring
+    # Jalankan batch dengan scoring.
     scored_runner = BatchResearchRunner(
         base_delta_t=timedelta(minutes=15),
         adaptive=False,

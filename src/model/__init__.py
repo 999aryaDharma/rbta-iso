@@ -1,4 +1,4 @@
-"""Isolation Forest model, scoring pipeline, calibration, and artifact lifecycle package."""
+"""Paket model Isolation Forest: scoring pipeline, kalibrasi, dan lifecycle artefak."""
 
 from src.model.calibration import CalibrationError, ScoreCalibration
 from src.model.decision import evaluate_decision

@@ -15,7 +15,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
   useEffect(() => {
     const handleUnauthorized = () => {
       setAuthed(false);
-      setError('Session expired or unauthorized. Please re-enter your API key.');
+      setError('Sesi berakhir atau tidak diizinkan. Masukkan kembali API key.');
     };
     window.addEventListener('rbta:unauthorized', handleUnauthorized);
     return () => window.removeEventListener('rbta:unauthorized', handleUnauthorized);
@@ -42,7 +42,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
       }
     } catch {
       clearApiKey();
-      setError('Failed connecting to REST API service.');
+      setError('Gagal terhubung ke server.');
     } finally {
       setIsVerifying(false);
     }
@@ -56,11 +56,11 @@ export function AuthGate({ children }: { children: ReactNode }) {
         <div className="flex items-center gap-2 mb-2">
           <Shield size={20} className="text-kumo-brand" />
           <h1 className="text-sm font-semibold tracking-tight text-kumo-default">
-            RBTA Security Analytics
+            RBTA Security Analytics (analisis alert keamanan)
           </h1>
         </div>
         <p className="text-xs mb-4 text-kumo-subtle">
-          Enter your authorized operational API key to access the control plane.
+          Masukkan API key operasional Anda untuk membuka dashboard.
         </p>
 
         {error && (
@@ -81,7 +81,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
                   handleSignIn();
                 }
               }}
-              placeholder="Enter RBTA API Key..."
+              placeholder="Masukkan API key RBTA…"
               className="font-mono text-xs px-3 py-2.5"
               autoFocus
             />
@@ -93,12 +93,12 @@ export function AuthGate({ children }: { children: ReactNode }) {
             className="w-full justify-center"
             variant="primary"
           >
-            {isVerifying ? 'Verifying Credential...' : 'Sign In to Control Plane'}
+            {isVerifying ? 'Memeriksa API key…' : 'Masuk'}
           </Button>
         </div>
 
         <p className="mt-4 text-[11px] text-center text-kumo-inactive">
-          Session key is securely held in browser memory (<code className="font-mono">sessionStorage</code>).
+          API key hanya disimpan sementara di memori browser selama sesi ini.
         </p>
       </div>
     </div>

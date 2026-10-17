@@ -1,4 +1,4 @@
-"""Unit tests for ShuffleWebhookForwarder (Sprint 9)."""
+"""Unit test ShuffleWebhookForwarder."""
 from datetime import datetime, timezone
 from unittest.mock import MagicMock, patch
 import pytest
@@ -35,7 +35,7 @@ def make_scored_meta(meta_id: int) -> ScoredMetaAlert:
 
 
 def test_shuffle_forwarder_sends_idempotent_event_header():
-    """Forwarder sends payload with X-Event-ID header and webhook key."""
+    """Forwarder mengirim payload dengan header X-Event-ID dan webhook key."""
     forwarder = ShuffleWebhookForwarder(
         webhook_url="https://shuffle.campus.local/api/v1/hooks/rbta_hook",
         api_key="shuffle-token-123",
@@ -58,11 +58,11 @@ def test_shuffle_forwarder_sends_idempotent_event_header():
 
 
 def test_shuffle_forwarder_idempotent_retry_on_lost_response():
-    """Receiver simulates lost response on attempt 1; retry is safely deduplicated by X-Event-ID."""
+    """Receiver menyimulasikan response hilang di percobaan 1; retry aman karena di-dedup lewat X-Event-ID."""
     forwarder = ShuffleWebhookForwarder(
         webhook_url="https://shuffle.campus.local/api/v1/hooks/rbta_hook",
         api_key="token-abc",
-        sleep_fn=lambda _: None,  # no-op sleep
+        sleep_fn=lambda _: None,  # sleep no-op
     )
     meta = make_scored_meta(42)
 
@@ -73,17 +73,17 @@ def test_shuffle_forwarder_idempotent_retry_on_lost_response():
         nonlocal business_executions
         event_id = headers.get("X-Event-ID")
 
-        # Check if already processed
+        # Cek apakah sudah pernah diproses.
         if event_id in processed_events:
-            # Duplicate detection: no business side effects, return 200 OK
+            # Deteksi duplikat: tanpa efek samping bisnis, kembalikan 200 OK.
             mock_200 = MagicMock(status_code=200, text="Duplicate ignored")
             return mock_200
 
-        # First attempt: process business action
+        # Percobaan pertama: jalankan aksi bisnis.
         processed_events.add(event_id)
         business_executions += 1
 
-        # Simulate connection drop / timeout right after business action
+        # Simulasikan koneksi putus / timeout tepat setelah aksi bisnis.
         raise ReadTimeout("Connection dropped before response")
 
     with patch("requests.Session.post", side_effect=fake_receiver_post):
@@ -91,12 +91,12 @@ def test_shuffle_forwarder_idempotent_retry_on_lost_response():
         assert result.success is True
         assert result.attempts == 2
         assert result.status_code == 200
-        # Business action was executed exactly once despite the timeout retry!
+        # Aksi bisnis tetap dijalankan tepat sekali meskipun ada retry karena timeout.
         assert business_executions == 1
 
 
 def test_shuffle_forwarder_retries_on_429_rate_limit():
-    """Forwarder retries on HTTP 429 with exponential backoff."""
+    """Forwarder melakukan retry saat HTTP 429 dengan exponential backoff."""
     forwarder = ShuffleWebhookForwarder(
         webhook_url="https://shuffle.campus.local/api/v1/hooks/rbta_hook",
         sleep_fn=lambda _: None,

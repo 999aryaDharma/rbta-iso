@@ -1,9 +1,7 @@
-"""
-INTEGRATION EXAMPLE 1: Stream → RBTA → Evaluation
-═══════════════════════════════════════════════════
+"""Contoh integrasi: stream → RBTA → evaluasi.
 
-Real-time simulation with RBTA bucketing + metrics evaluation
-(No IF here — just batch evaluation at end)
+Simulasi real-time dengan bucketing RBTA dan evaluasi metrik
+(tanpa IF — evaluasi batch di akhir).
 """
 
 import sys
@@ -12,7 +10,7 @@ from pathlib import Path
 
 import pandas as pd
 
-# Add source path
+# Tambahkan path source.
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.streaming import AlertStreamSimulator
@@ -20,7 +18,7 @@ from engine.rbta_core import run_rbta
 
 
 class RBTAStreamProcessor:
-    """Real-time RBTA processing from simulated alerts."""
+    """Pemrosesan RBTA real-time dari alert simulasi."""
     
     def __init__(self, lookback_sec=300):
         self.lookback_sec = lookback_sec
@@ -29,8 +27,8 @@ class RBTAStreamProcessor:
         self.alerts_raw = []
     
     def process_alert(self, alert):
-        """Receive alert from simulator, queue for RBTA."""
-        # Keep raw alert for RBTA processing
+        """Terima alert dari simulator, antrekan untuk RBTA."""
+        # Simpan raw alert untuk diproses RBTA.
         self.alerts_raw.append({
             'timestamp_utc': alert.get('timestamp_utc'),
             'agent_id': alert.get('agent_id'),
@@ -45,7 +43,7 @@ class RBTAStreamProcessor:
         
         self.alert_count += 1
         
-        # Log batch processing every 10k alerts
+        # Catat pemrosesan batch setiap 10k alert.
         if self.alert_count % 10000 == 0:
             print(f"[STREAM] Processed {self.alert_count:,} alerts, "
                   f"queued for RBTA")
@@ -56,21 +54,21 @@ def main():
     print("INTEGRATION 1: Stream → RBTA → Metrics")
     print("=" * 70)
     
-    # Setup simulator
-    # speed_factor=100 means: real 100 seconds = 1 second simulation
-    # Timestamps are preserved and respected during replay
+    # Siapkan simulator.
+    # speed_factor=100 berarti 100 detik nyata = 1 detik simulasi.
+    # Timestamp tetap dipertahankan selama replay.
     sim = AlertStreamSimulator(
         csv_path="data/raw/rbta_ready_all.csv",
-        speed_factor=100,           # 100x acceleration
+        speed_factor=100,           # dipercepat 100x
         log_file="output/05_stream_rbta.log",
-        log_level="INFO",           # Show progress
-        log_frequency=10000,        # Every 10k alerts
+        log_level="INFO",           # tampilkan progres
+        log_frequency=10000,        # setiap 10k alert
     )
     
-    # Setup processor
+    # Siapkan processor.
     processor = RBTAStreamProcessor(lookback_sec=300)
     
-    # PHASE 1: Streaming replay
+    # Tahap 1: replay streaming.
     print("\n[PHASE 1] Streaming alerts through simulator...")
     start = datetime.now()
     stats = sim.replay(on_alert_callback=processor.process_alert)
@@ -79,13 +77,13 @@ def main():
     print(f"\n✓ Streamed {processor.alert_count:,} alerts in {duration:.1f} sec")
     print(f"  Rate: {processor.alert_count/duration:.0f} alerts/sec")
     
-    # PHASE 2: RBTA bucketing (batch mode at end)
+    # Tahap 2: bucketing RBTA (mode batch di akhir).
     print(f"\n[PHASE 2] Converting to DataFrame and running RBTA...")
     
-    # Convert list of dicts to DataFrame
+    # Ubah list dict menjadi DataFrame.
     df_alerts = pd.DataFrame(processor.alerts_raw)
     
-    # Map column names to expected format
+    # Petakan nama kolom ke format yang diharapkan.
     df_alerts = df_alerts.rename(columns={
         'timestamp_utc': 'timestamp',
         'rule_group_primary': 'rule_groups',
@@ -95,8 +93,8 @@ def main():
     start = datetime.now()
     df_meta, df_compound, idx_map, elastic_win, wmark = run_rbta(
         df=df_alerts,
-        delta_t_minutes=5,      # 5-minute base window
-        max_window_minutes=60,  # Max 1 hour
+        delta_t_minutes=5,      # window dasar 5 menit
+        max_window_minutes=60,  # maksimum 1 jam
         buffer_size=50,
     )
     duration = (datetime.now() - start).total_seconds()
@@ -105,14 +103,14 @@ def main():
     if len(df_meta) > 0:
         print(f"  Average alerts/bucket: {len(processor.alerts_raw)/len(df_meta):.1f}")
     
-    # PHASE 3: Summary
+    # Tahap 3: ringkasan.
     print(f"\n[PHASE 3] Results:")
     print(f"  Raw alerts: {len(processor.alerts_raw):,}")
     print(f"  RBTA buckets: {len(df_meta):,}")
     if len(df_meta) > 0:
         print(f"  Compression: {len(processor.alerts_raw)/len(df_meta):.1f}x")
     
-    # Sample output
+    # Contoh output.
     print(f"\n[SAMPLE] First 3 buckets:")
     for i, row in enumerate(df_meta.head(3).itertuples()):
         print(f"  Bucket {i+1}:")

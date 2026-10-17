@@ -1,4 +1,4 @@
-"""Model artifact registry with atomic staging publication."""
+"""Registry artefak model dengan publikasi lewat staging yang atomik."""
 
 import hashlib
 import json
@@ -16,7 +16,7 @@ from src.model.threshold import TukeyThreshold
 
 
 class ModelRegistryError(RuntimeError):
-    """Raised when artifact publication, validation, or loading fails."""
+    """Dilempar bila publikasi, validasi, atau pemuatan artefak gagal."""
     pass
 
 
@@ -31,7 +31,7 @@ REQUIRED_ARTIFACT_FILES = (
 
 
 class ModelRegistry:
-    """Manages versioned model artifacts with atomic staging publication."""
+    """Mengelola artefak model berversi dengan publikasi staging yang atomik."""
 
     def __init__(self, base_dir: Union[str, Path] = "artifacts/models", explicit_version: Optional[str] = None) -> None:
         self.base_dir: Path = Path(base_dir).resolve()
@@ -39,7 +39,7 @@ class ModelRegistry:
         self._explicit_version = explicit_version or os.getenv("RBTA_MODEL_VERSION")
 
     def get_active_version(self) -> Optional[str]:
-        """Discover configured active model version (explicit constructor or RBTA_MODEL_VERSION env var)."""
+        """Cari versi model aktif (dari constructor atau env RBTA_MODEL_VERSION)."""
         candidate_version = self._explicit_version or os.getenv("RBTA_MODEL_VERSION")
         if candidate_version:
             version_dir = self.base_dir / candidate_version
@@ -48,24 +48,24 @@ class ModelRegistry:
         return None
 
     def publish_bundle(self, bundle: ModelArtifactBundle, model_version: str) -> Path:
-        """Publish a model bundle atomically via staging.
+        """Publikasikan bundle model secara atomik lewat staging.
 
         Parameters
         ----------
         bundle : ModelArtifactBundle
-            Bundle to serialize and publish.
+            Bundle yang akan diserialisasi dan dipublikasikan.
         model_version : str
-            Target model version directory name.
+            Nama direktori versi model tujuan.
 
         Returns
         -------
         Path
-            Path to the published model directory.
+            Path direktori model yang sudah dipublikasikan.
 
         Raises
         ------
         ModelRegistryError
-            If validation or publication fails.
+            Bila validasi atau publikasi gagal.
         """
         target_dir = self.base_dir / model_version
         if target_dir.exists():
@@ -76,7 +76,7 @@ class ModelRegistry:
         stage_dir.mkdir(parents=True, exist_ok=True)
 
         try:
-            # 1. Write all 6 files
+            # Tulis keenam file artefak.
             joblib.dump(bundle.model, stage_dir / "isolation_forest.joblib")
             joblib.dump(bundle.scaler, stage_dir / "robust_scaler.joblib")
 
@@ -100,10 +100,10 @@ class ModelRegistry:
             with (stage_dir / "manifest.json").open("w", encoding="utf-8") as f:
                 json.dump(manifest, f, indent=2)
 
-            # 2. Validate roundtrip in staging
+            # Validasi roundtrip di staging.
             self._validate_directory(stage_dir)
 
-            # 3. Publish atomically
+            # Publikasikan secara atomik.
             target_dir.parent.mkdir(parents=True, exist_ok=True)
             shutil.move(str(stage_dir), str(target_dir))
 
@@ -115,22 +115,22 @@ class ModelRegistry:
             raise ModelRegistryError(f"Failed to publish model bundle: {exc}") from exc
 
     def load_bundle(self, model_version_or_path: Union[str, Path]) -> ModelArtifactBundle:
-        """Load and validate a published model artifact bundle.
+        """Muat dan validasi bundle artefak model yang sudah dipublikasikan.
 
         Parameters
         ----------
         model_version_or_path : str | Path
-            Version name or direct path to model directory.
+            Nama versi atau path langsung ke direktori model.
 
         Returns
         -------
         ModelArtifactBundle
-            Loaded artifact bundle ready for inference.
+            Bundle artefak yang siap dipakai untuk inferensi.
 
         Raises
         ------
         ModelRegistryError
-            If directory is missing, incomplete, or schema is invalid.
+            Bila direktori tidak ada, tidak lengkap, atau skemanya tidak valid.
         """
         model_path = Path(model_version_or_path)
         if not model_path.is_absolute():
@@ -172,13 +172,13 @@ class ModelRegistry:
             raise ModelRegistryError(f"Error reading model artifacts from '{model_path}': {exc}") from exc
 
     def _validate_directory(self, dir_path: Path) -> None:
-        """Ensure all required artifact files exist and feature schema is valid."""
+        """Pastikan semua file artefak wajib ada dan skema fitur valid."""
         for filename in REQUIRED_ARTIFACT_FILES:
             file_path = dir_path / filename
             if not file_path.exists():
                 raise ModelRegistryError(f"Missing required artifact file '{filename}' in '{dir_path}'")
 
-        # Validate feature schema matches canonical FEATURE_COLUMNS exactly
+        # Skema fitur harus persis sama dengan FEATURE_COLUMNS kanonis.
         schema_file = dir_path / "feature_schema.json"
         with schema_file.open("r", encoding="utf-8") as f:
             schema_data = json.load(f)

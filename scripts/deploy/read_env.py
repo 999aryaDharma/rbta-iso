@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Deterministic, standard-library-only environment file parser for RBTA deployment harness."""
+"""Parser file environment yang deterministik, hanya memakai standard library."""
 
 import argparse
 from pathlib import Path
@@ -9,7 +9,7 @@ from typing import Dict, Optional
 
 
 def parse_env_file(filepath: Path) -> Dict[str, str]:
-    """Parse a simple KEY=VALUE .env file deterministically without shell evaluation."""
+    """Parse file .env sederhana KEY=VALUE secara deterministik tanpa evaluasi shell."""
     if not filepath.exists():
         raise FileNotFoundError(f"Configuration file not found: {filepath}")
 
@@ -18,25 +18,25 @@ def parse_env_file(filepath: Path) -> Dict[str, str]:
 
     for idx, line in enumerate(lines, start=1):
         stripped = line.strip()
-        # Skip blank lines and full-line comments
+        # Lewati baris kosong dan baris komentar.
         if not stripped or stripped.startswith("#"):
             continue
 
-        # Reject lines that don't match KEY=VALUE
+        # Tolak baris yang bukan KEY=VALUE.
         if "=" not in line:
             raise ValueError(f"Malformed line {idx} in {filepath}: missing '=' delimiter: '{line}'")
 
         key_part, val_part = line.split("=", 1)
         key = key_part.strip()
 
-        # Validate key identifier
+        # Validasi identifier key.
         if not re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", key):
             raise ValueError(f"Invalid key identifier '{key}' on line {idx} in {filepath}")
 
-        # Clean value: strip leading/trailing whitespace
+        # Bersihkan value: buang whitespace di awal/akhir.
         val = val_part.strip()
 
-        # Remove surrounding matching quotes if present
+        # Buang tanda kutip pembungkus yang berpasangan bila ada.
         if len(val) >= 2 and ((val.startswith('"') and val.endswith('"')) or (val.startswith("'") and val.endswith("'"))):
             val = val[1:-1]
 
@@ -74,7 +74,7 @@ def main() -> int:
             print(val)
         return 0
 
-    # If no key specified, output as KEY=VALUE lines
+    # Bila key tidak ditentukan, keluarkan sebagai baris KEY=VALUE.
     for k, v in env_map.items():
         print(f"{k}={v}")
     return 0

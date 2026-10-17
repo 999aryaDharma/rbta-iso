@@ -21,13 +21,30 @@ services:
     tmpfs:
       - /tmp:rw,noexec,nosuid,size=128m,uid=10001,gid=10001
     ports:
-      - "${RBTA_HOST_PORT:-8010}:8000"
+      # RBTA_BIND_ADDR=127.0.0.1 bila dashboard hanya diakses lewat reverse proxy (lihat README).
+      - "${RBTA_BIND_ADDR:-0.0.0.0}:${RBTA_HOST_PORT:-8010}:8000"
     extra_hosts:
       # Indexer TANPA IP-SAN: wajib diakses via nama DNS ini (bukan IP).
       - "wazuh.indexer:${WAZUH_INDEXER_HOST_IP:?WAZUH_INDEXER_HOST_IP is required}"
     environment:
       RBTA_API_KEY: ${RBTA_API_KEY:?RBTA_API_KEY is required}
       RBTA_MODEL_VERSION: ${RBTA_MODEL_VERSION:?RBTA_MODEL_VERSION is required}
+      RBTA_EXPECTED_MODEL_SHA256: ${RBTA_EXPECTED_MODEL_SHA256:-}
+      # Override sekali pakai saat ganti model/derivasi pada state lama (nilai = target persis).
+      RBTA_LIVE_MODEL_OVERRIDE: ${RBTA_LIVE_MODEL_OVERRIDE:-}
+      RBTA_LIVE_DERIVATION_OVERRIDE: ${RBTA_LIVE_DERIVATION_OVERRIDE:-}
+      RBTA_BASE_DELTA_T_MIN: ${RBTA_BASE_DELTA_T_MIN:-}
+      RBTA_EXCLUDED_AGENTS: ${RBTA_EXCLUDED_AGENTS:-}
+      RBTA_AGENT_CRITICALITY_FILE: ${RBTA_AGENT_CRITICALITY_FILE:-}
+      RBTA_EVIDENCE_DIR: /app/data/live/evidence
+      RBTA_EVIDENCE_EXPORT_AT: ${RBTA_EVIDENCE_EXPORT_AT:-00:05}
+      RBTA_DIGEST_AT: ${RBTA_DIGEST_AT:-07:30}
+      RBTA_DIGEST_ENABLED: ${RBTA_DIGEST_ENABLED:-true}
+      RBTA_DASHBOARD_URL: ${RBTA_DASHBOARD_URL:-}
+      RBTA_TELEGRAM_DRY_RUN: ${RBTA_TELEGRAM_DRY_RUN:-false}
+      RBTA_ESCALATION_COOLDOWN_MIN: ${RBTA_ESCALATION_COOLDOWN_MIN:-60}
+      RBTA_RETENTION_DAYS: ${RBTA_RETENTION_DAYS:-90}
+      RBTA_RETENTION_AT: ${RBTA_RETENTION_AT:-03:30}
       RBTA_SOURCE_MODE: "LIVE"
       RBTA_LIVE_WORKER_ENABLED: "true"
       RBTA_LIVE_SOURCE: ${RBTA_LIVE_SOURCE:-indexer}
@@ -65,6 +82,10 @@ services:
       - type: bind
         source: ./certs
         target: /app/certs
+        read_only: true
+      - type: bind
+        source: ./config
+        target: /app/config
         read_only: true
       - type: bind
         source: ./replay

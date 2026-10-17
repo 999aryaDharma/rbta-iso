@@ -1,4 +1,4 @@
-"""Canonical raw alert contract for normalized Wazuh event representation."""
+"""Kontrak raw alert kanonis untuk representasi event Wazuh yang sudah dinormalisasi."""
 
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -9,32 +9,32 @@ from src.contracts.immutability import freeze_value
 
 @dataclass(frozen=True, slots=True)
 class CanonicalRawAlert:
-    """Immutable domain representation of a normalized raw alert from Wazuh SIEM.
+    """Representasi domain immutable dari raw alert Wazuh SIEM yang sudah dinormalisasi.
 
     Attributes
     ----------
     wazuh_alert_id : str
-        Original Wazuh alert identifier (e.g. '1787895525.48425').
+        ID alert Wazuh asli (mis. '1787895525.48425').
     timestamp : datetime
-        Timezone-aware event timestamp (UTC normalized).
+        Timestamp event timezone-aware (dinormalisasi ke UTC).
     agent_id : str
-        Wazuh agent ID (e.g. '001', '000').
+        ID agent Wazuh (mis. '001', '000').
     agent_name : str
-        Wazuh agent host name (e.g. 'soc-1', 'pusatkarir').
+        Nama host agent Wazuh (mis. 'soc-1', 'pusatkarir').
     rule_group_primary : str
-        Authoritatively resolved primary rule group.
+        Rule group primer hasil resolusi.
     rule_level : int
-        Wazuh rule severity level in range [0, 15].
+        Level severity rule Wazuh dalam rentang [0, 15].
     rule_id : str
-        Wazuh rule ID (e.g. '5501').
+        ID rule Wazuh (mis. '5501').
     mitre_tactics : tuple[str, ...]
-        Tuple of unique MITRE ATT&CK tactics associated with this alert.
+        Tuple taktik MITRE ATT&CK unik milik alert ini.
     srcip : str | None
-        Source IP address if present, or None for local/HIDS events.
+        IP sumber bila ada, None untuk event lokal/HIDS.
     agent_criticality : int
-        Domain asset criticality score in range [1, 4].
+        Skor kritikalitas aset domain dalam rentang [1, 4].
     metadata : Mapping[str, Any]
-        Recursively immutable audit and envelope metadata.
+        Metadata audit dan envelope (immutable).
     """
 
     wazuh_alert_id: str

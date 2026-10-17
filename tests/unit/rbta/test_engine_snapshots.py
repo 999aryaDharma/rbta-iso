@@ -41,7 +41,7 @@ def test_snapshot_agents_returns_agent_state():
 
 
 def test_snapshot_agents_keeps_canonical_name_after_bucket_is_finalized():
-    """Agent telemetry must not lose its name when no bucket remains open."""
+    """Telemetri agent tidak boleh kehilangan namanya meski tidak ada bucket yang terbuka."""
     engine = RBTAEngine()
     alert = CanonicalRawAlert(
         wazuh_alert_id="alert-finalized",

@@ -1,4 +1,4 @@
-"""Unit tests for centralized research domain constants."""
+"""Unit test konstanta domain penelitian yang terpusat."""
 import pytest
 from src.config.domain import (
     AGENT_CRITICALITY,
@@ -13,7 +13,7 @@ from src.config.domain import (
 
 
 def test_agent_criticality_mapping():
-    """Test that known agent names map to authoritative 1-4 criticality scores."""
+    """Nama agent yang dikenal dipetakan ke skor kritikalitas 1-4."""
     assert get_agent_criticality("dfir-iris") == 4
     assert get_agent_criticality("pusatkarir") == 3
     assert get_agent_criticality("proxy-manager") == 3
@@ -25,21 +25,21 @@ def test_agent_criticality_mapping():
 
 
 def test_agent_criticality_case_insensitivity_and_whitespace():
-    """Test case insensitivity and whitespace handling in agent criticality lookup."""
+    """Pencarian kritikalitas agent tidak peka huruf besar/kecil dan whitespace."""
     assert get_agent_criticality("  DFIR-IRIS  ") == 4
     assert get_agent_criticality("PusatKarir") == 3
     assert get_agent_criticality("DVWA") == 1
 
 
 def test_agent_criticality_unknown_default():
-    """Test unknown agent defaults to 1 (Low) without crashing."""
+    """Agent tak dikenal default ke 1 (Low) tanpa error."""
     assert get_agent_criticality("unknown-server") == DEFAULT_AGENT_CRITICALITY
     assert get_agent_criticality(None) == DEFAULT_AGENT_CRITICALITY
     assert get_agent_criticality("") == DEFAULT_AGENT_CRITICALITY
 
 
 def test_group_severity_weight_values():
-    """Test that high-priority groups have higher weight than low-priority groups."""
+    """Group prioritas tinggi punya bobot lebih tinggi dari group prioritas rendah."""
     assert GROUP_SEVERITY_WEIGHT["attack"] == 10
     assert GROUP_SEVERITY_WEIGHT["sql_injection"] == 10
     assert GROUP_SEVERITY_WEIGHT["authentication_failed"] == 9
@@ -48,32 +48,32 @@ def test_group_severity_weight_values():
 
 
 def test_resolve_primary_rule_group_single():
-    """Test single rule group resolution."""
+    """Resolusi satu rule group."""
     assert resolve_primary_rule_group(["syslog"]) == "syslog"
     assert resolve_primary_rule_group(["attack"]) == "attack"
 
 
 def test_resolve_primary_rule_group_multiple():
-    """Test multiple rule groups selects the highest weight."""
+    """Beberapa rule group memilih bobot tertinggi."""
     groups = ["pam", "syslog", "authentication_success"]
     # pam (7) > authentication_success (3) == syslog (3)
     assert resolve_primary_rule_group(groups) == "pam"
 
     groups2 = ["web", "accesslog", "sql_injection", "attack"]
-    # sql_injection (10) appears before attack (10), both are 10
+    # sql_injection (10) muncul sebelum attack (10), keduanya bernilai 10.
     assert resolve_primary_rule_group(groups2) in ("sql_injection", "attack")
-    # deterministic: first highest seen
+    # deterministik: yang tertinggi pertama kali ditemukan
     assert resolve_primary_rule_group(groups2) == "sql_injection"
 
 
 def test_resolve_primary_rule_group_empty_or_unknown():
-    """Test empty or unknown rule group list handling."""
+    """Penanganan daftar rule group kosong atau tak dikenal."""
     assert resolve_primary_rule_group([]) == "unknown"
     assert resolve_primary_rule_group(["custom_unlisted_group"]) == "custom_unlisted_group"
 
 
 def test_critical_mitre_tactics_membership():
-    """Test the authoritative 6 critical MITRE tactics."""
+    """Enam taktik MITRE kritis acuan."""
     expected = {
         "Execution",
         "Lateral Movement",
@@ -86,8 +86,8 @@ def test_critical_mitre_tactics_membership():
 
 
 def test_has_critical_mitre_tactic():
-    """Test detection of critical MITRE tactics in a list."""
+    """Deteksi taktik MITRE kritis di dalam list."""
     assert has_critical_mitre_tactic(["Defense Evasion", "Initial Access"]) is True
     assert has_critical_mitre_tactic(["Initial Access", "Reconnaissance"]) is False
     assert has_critical_mitre_tactic([]) is False
-    assert has_critical_mitre_tactic(["credential access"]) is True  # case insensitive
+    assert has_critical_mitre_tactic(["credential access"]) is True  # tidak peka huruf besar/kecil

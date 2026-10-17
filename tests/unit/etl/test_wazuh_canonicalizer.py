@@ -1,4 +1,4 @@
-"""Unit tests for Wazuh alert canonicalizer."""
+"""Unit test canonicalizer alert Wazuh."""
 import json
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
@@ -19,11 +19,11 @@ def load_fixture(filename: str) -> dict:
         return json.load(f)
 
 
-# ── Timestamp Tests (FIX 6) ───────────────────────────────────────────────────
+# Timestamp
 
 def test_parse_wazuh_timestamp_iso_formats():
-    """Test parsing various valid timezone-aware Wazuh timestamps into UTC."""
-    # With offset +0000
+    """Berbagai timestamp Wazuh timezone-aware yang valid di-parse menjadi UTC."""
+    # Dengan offset +0000.
     dt1 = parse_wazuh_timestamp("2026-08-28T05:38:45.712+0000")
     assert dt1.tzinfo is not None
     assert dt1.utcoffset() == timedelta(0)
@@ -31,42 +31,42 @@ def test_parse_wazuh_timestamp_iso_formats():
     assert dt1.hour == 5 and dt1.minute == 38 and dt1.second == 45
     assert dt1.microsecond == 712000
 
-    # With Z
+    # Dengan Z.
     dt2 = parse_wazuh_timestamp("2026-08-28T05:38:45.712Z")
     assert dt2.tzinfo is not None
     assert dt2 == dt1
 
-    # With explicit offset +08:00 (converted to UTC)
+    # Dengan offset eksplisit +08:00 (dikonversi ke UTC).
     dt3 = parse_wazuh_timestamp("2026-08-28T13:38:45.712+08:00")
     assert dt3.tzinfo is not None
     assert dt3 == dt1
 
-    # Timezone-aware datetime object
+    # Objek datetime timezone-aware.
     aware_dt = datetime(2026, 8, 28, 5, 38, 45, 712000, tzinfo=timezone.utc)
     assert parse_wazuh_timestamp(aware_dt) == aware_dt
 
-    # Epoch in seconds / milliseconds
+    # Epoch dalam detik / milidetik.
     dt_epoch = parse_wazuh_timestamp(1787895525.712)
     assert dt_epoch.tzinfo is not None
 
 
 def test_parse_wazuh_timestamp_rejects_naive():
-    """Test that naive timestamps (strings without offset and naive datetime objects) are strictly rejected."""
-    # Naive ISO string without offset or Z
+    """Timestamp naive (string tanpa offset dan objek datetime naive) ditolak tegas."""
+    # String ISO naive tanpa offset atau Z.
     with pytest.raises(CanonicalizationError, match="naive|offset"):
         parse_wazuh_timestamp("2026-08-28T05:38:45.712")
 
     with pytest.raises(CanonicalizationError, match="naive|offset"):
         parse_wazuh_timestamp("2026-08-28 05:38:45")
 
-    # Naive datetime object
+    # Objek datetime naive.
     naive_dt = datetime(2026, 8, 28, 5, 38, 45)
     with pytest.raises(CanonicalizationError, match="naive|timezone-aware"):
         parse_wazuh_timestamp(naive_dt)
 
 
 def test_parse_wazuh_timestamp_invalid():
-    """Test that invalid timestamp formats raise CanonicalizationError."""
+    """Format timestamp tidak valid melempar CanonicalizationError."""
     with pytest.raises(CanonicalizationError, match="[Tt]imestamp|naive"):
         parse_wazuh_timestamp("invalid-date-string")
 
@@ -77,72 +77,72 @@ def test_parse_wazuh_timestamp_invalid():
         parse_wazuh_timestamp("")
 
 
-# ── Rule Level Validation Tests (FIX 4) ───────────────────────────────────────
+# Validasi rule level
 
 def test_canonicalize_rule_level_validation():
-    """Test strict validation of rule.level in range 0..15."""
+    """Validasi ketat rule.level dalam rentang 0..15."""
     base_alert = {
         "id": "1001",
         "timestamp": "2026-08-28T05:00:00Z",
         "rule": {"id": "500", "groups": ["syslog"]},
     }
 
-    # Missing rule.level
+    # rule.level tidak ada.
     with pytest.raises(CanonicalizationError, match="rule.level"):
         canonicalize_wazuh_alert(base_alert)
 
-    # Null rule.level
+    # rule.level null.
     with pytest.raises(CanonicalizationError, match="rule.level"):
         canonicalize_wazuh_alert({**base_alert, "rule": {"id": "500", "level": None, "groups": ["syslog"]}})
 
-    # Non-numeric rule.level
+    # rule.level bukan angka.
     with pytest.raises(CanonicalizationError, match="rule.level"):
         canonicalize_wazuh_alert({**base_alert, "rule": {"id": "500", "level": "high", "groups": ["syslog"]}})
 
-    # Negative rule.level
+    # rule.level negatif.
     with pytest.raises(CanonicalizationError, match="Rule level"):
         canonicalize_wazuh_alert({**base_alert, "rule": {"id": "500", "level": -1, "groups": ["syslog"]}})
 
-    # Out-of-range rule.level
+    # rule.level di luar rentang.
     with pytest.raises(CanonicalizationError, match="Rule level"):
         canonicalize_wazuh_alert({**base_alert, "rule": {"id": "500", "level": 16, "groups": ["syslog"]}})
 
-    # Valid boundary 0
+    # Batas valid 0.
     a0 = canonicalize_wazuh_alert({**base_alert, "rule": {"id": "500", "level": 0, "groups": ["syslog"]}})
     assert a0.rule_level == 0
 
-    # Valid boundary 15
+    # Batas valid 15.
     a15 = canonicalize_wazuh_alert({**base_alert, "rule": {"id": "500", "level": 15, "groups": ["syslog"]}})
     assert a15.rule_level == 15
 
 
-# ── Agent Normalization Tests (FIX 5) ─────────────────────────────────────────
+# Normalisasi agent
 
 def test_canonicalize_agent_null_and_fallback_normalization():
-    """Test that null, missing, or whitespace agent fields normalize cleanly to '000' and 'unknown' without creating 'None' strings."""
+    """Field agent yang null, tidak ada, atau hanya whitespace dinormalisasi menjadi '000' dan 'unknown' tanpa menghasilkan string 'None'."""
     base_alert = {
         "id": "1001",
         "timestamp": "2026-08-28T05:00:00Z",
         "rule": {"id": "500", "level": 3, "groups": ["syslog"]},
     }
 
-    # 1. Missing agent block
+    # Blok agent tidak ada.
     a1 = canonicalize_wazuh_alert(base_alert)
     assert a1.agent_id == "000"
     assert a1.agent_name == "unknown"
 
-    # 2. Null agent fields
+    # Field agent null.
     a2 = canonicalize_wazuh_alert({**base_alert, "agent": {"id": None, "name": None}})
     assert a2.agent_id == "000"
     assert a2.agent_name == "unknown"
     assert "None" not in (a2.agent_id, a2.agent_name)
 
-    # 3. Empty/whitespace agent fields
+    # Field agent kosong/whitespace.
     a3 = canonicalize_wazuh_alert({**base_alert, "agent": {"id": "   ", "name": "   "}})
     assert a3.agent_id == "000"
     assert a3.agent_name == "unknown"
 
-    # 4. Fallback to manager name when agent name is absent
+    # Fallback ke nama manager bila nama agent tidak ada.
     a4 = canonicalize_wazuh_alert({
         **base_alert,
         "agent": {"id": "000", "name": None},
@@ -151,16 +151,16 @@ def test_canonicalize_agent_null_and_fallback_normalization():
     assert a4.agent_id == "000"
     assert a4.agent_name == "wazuh-soc-master"
 
-    # 5. Normal valid agent preserved
+    # Agent normal yang valid dipertahankan.
     a5 = canonicalize_wazuh_alert({**base_alert, "agent": {"id": "001", "name": "soc-1"}})
     assert a5.agent_id == "001"
     assert a5.agent_name == "soc-1"
 
 
-# ── MITRE Deduplication & Case-Insensitive Normalization Tests (FIX 3) ────────
+# Dedup MITRE & normalisasi tanpa membedakan huruf besar/kecil
 
 def test_canonicalize_mitre_case_insensitive_deduplication():
-    """Test that MITRE tactics are deduplicated case-insensitively, preserving first valid casing (FIX 3)."""
+    """Taktik MITRE di-dedup tanpa membedakan huruf besar/kecil, penulisan valid pertama dipertahankan."""
     alert_data = {
         "id": "1001",
         "timestamp": "2026-08-28T05:00:00Z",
@@ -178,50 +178,50 @@ def test_canonicalize_mitre_case_insensitive_deduplication():
     assert alert.mitre_tactics == ("Execution", "defense evasion")
 
 
-# ── Rule Groups Normalization Tests (FIX 4) ───────────────────────────────────
+# Normalisasi rule group
 
 def test_canonicalize_rule_groups_malformed_normalization():
-    """Test that malformed rule groups (None, empty, null, none) are filtered out safely (FIX 4)."""
+    """Rule group yang rusak (None, kosong, null, none) disaring dengan aman."""
     base_alert = {
         "id": "1001",
         "timestamp": "2026-08-28T05:00:00Z",
         "rule": {"id": "500", "level": 3},
     }
 
-    # 1. Missing groups
+    # Group tidak ada.
     a1 = canonicalize_wazuh_alert({**base_alert, "rule": {"id": "500", "level": 3}})
     assert a1.rule_group_primary == "unknown"
     assert a1.metadata["rule_groups_all"] == ()
 
-    # 2. Empty list of groups
+    # List group kosong.
     a2 = canonicalize_wazuh_alert({**base_alert, "rule": {"id": "500", "level": 3, "groups": []}})
     assert a2.rule_group_primary == "unknown"
     assert a2.metadata["rule_groups_all"] == ()
 
-    # 3. List of None and empty strings
+    # List berisi None dan string kosong.
     a3 = canonicalize_wazuh_alert({**base_alert, "rule": {"id": "500", "level": 3, "groups": [None, "", "   "]}})
     assert a3.rule_group_primary == "unknown"
     assert a3.metadata["rule_groups_all"] == ()
 
-    # 4. List containing 'none', 'null' string literals
+    # List berisi literal string 'none', 'null'.
     a4 = canonicalize_wazuh_alert({**base_alert, "rule": {"id": "500", "level": 3, "groups": ["none", "null"]}})
     assert a4.rule_group_primary == "unknown"
     assert a4.metadata["rule_groups_all"] == ()
 
-    # 5. Mixed valid groups with whitespace and casing variants
+    # Campuran group valid dengan variasi whitespace dan huruf.
     a5 = canonicalize_wazuh_alert({
         **base_alert,
         "rule": {"id": "500", "level": 3, "groups": [None, " Web ", "web", "syslog"]},
     })
-    # 'web' has higher weight than 'syslog' (7 vs 3)
+    # 'web' bobotnya lebih tinggi dari 'syslog' (7 vs 3).
     assert a5.rule_group_primary == "web"
     assert a5.metadata["rule_groups_all"] == ("web", "syslog")
 
 
-# ── OpenSearch Envelope and Traceability Tests ────────────────────────────────
+# Envelope OpenSearch dan penelusuran
 
 def test_canonicalize_opensearch_hit_envelope_alert_id_traceability():
-    """Test that wazuh_alert_id strictly comes from _source.id and NOT from OpenSearch _id."""
+    """wazuh_alert_id wajib berasal dari _source.id, BUKAN dari _id OpenSearch."""
     hit = {
         "_index": "wazuh-alerts-4.x-2026.08.28",
         "_id": "opensearch-doc-id-xyz",
@@ -242,12 +242,12 @@ def test_canonicalize_opensearch_hit_envelope_alert_id_traceability():
 
 
 def test_canonicalize_missing_source_id_fails_fast():
-    """Test that OpenSearch hit with missing _source.id fails fast even if _id is present."""
+    """Hit OpenSearch tanpa _source.id langsung gagal meski _id ada."""
     hit = {
         "_index": "wazuh-alerts-4.x-2026.08.28",
         "_id": "opensearch-doc-id-xyz",
         "_source": {
-            # missing "id"
+            # tidak ada "id"
             "timestamp": "2026-08-28T05:00:00Z",
             "rule": {"id": "500", "level": 4, "groups": ["syslog"]},
         },
@@ -256,10 +256,10 @@ def test_canonicalize_missing_source_id_fails_fast():
         canonicalize_wazuh_alert(hit)
 
 
-# ── Fixtures & Parity Tests ───────────────────────────────────────────────────
+# Fixture & kesetaraan
 
 def test_canonicalize_standard_raw_alert():
-    """Test canonicalization of standard raw Wazuh alert fixture."""
+    """Kanonisasi fixture alert Wazuh mentah standar."""
     data = load_fixture("raw_alert_standard.json")
     alert = canonicalize_wazuh_alert(data)
 
@@ -277,7 +277,7 @@ def test_canonicalize_standard_raw_alert():
 
 
 def test_canonicalize_alert_no_mitre():
-    """Test canonicalization of alert without MITRE section."""
+    """Kanonisasi alert tanpa bagian MITRE."""
     data = load_fixture("raw_alert_no_mitre.json")
     alert = canonicalize_wazuh_alert(data)
 
@@ -290,7 +290,7 @@ def test_canonicalize_alert_no_mitre():
 
 
 def test_canonicalize_alert_flattened_mitre():
-    """Test canonicalization of alert with flattened MITRE tactics."""
+    """Kanonisasi alert dengan taktik MITRE versi datar."""
     data = load_fixture("raw_alert_flattened_mitre.json")
     alert = canonicalize_wazuh_alert(data)
 
@@ -304,7 +304,7 @@ def test_canonicalize_alert_flattened_mitre():
 
 
 def test_canonicalize_parity_raw_vs_opensearch_hit():
-    """Test that raw source and OpenSearch hit containing identical _source produce identical core domain fields."""
+    """Source mentah dan hit OpenSearch dengan _source identik menghasilkan field domain inti yang identik."""
     hit = load_fixture("opensearch_hit.json")
     raw = hit["_source"]
 
@@ -324,15 +324,15 @@ def test_canonicalize_parity_raw_vs_opensearch_hit():
 
 
 def test_canonicalize_missing_mandatory_fields_fails():
-    """Test that missing mandatory fields raise CanonicalizationError."""
-    # Missing ID
+    """Field wajib yang tidak ada melempar CanonicalizationError."""
+    # ID tidak ada.
     with pytest.raises(CanonicalizationError, match="id"):
         canonicalize_wazuh_alert({
             "timestamp": "2026-08-28T05:00:00Z",
             "rule": {"id": "100", "level": 3, "groups": ["syslog"]},
         })
 
-    # Missing Rule ID
+    # Rule ID tidak ada.
     with pytest.raises(CanonicalizationError, match="rule.id"):
         canonicalize_wazuh_alert({
             "id": "123.456",
@@ -340,14 +340,14 @@ def test_canonicalize_missing_mandatory_fields_fails():
             "rule": {"level": 3, "groups": ["syslog"]},
         })
 
-    # Missing Timestamp
+    # Timestamp tidak ada.
     with pytest.raises(CanonicalizationError, match="[Tt]imestamp"):
         canonicalize_wazuh_alert({
             "id": "123.456",
             "rule": {"id": "100", "level": 3, "groups": ["syslog"]},
         })
 
-    # Missing Rule block
+    # Blok rule tidak ada.
     with pytest.raises(CanonicalizationError, match="rule"):
         canonicalize_wazuh_alert({
             "id": "123.456",
@@ -356,7 +356,7 @@ def test_canonicalize_missing_mandatory_fields_fails():
 
 
 def test_canonicalize_deterministic_output():
-    """Test that repeated canonicalization on same object returns equal CanonicalRawAlert."""
+    """Kanonisasi berulang pada objek yang sama menghasilkan CanonicalRawAlert yang sama."""
     data = load_fixture("raw_alert_standard.json")
     a1 = canonicalize_wazuh_alert(data)
     a2 = canonicalize_wazuh_alert(data)

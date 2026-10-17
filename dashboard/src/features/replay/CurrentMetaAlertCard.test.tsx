@@ -34,7 +34,7 @@ describe('CurrentMetaAlertCard component', () => {
     expect(screen.getByText('syscheck')).toBeDefined();
     expect(screen.getByText(/17/)).toBeDefined();
     expect(screen.getByText(/93.4%/)).toBeDefined();
-    expect(screen.getByText(/Perlu perhatian: 238/)).toBeDefined();
+    expect(screen.getByText(/Perlu dicek segera: 238/)).toBeDefined();
   });
 
   it('renders waiting placeholder when no meta is finalized yet', () => {

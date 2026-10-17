@@ -17,11 +17,11 @@ export function ProcessingTrace({ trace }: ProcessingTraceProps) {
             <TerminalWindow size={14} />
           </div>
           <span className="text-xs font-semibold uppercase tracking-wider text-kumo-strong">
-            Live Runtime Processing Trace
+            Jejak pemrosesan
           </span>
         </div>
         <Badge variant="secondary">
-          Showing latest {items.length} pipeline events (ring buffer)
+          Menampilkan {items.length} kejadian terakhir
         </Badge>
       </div>
 
@@ -41,7 +41,7 @@ export function ProcessingTrace({ trace }: ProcessingTraceProps) {
           ))
         ) : (
           <div className="min-h-32 flex items-center justify-center text-xs text-kumo-subtle italic">
-            Trace buffer idle. Start or resume replay to observe live stream operations.
+            Belum ada proses. Jalankan replay untuk melihat jejak.
           </div>
         )}
       </div>

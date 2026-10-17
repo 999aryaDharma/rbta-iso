@@ -1,4 +1,4 @@
-"""Structural Silhouette score and permutation null baseline evaluation module."""
+"""Evaluasi skor Silhouette struktural dan baseline null permutasi."""
 
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Sequence
@@ -13,7 +13,7 @@ from src.model.scoring_pipeline import ModelArtifactBundle
 
 @dataclass(frozen=True)
 class StructuralSilhouetteResult:
-    """Outcome of structural Silhouette evaluation and permutation baseline comparison."""
+    """Hasil evaluasi Silhouette struktural dan perbandingannya dengan baseline permutasi."""
 
     is_calculable: bool
     uncalculable_reason: Optional[str] = None
@@ -37,23 +37,23 @@ def run_structural_silhouette_evaluation(
     n_permutations: int = 100,
     random_seed: int = 42,
 ) -> StructuralSilhouetteResult:
-    """Evaluate structural cluster validity of decision partitions against permutation null baseline.
+    """Evaluasi validitas struktur partisi keputusan terhadap baseline null permutasi.
 
     Parameters
     ----------
     scored_metas : Sequence[ScoredMetaAlert]
-        Evaluated scored meta-alerts.
+        Meta-alert terskor yang dievaluasi.
     model_bundle : ModelArtifactBundle
-        Immutable model bundle containing reference RobustScaler.
+        Bundle model immutable yang berisi RobustScaler reference.
     n_permutations : int
-        Number of random label permutations (default 100).
+        Jumlah permutasi label acak (default 100).
     random_seed : int
-        Deterministic random seed.
+        Seed acak deterministik.
 
     Returns
     -------
     StructuralSilhouetteResult
-        Calculated Silhouette, null distribution statistics, z-score, and empirical p-value.
+        Silhouette terhitung, statistik distribusi null, z-score, dan p-value empiris.
     """
     if len(scored_metas) < 2:
         return StructuralSilhouetteResult(
@@ -62,7 +62,7 @@ def run_structural_silhouette_evaluation(
             random_seed=random_seed,
         )
 
-    # 1. Build Scaled Feature Matrix X_scaled
+    # Matriks fitur ter-skala X_scaled.
     records: List[Dict[str, float]] = []
     for s in scored_metas:
         feat_dict = {col: float(s.seven_features.get(col, 0.0)) for col in FEATURE_COLUMNS}
@@ -71,7 +71,7 @@ def run_structural_silhouette_evaluation(
     df_feats = pd.DataFrame(records)[list(FEATURE_COLUMNS)]
     x_scaled = model_bundle.scaler.transform(df_feats)
 
-    # 2. Binary Evaluation Partition: ESCALATE (1) vs non-ESCALATE (0)
+    # Partisi biner untuk evaluasi: ESCALATE (1) vs non-ESCALATE (0).
     observed_partition = np.array([1 if s.action == "ESCALATE" else 0 for s in scored_metas], dtype=int)
     unique_classes = np.unique(observed_partition)
 
@@ -82,10 +82,10 @@ def run_structural_silhouette_evaluation(
             random_seed=random_seed,
         )
 
-    # 3. Compute Observed Silhouette Score
+    # Skor Silhouette observasi.
     obs_sil = float(silhouette_score(x_scaled, observed_partition))
 
-    # 4. Run Permutation Baseline
+    # Baseline permutasi.
     rng = np.random.default_rng(random_seed)
     null_scores: List[float] = []
 
@@ -109,13 +109,13 @@ def run_structural_silhouette_evaluation(
     r_min = float(np.min(null_arr))
     r_max = float(np.max(null_arr))
 
-    # Percentile of observed score in null distribution
+    # Persentil skor observasi di dalam distribusi null.
     percentile = float(np.mean(null_arr <= obs_sil) * 100.0)
 
-    # Standardized Z-Score
+    # Z-score terstandar.
     z_score = float((obs_sil - r_mean) / r_std) if r_std > 0 else 0.0
 
-    # Empirical p-value with finite-sample correction
+    # p-value empiris dengan koreksi sampel hingga:
     # p = (count(null >= obs) + 1) / (N + 1)
     k_greater_equal = int(np.sum(null_arr >= obs_sil))
     empirical_p = float((k_greater_equal + 1) / (len(null_scores) + 1))

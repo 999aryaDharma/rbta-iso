@@ -1,7 +1,7 @@
-"""Operator quarantine_release endpoint + Telegram HOLDING startup warning.
+"""Endpoint quarantine_release untuk operator + peringatan startup Telegram HOLDING.
 
-Minor N (operator quarantine_release) + P2 (startup warning when the
-Telegram dispatcher is HOLDING without credentials).
+Mencakup pelepasan quarantine oleh operator dan peringatan startup saat dispatcher
+Telegram berada di mode HOLDING karena kredensial tidak ada.
 """
 import logging
 from types import SimpleNamespace
@@ -81,7 +81,7 @@ def _bootstrap_env(tmp_path, extra):
 
 
 def test_startup_warns_when_dispatcher_holding_without_creds(tmp_path, caplog, monkeypatch):
-    """Worker on + no Telegram creds + no dry-run -> single HOLDING warning."""
+    """Worker aktif + tanpa kredensial Telegram + tanpa dry-run -> satu peringatan HOLDING."""
     from src.api.server import create_production_app
 
     monkeypatch.delenv("RBTA_TELEGRAM_BOT_TOKEN", raising=False)
@@ -97,7 +97,7 @@ def test_startup_warns_when_dispatcher_holding_without_creds(tmp_path, caplog, m
 
 
 def test_startup_no_holding_warning_in_explicit_dry_run(tmp_path, caplog):
-    """RBTA_TELEGRAM_DRY_RUN=true is an explicit operator choice -> no warning."""
+    """RBTA_TELEGRAM_DRY_RUN=true adalah pilihan operator yang eksplisit -> tanpa peringatan."""
     from src.api.server import create_production_app
 
     with caplog.at_level(logging.WARNING, logger="rbta.server"):

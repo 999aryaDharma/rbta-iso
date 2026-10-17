@@ -1,4 +1,4 @@
-"""Governance tests ensuring clean architectural boundaries for the RBTA core (Sprint 2)."""
+"""Test batas arsitektur inti RBTA."""
 from pathlib import Path
 import re
 from src.rbta.engine import RBTAEngine
@@ -7,7 +7,7 @@ RBTA_SRC_DIR = Path(__file__).resolve().parent.parent.parent.parent / "src" / "r
 
 
 def test_rbta_src_contains_no_forbidden_legacy_symbols():
-    """Verify that src/rbta/ does not import or declare forbidden legacy constructs."""
+    """src/rbta/ tidak boleh meng-import atau mendeklarasikan konstruksi lama yang dilarang."""
     forbidden_tokens = [
         "HIGH_FREQ",
         "LOW_FREQ",
@@ -35,7 +35,7 @@ def test_rbta_src_contains_no_forbidden_legacy_symbols():
 
 
 def test_engine_instances_do_not_share_mutable_state():
-    """Verify that separate RBTAEngine instances maintain completely isolated internal state."""
+    """Instance RBTAEngine yang terpisah harus punya state internal yang benar-benar terisolasi."""
     engine1 = RBTAEngine()
     engine2 = RBTAEngine()
 

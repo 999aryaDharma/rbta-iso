@@ -1,4 +1,4 @@
-"""Single-bucket deterministic RBTA Engine with agent-local ETW."""
+"""Engine RBTA single-bucket deterministik dengan ETW lokal per agent."""
 
 from collections import Counter
 from datetime import datetime, timedelta
@@ -15,12 +15,12 @@ from src.rbta.temporal_state import AgentTemporalState
 
 
 class RBTAInvariantError(ValueError):
-    """Raised when an internal RBTA aggregation invariant is violated."""
+    """Dilempar bila invarian internal agregasi RBTA dilanggar."""
     pass
 
 
 class _ActiveBucket:
-    """Internal mutable accumulator for an active aggregation window."""
+    """Akumulator mutable internal untuk window agregasi yang sedang aktif."""
 
     def __init__(self, alert: CanonicalRawAlert, meta_id: int) -> None:
         self.meta_id: int = meta_id
@@ -36,7 +36,7 @@ class _ActiveBucket:
         self.agent_criticality: int = alert.agent_criticality
         self.wazuh_alert_ids: List[str] = [alert.wazuh_alert_id]
 
-        # Case-insensitive MITRE deduplication preserving first encountered form
+        # Dedup MITRE tanpa membedakan huruf besar/kecil, pertahankan bentuk yang pertama ditemukan.
         self.mitre_tactics_order: List[str] = []
         self._mitre_seen: Set[str] = set()
         for t in alert.mitre_tactics:
@@ -48,7 +48,7 @@ class _ActiveBucket:
         self.critical_mitre_present: bool = has_critical_mitre_tactic(self.mitre_tactics_order)
 
     def copy(self) -> "_ActiveBucket":
-        """Create a defensive copy of this active bucket accumulator for transactional operations."""
+        """Salinan defensif akumulator bucket aktif ini untuk operasi transaksional."""
         copied = _ActiveBucket.__new__(_ActiveBucket)
         copied.meta_id = self.meta_id
         copied.agent_id = self.agent_id
@@ -68,7 +68,7 @@ class _ActiveBucket:
         return copied
 
     def add(self, alert: CanonicalRawAlert) -> None:
-        """Accumulate a merged alert into this active bucket."""
+        """Tambahkan alert yang di-merge ke bucket aktif ini."""
         self.alert_count += 1
         if alert.rule_level > self.max_severity:
             self.max_severity = alert.rule_level
@@ -88,7 +88,7 @@ class _ActiveBucket:
         self.wazuh_alert_ids.append(alert.wazuh_alert_id)
 
     def finalize(self) -> MetaAlert:
-        """Convert this mutable active bucket into an immutable MetaAlert DTO."""
+        """Ubah bucket aktif yang mutable ini menjadi DTO MetaAlert yang immutable."""
         duration = self.end_time - self.start_time
         if duration < timedelta(0):
             raise RBTAInvariantError(
@@ -118,18 +118,18 @@ class _ActiveBucket:
 
 
 class RBTAEngine:
-    """Deterministic Rule-Based Temporal Aggregation (RBTA) Engine.
+    """Engine Rule-Based Temporal Aggregation (RBTA) yang deterministik.
 
-    Aggregates incoming CanonicalRawAlert events into immutable MetaAlert buckets
-    based on the exact single-bucket key (agent_id, rule_group_primary) and
-    agent-local adaptive Elastic Time Windows.
+    Mengagregasi CanonicalRawAlert yang masuk menjadi bucket MetaAlert immutable
+    berdasarkan kunci single-bucket (agent_id, rule_group_primary) dan Elastic Time
+    Window adaptif yang lokal per agent.
 
     Parameters
     ----------
     base_delta_t : timedelta
-        Experiment baseline temporal window.
+        Window temporal baseline eksperimen.
     adaptive : bool
-        Whether to enable agent-local EMA adaptation after warmup (True) or keep fixed window (False).
+        Aktifkan adaptasi EMA lokal per agent setelah warmup (True) atau pertahankan window tetap (False).
     """
 
     def __init__(
@@ -150,11 +150,11 @@ class RBTAEngine:
 
     @property
     def seen_alert_count(self) -> int:
-        """Return count of uniquely committed raw alerts seen by engine."""
+        """Jumlah raw alert unik yang sudah di-commit oleh engine."""
         return len(self._seen_alert_ids)
 
     def has_seen_alert(self, wazuh_alert_id: str) -> bool:
-        """Return True if raw alert has already been successfully committed."""
+        """True bila raw alert sudah pernah berhasil di-commit."""
         return wazuh_alert_id in self._seen_alert_ids
 
     def _get_agent_state(self, agent_id: str) -> AgentTemporalState:
@@ -167,26 +167,26 @@ class RBTAEngine:
         return self._temporal_states[agent_id]
 
     def process(self, alert: CanonicalRawAlert) -> List[MetaAlert]:
-        """Process an incoming canonical raw alert through transactional RBTA aggregation.
+        """Proses raw alert kanonis yang masuk lewat agregasi RBTA yang transaksional.
 
-        Guarantees failure-atomicity: If processing fails, zero internal state is mutated,
-        the alert ID is not marked seen, and it can be safely retried.
+        Atomik saat gagal: bila pemrosesan gagal, tidak ada state internal yang berubah,
+        ID alert tidak ditandai seen, dan alert aman untuk dicoba ulang.
 
         Parameters
         ----------
         alert : CanonicalRawAlert
-            Normalized, immutable raw alert.
+            Raw alert immutable yang sudah dinormalisasi.
 
         Returns
         -------
         List[MetaAlert]
-            List of 0 or more finalized MetaAlerts (e.g. from bucket splits or singleton residual events).
+            Nol atau lebih MetaAlert final (mis. dari split bucket atau event residual singleton).
         """
-        # ── 1. Idempotency Check (Seen ID = Successfully Committed Alert) ────
+        # Idempotensi: ID yang sudah seen berarti alert sudah berhasil di-commit.
         if alert.wazuh_alert_id in self._seen_alert_ids:
             return []
 
-        # ── 2. Pre-Validation Check on Active Bucket ─────────────────────────
+        # Validasi awal terhadap bucket aktif.
         bucket_key = (alert.agent_id, alert.rule_group_primary)
         active_bucket = self._active_buckets.get(bucket_key)
 
@@ -196,11 +196,11 @@ class RBTAEngine:
                 f"{active_bucket.agent_criticality}) for agent '{alert.agent_id}'"
             )
 
-        # ── 3. Transactional Candidate State Evaluation ───────────────────────
+        # Evaluasi state kandidat secara transaksional.
         current_agent_state = self._get_agent_state(alert.agent_id)
         candidate_state = current_agent_state.snapshot()
-        # Keep presentation metadata with the per-agent temporal state so a
-        # finalized/drained bucket cannot erase the dashboard host name.
+        # Simpan metadata tampilan bersama state temporal per agent supaya bucket yang
+        # sudah final/di-drain tidak menghapus nama host di dashboard.
         if alert.agent_name and (candidate_state.agent_name == "unknown" or alert.agent_name != "unknown"):
             candidate_state.agent_name = alert.agent_name
         current_delta_t = candidate_state.observe(alert.timestamp)
@@ -226,7 +226,7 @@ class RBTAEngine:
             )
 
             try:
-                # ── Case A: Normal Forward / Equal Arrival ────────────────────────
+                # Kasus A: alert datang maju atau di waktu yang sama.
                 if alert.timestamp >= active_bucket.end_time:
                     gap = alert.timestamp - active_bucket.end_time
                     prospective_duration = alert.timestamp - active_bucket.start_time
@@ -235,18 +235,18 @@ class RBTAEngine:
                         active_bucket.end_time = alert.timestamp
                         active_bucket.add(alert)
                     else:
-                        # Split: finalize existing bucket, start new active bucket
+                        # Split: finalkan bucket lama, mulai bucket aktif baru.
                         finalized_meta = active_bucket.finalize()
                         new_bucket = _ActiveBucket(alert, meta_id=self._meta_id_counter)
                         candidate_meta_id_increment = 1
                         candidate_bucket_update = (bucket_key, new_bucket)
                         finalized_list.append(finalized_meta)
 
-                # ── Case B: In-Window Arrival (start <= timestamp < end) ───────────
+                # Kasus B: alert datang di dalam window (start <= timestamp < end).
                 elif alert.timestamp >= active_bucket.start_time:
                     active_bucket.add(alert)
 
-                # ── Case C: Earlier Residual Arrival (timestamp < start) ──────────
+                # Kasus C: alert residual yang lebih awal (timestamp < start).
                 else:
                     boundary_gap = active_bucket.start_time - alert.timestamp
                     prospective_duration = active_bucket.end_time - alert.timestamp
@@ -255,12 +255,12 @@ class RBTAEngine:
                         active_bucket.start_time = alert.timestamp
                         active_bucket.add(alert)
                     else:
-                        # Extremely late non-mergeable event -> create immediate singleton
+                        # Event yang sangat terlambat dan tidak bisa di-merge -> langsung jadi singleton.
                         singleton = _ActiveBucket(alert, meta_id=self._meta_id_counter)
                         finalized_singleton = singleton.finalize()
                         candidate_meta_id_increment = 1
                         finalized_list.append(finalized_singleton)
-                        # Existing active bucket is untouched
+                        # Bucket aktif yang ada tidak disentuh.
             except Exception:
                 if active_bucket.alert_count > rollback_scalars[2]:
                     active_bucket.rule_id_distribution[alert.rule_id] -= 1
@@ -287,7 +287,7 @@ class RBTAEngine:
                 active_bucket._mitre_seen = set(mitre_seen_list)
                 raise
 
-        # ── 4. Atomic Commit Phase ────────────────────────────────────────────
+        # Commit atomik.
         self._temporal_states[alert.agent_id] = candidate_state
         if candidate_bucket_update is not None:
             k, b = candidate_bucket_update
@@ -299,17 +299,17 @@ class RBTAEngine:
         return finalized_list
 
     def flush_idle(self, event_time: datetime) -> List[MetaAlert]:
-        """Finalize and return active buckets whose idle duration strictly exceeds current_delta_t.
+        """Finalkan dan kembalikan bucket aktif yang lama idle-nya benar-benar melebihi current_delta_t.
 
         Parameters
         ----------
         event_time : datetime
-            Reference event timestamp to check idle timeout against.
+            Timestamp event acuan untuk mengecek timeout idle.
 
         Returns
         -------
         List[MetaAlert]
-            Finalized meta-alerts sorted deterministically by meta_id.
+            Meta-alert final, diurutkan deterministik berdasarkan meta_id.
         """
         if event_time.tzinfo is None:
             raise RBTAInvariantError("event_time must be timezone-aware")
@@ -321,7 +321,7 @@ class RBTAEngine:
             if event_time >= bucket.end_time:
                 idle_gap = event_time - bucket.end_time
                 agent_state = self._get_agent_state(bucket.agent_id)
-                # Strict inequality: at gap == delta_t, bucket is still merge-eligible
+                # Pertidaksamaan ketat: saat gap == delta_t, bucket masih boleh di-merge.
                 if idle_gap > agent_state.current_delta_t:
                     keys_to_remove.append(key)
                     finalized_list.append(bucket.finalize())
@@ -333,14 +333,14 @@ class RBTAEngine:
         return finalized_list
 
     def drain(self) -> List[MetaAlert]:
-        """Finalize and return all remaining active buckets.
+        """Finalkan dan kembalikan semua bucket aktif yang tersisa.
 
-        Subsequent calls on an empty engine return an empty list (idempotent).
+        Pemanggilan berikutnya pada engine kosong mengembalikan list kosong (idempoten).
 
         Returns
         -------
         List[MetaAlert]
-            All finalized meta-alerts sorted deterministically by meta_id.
+            Semua meta-alert final, diurutkan deterministik berdasarkan meta_id.
         """
         finalized_list: List[MetaAlert] = []
         for bucket in self._active_buckets.values():
@@ -351,7 +351,7 @@ class RBTAEngine:
         return finalized_list
 
     def snapshot_agents(self) -> list[dict]:
-        """Read-only snapshot of agent temporal states for dashboard."""
+        """Snapshot read-only state temporal agent untuk dashboard."""
         result = []
         for agent_id, state in self._temporal_states.items():
             agent_buckets = [
@@ -377,10 +377,10 @@ class RBTAEngine:
     def active_bucket_members(
         self, agent_id: str, rule_group_primary: str
     ) -> Optional[Tuple[int, List[str]]]:
-        """Read-only accessor for dashboard drill-down into one open bucket.
+        """Akses read-only untuk drill-down dashboard ke satu bucket yang masih terbuka.
 
-        Returns the reserved ``meta_id`` and member ``wazuh_alert_id`` list
-        in arrival order, or None when no bucket is open for the key.
+        Mengembalikan ``meta_id`` yang sudah dicadangkan dan daftar ``wazuh_alert_id``
+        anggota sesuai urutan datang, atau None bila tidak ada bucket terbuka untuk kunci itu.
         """
         bucket = self._active_buckets.get((agent_id, rule_group_primary))
         if bucket is None:
@@ -388,13 +388,12 @@ class RBTAEngine:
         return bucket.meta_id, list(bucket.wazuh_alert_ids)
 
     def snapshot_buckets(self) -> list[dict]:
-        """Read-only snapshot of active buckets for dashboard.
+        """Snapshot read-only bucket aktif untuk dashboard.
 
-        Active buckets are still aggregating: their ``meta_id`` is a
-        reservation for the future MetaAlert, NOT a finalized record.
-        ``finalized`` is therefore always False here; the dashboard must
-        not link these rows to the MetaAlert detail endpoint (which only
-        reads finalized_history) until the bucket closes.
+        Bucket aktif masih mengagregasi: ``meta_id``-nya adalah reservasi untuk MetaAlert
+        yang akan datang, BUKAN record final. Karena itu ``finalized`` di sini selalu False;
+        dashboard tidak boleh menautkan baris ini ke endpoint detail MetaAlert (yang hanya
+        membaca finalized_history) sampai bucket ditutup.
         """
         result = []
         for (agent_id, rule_group), bucket in self._active_buckets.items():

@@ -1,20 +1,18 @@
-"""Best-effort live alert archiver: raw JSONL replay dataset writer (Design A).
+"""Pengarsip alert live (best effort): menulis dataset replay JSONL mentah.
 
-Every successfully ingested live alert is recorded as one compact JSON object
-per line in ``data/archive/live-YYYYMMDD.jsonl`` (daily rotation by event-time
-UTC date), so the live stream can later be replayed as a deterministic replay
-dataset: each line is accepted by
-:func:`src.etl.wazuh_canonicalizer.canonicalize_wazuh_alert`.
+Setiap alert live yang berhasil di-ingest dicatat sebagai satu objek JSON ringkas per
+baris di ``data/archive/live-YYYYMMDD.jsonl`` (rotasi harian menurut tanggal UTC
+event-time), sehingga aliran live bisa di-replay nanti sebagai dataset deterministik:
+setiap baris diterima oleh :func:`src.etl.wazuh_canonicalizer.canonicalize_wazuh_alert`.
 
-The live poller discards the original OpenSearch hit after canonicalization,
-so the archive record is reconstructed from :class:`CanonicalRawAlert` plus
-its preserved metadata (rule description/groups, location, full_log, decoder,
-manager, data, source index/document id). Reconstruction is canonical-preserving
-(the re-canonicalized alert is field-equivalent), not byte-identical.
+Live poller membuang hit OpenSearch asli setelah kanonisasi, jadi record arsip disusun
+ulang dari :class:`CanonicalRawAlert` beserta metadata yang ikut tersimpan (deskripsi/group
+rule, location, full_log, decoder, manager, data, index sumber/id dokumen). Hasilnya
+setara secara kanonis (alert hasil kanonisasi ulang setara per field), bukan identik per byte.
 
-Failure policy: archiving must never break live ingestion. All public entry
-points swallow I/O errors, log at warning level, bump the ``failed`` counter,
-and return a degraded result (``None`` / ``0``).
+Kebijakan kegagalan: pengarsipan tidak boleh merusak ingestion live. Semua entry point
+publik menelan error I/O, mencatat log level warning, menaikkan counter ``failed``,
+dan mengembalikan hasil degradasi (``None`` / ``0``).
 """
 
 from datetime import datetime, timezone
@@ -37,7 +35,7 @@ _stats: Dict[str, Any] = {"archived": 0, "failed": 0, "last_error": None}
 
 
 def get_stats() -> Dict[str, Any]:
-    """Return a snapshot of archive counters (archived, failed, last_error)."""
+    """Kembalikan snapshot counter arsip (archived, failed, last_error)."""
     with _stats_lock:
         return dict(_stats)
 
@@ -51,7 +49,7 @@ def _bump(archived: int = 0, failed: int = 0, error: Optional[str] = None) -> No
 
 
 def archive_enabled_from_env() -> bool:
-    """Read the archive kill-switch (default False so replay/demo are unaffected)."""
+    """Baca saklar pengarsipan (default False agar replay/demo tidak terpengaruh)."""
     return os.environ.get("RBTA_LIVE_ARCHIVE_ENABLED", "").strip().lower() in (
         "1",
         "true",
@@ -61,7 +59,7 @@ def archive_enabled_from_env() -> bool:
 
 
 def archive_dir_from_env(default: Union[str, Path] = DEFAULT_ARCHIVE_DIR) -> Path:
-    """Read the archive directory override (default ``data/archive``)."""
+    """Baca override direktori arsip (default ``data/archive``)."""
     raw = os.environ.get("RBTA_LIVE_ARCHIVE_DIR", "")
     return Path(raw.strip()) if raw.strip() else Path(default)
 
@@ -72,11 +70,11 @@ def _meta(alert: CanonicalRawAlert) -> Dict[str, Any]:
 
 
 def build_archive_record(alert: CanonicalRawAlert) -> Dict[str, Any]:
-    """Reconstruct a replay-compatible raw Wazuh alert dict from a canonical alert.
+    """Susun ulang dict raw alert Wazuh yang kompatibel untuk replay dari alert kanonis.
 
-    Returns an OpenSearch-hit envelope (``{_index, _id, _source[, sort]}``)
-    when the canonical metadata carries source lineage, otherwise the plain
-    alert body. Both shapes are accepted by ``canonicalize_wazuh_alert``.
+    Mengembalikan envelope hit OpenSearch (``{_index, _id, _source[, sort]}``) bila metadata
+    kanonis membawa lineage sumber, selain itu body alert biasa. Kedua bentuk diterima
+    ``canonicalize_wazuh_alert``.
     """
     meta = _meta(alert)
     safe = to_json_safe(meta)
@@ -149,7 +147,7 @@ def _append_line(path: Path, line: str) -> bool:
             except OSError:
                 pass
         return True
-    except Exception as exc:  # never propagate to the live cycle
+    except Exception as exc:  # jangan sampai merambat ke siklus live
         logger.warning("Live archive write failed for '%s': %s", path, exc)
         _bump(failed=1, error=str(exc))
         return False
@@ -160,7 +158,7 @@ def append_alert(
     archive_dir: Union[str, Path],
     event_time: Optional[datetime] = None,
 ) -> Optional[Path]:
-    """Append one alert to the daily archive file. Never raises; None on failure."""
+    """Tambahkan satu alert ke file arsip harian. Tidak pernah error; None bila gagal."""
     try:
         record = build_archive_record(alert)
         line = deterministic_json_dumps(record)
@@ -169,7 +167,7 @@ def append_alert(
             _bump(archived=1)
             return path
         return None
-    except Exception as exc:  # defensive: build must not break ingestion either
+    except Exception as exc:  # defensif: proses build juga tidak boleh merusak ingestion
         logger.warning("Live archive record build failed for '%s': %s", alert.wazuh_alert_id, exc)
         _bump(failed=1, error=str(exc))
         return None
@@ -179,7 +177,7 @@ def append_alerts(
     alerts: List[CanonicalRawAlert],
     archive_dir: Union[str, Path],
 ) -> int:
-    """Append a batch in (event_time, alert_id) order, rotating per UTC day. Never raises."""
+    """Tambahkan satu batch berurutan (event_time, alert_id), rotasi per hari UTC. Tidak pernah error."""
     try:
         ordered = sorted(alerts, key=lambda a: (_event_time(a), a.wazuh_alert_id))
     except Exception as exc:

@@ -50,7 +50,7 @@ describe('Zod v4 Schema Validation & Contract Integrity', () => {
       critical_meta_count: 1,
       active_buckets_count: 4,
       source_mode: 'LIVE',
-      // system_status omitted
+      // system_status sengaja dihilangkan
     };
     expect(() => DashboardSummarySchema.parse(invalid)).toThrow();
   });
@@ -72,7 +72,7 @@ describe('Zod v4 Schema Validation & Contract Integrity', () => {
       decision: 'ESCALATE',
       action: 'DISPATCH',
       escalate: true,
-      // model_version omitted - must NOT default to v1
+      // model_version sengaja dihilangkan - TIDAK boleh default ke v1
     };
     expect(() => MetaAlertSchema.parse(invalid)).toThrow();
   });
@@ -118,7 +118,7 @@ describe('Zod v4 Schema Validation & Contract Integrity', () => {
       agent_id: '001',
       agent_name: 'test',
       event_count: 10,
-      // warmup_required, base_delta_t_seconds omitted
+      // warmup_required, base_delta_t_seconds sengaja dihilangkan
     };
     expect(() => AgentStateSchema.parse(invalid)).toThrow();
   });

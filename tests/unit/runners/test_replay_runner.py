@@ -1,4 +1,4 @@
-"""Unit tests for ReplayStreamRunner (Sprint 6)."""
+"""Unit test ReplayStreamRunner."""
 from datetime import datetime, timedelta, timezone
 import pytest
 
@@ -26,7 +26,7 @@ def make_alert(idx: int, ts: datetime, group: str = "pam", level: int = 3, agent
 
 
 def test_replay_runner_streams_and_scores_event_by_event():
-    """Replay runner processes incoming stream, advances clock, and yields ScoredMetaAlerts."""
+    """Replay runner memproses aliran masuk, memajukan clock, dan yield ScoredMetaAlert."""
     base_t = datetime(2026, 8, 28, 10, 0, 0, tzinfo=timezone.utc)
     alerts = [
         make_alert(
@@ -39,7 +39,7 @@ def test_replay_runner_streams_and_scores_event_by_event():
         for i in range(30)
     ]
 
-    # Prepare model
+    # Siapkan model.
     batch_res = BatchResearchRunner(base_delta_t=timedelta(minutes=15), adaptive=False).run(alerts)
     bundle = train_reference_pipeline(batch_res.meta_alerts, random_state=42, model_version="replay-v1")
     scoring_pipe = ScoringPipeline(bundle)

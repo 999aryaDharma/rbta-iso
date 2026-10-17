@@ -3,8 +3,20 @@ import { fetchIntegrations, fetchSummary } from '@/api/dashboard';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { MetricCard } from '@/components/shared/MetricCard';
 import { formatNumber } from '@/lib/formatters';
+import { TERMS, TERM_HINTS } from '@/lib/labels';
 import { useSearchParams } from 'react-router-dom';
 import { ArrowRight, Database, Stack, ShieldCheck, PaperPlaneTilt, Plugs, ChatTeardropText } from '@phosphor-icons/react';
+
+const STATUS_LABELS: Record<string, string> = {
+  READY: 'Siap',
+  ONLINE: 'Online',
+  ACTIVE: 'Aktif',
+  DEFERRED: TERMS.deferred,
+};
+
+function statusLabel(status: string): string {
+  return STATUS_LABELS[status] ?? status;
+}
 
 export function IntegrationsPage() {
   const [searchParams] = useSearchParams();
@@ -25,25 +37,26 @@ export function IntegrationsPage() {
   return (
     <>
       <PageHeader
-        breadcrumbs={['Operations', 'Integrations']}
-        title="Status Integrasi dan Output"
-        description="Pisahkan komponen yang aktif pada demo dari koneksi eksternal yang masih deferred."
+        breadcrumbs={['Operasi', 'Integrasi']}
+        title="Integrasi"
+        description="Status Telegram dan Shuffle. Komponen yang aktif dipisahkan dari koneksi eksternal yang belum aktif."
       />
 
       <div className="px-6 py-8 lg:px-10 space-y-8">
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-5">
-          <MetricCard label="Raw Events Ingested" value={summary ? formatNumber(summary.raw_alert_count) : '-'} sub="Raw stream count" />
-          <MetricCard label="MetaAlerts Generated" value={summary ? formatNumber(summary.meta_alert_count) : '-'} sub="Temporal cluster count" />
+          <MetricCard label={TERMS.rawIn} value={summary ? formatNumber(summary.raw_alert_count) : '-'} sub="Jumlah alert dari sumber data" />
+          <MetricCard label="Meta-alert dibentuk" value={summary ? formatNumber(summary.meta_alert_count) : '-'} sub="Jumlah kelompok alert" />
           <MetricCard
-            label="Reduction Achieved"
+            label="Pengurangan alert (ARR)"
+            hint={TERM_HINTS.ARR}
             value={
               summary && summary.alert_reduction_rate_percent !== null && summary.alert_reduction_rate_percent !== undefined
                 ? `${summary.alert_reduction_rate_percent}%`
                 : '-'
             }
-            sub="Pengurangan unit triase, bukan eliminasi noise"
+            sub="Pengurangan yang perlu dicek, bukan penghapusan noise"
           />
-          <MetricCard label="Active In-Memory Buckets" value={summary ? formatNumber(summary.active_buckets_count) : '-'} sub="Open buffer windows" />
+          <MetricCard label={TERMS.bucketOpen} value={summary ? formatNumber(summary.active_buckets_count) : '-'} sub="Masih menunggu alert berikutnya" />
         </div>
 
         <div className="space-y-4">
@@ -71,18 +84,18 @@ export function IntegrationsPage() {
                             ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20'
                             : 'bg-kumo-recessed text-kumo-subtle border-kumo-hairline'
                         }`}>
-                          {item.status}
+                          {statusLabel(item.status)}
                         </span>
                       </div>
                       <p className="text-xs text-kumo-subtle max-w-3xl">
-                        {item.detail || 'Operational service integration component'}
+                        {item.detail || 'Komponen integrasi layanan'}
                       </p>
                       {item.status === 'DEFERRED' && <p className="mt-1 text-[11px] font-medium text-amber-700 dark:text-amber-300">Tidak didemonstrasikan sebagai integrasi live.</p>}
                     </div>
                   </div>
                   {idx < arr.length - 1 && (
                     <div className="hidden lg:flex items-center text-xs font-mono shrink-0 pl-4 text-kumo-subtle">
-                      <span className="text-[11px] uppercase tracking-wider font-semibold">STAGE {idx + 1}</span>
+                      <span className="text-[11px] uppercase tracking-wider font-semibold">Tahap {idx + 1}</span>
                       <ArrowRight size={14} className="ml-1.5 text-kumo-hairline" />
                     </div>
                   )}

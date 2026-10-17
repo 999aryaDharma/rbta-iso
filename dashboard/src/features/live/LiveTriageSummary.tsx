@@ -4,6 +4,8 @@ import { fetchLiveStatus } from '@/api/live';
 import { fetchMetaAlerts } from '@/api/metaAlerts';
 import { LIVE_STALE_AFTER_MS } from './LiveStatusPanel';
 import { ArrowRight, ListChecks } from '@phosphor-icons/react';
+import { Hint } from '@/components/shared/Hint';
+import { TERM_HINTS, TERMS, decisionLabel } from '@/lib/labels';
 
 export interface TriageSummaryDatum {
   rawAlerts: number | null;
@@ -71,7 +73,7 @@ export function LiveTriageSummaryPanel({ isLoading, isError, data, errorMessage,
   if (isLoading) {
     return (
       <div className="p-6 rounded-xl border border-kumo-hairline bg-kumo-canvas shadow-xs">
-        <p role="status" className="text-xs text-kumo-subtle">Memuat beban triase live…</p>
+        <p role="status" className="text-xs text-kumo-subtle">Memuat beban kerja analyst (live)…</p>
       </div>
     );
   }
@@ -80,7 +82,7 @@ export function LiveTriageSummaryPanel({ isLoading, isError, data, errorMessage,
     return (
       <div className="p-6 rounded-xl border border-kumo-hairline bg-kumo-canvas shadow-xs space-y-3">
         <p role="alert" className="text-xs text-red-600">
-          Gagal memuat beban triase live{errorMessage ? `: ${errorMessage}` : ''}
+          Gagal memuat beban kerja analyst (live){errorMessage ? `: ${errorMessage}` : ''}
         </p>
         <button
           type="button"
@@ -105,26 +107,26 @@ export function LiveTriageSummaryPanel({ isLoading, isError, data, errorMessage,
         </div>
         <div>
           <h3 className="font-semibold text-xs uppercase tracking-wider text-kumo-strong">
-            Beban triase live
+            Beban kerja analyst (live)
           </h3>
           <p className="text-[11px] text-kumo-subtle mt-0.5">
-            ARR = reduksi unit triase, bukan akurasi. Skor anomali = prioritas, bukan vonis serangan.
+            ARR = pengurangan jumlah yang perlu dicek analyst, bukan akurasi. Skor keanehan = prioritas, bukan vonis serangan.
           </p>
         </div>
         <span className={`ml-auto font-mono text-xs font-bold ${data.workerAlive ? 'text-emerald-500' : 'text-kumo-subtle'}`}>
-          {data.workerAlive ? 'Worker hidup' : 'Worker berhenti'}
+          {data.workerAlive ? TERMS.workerUp : TERMS.workerDown}
         </span>
       </div>
 
       {data.stale && data.workerAlive && (
         <p role="status" className="text-xs text-amber-600">
-          Data basi, siklus terakhir lebih dari 2 menit lalu. Periksa koneksi Indexer/API dan log backend.
+          Data belum diperbarui lebih dari 2 menit. Periksa koneksi ke sumber data (Indexer/API) dan log server.
         </p>
       )}
 
       <div
         role="img"
-        aria-label={`Reduksi: ${data.rawAlerts ?? '-'} alert menjadi ${data.metaAlerts ?? '-'} MetaAlert, ARR ${formatArr(data.arrPercent)}`}
+        aria-label={`Reduksi: ${data.rawAlerts ?? '-'} alert menjadi ${data.metaAlerts ?? '-'} meta-alert, ARR ${formatArr(data.arrPercent)}`}
         className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg bg-kumo-recessed/40 px-4 py-3 text-xs"
       >
         <div className="min-w-0">
@@ -134,22 +136,22 @@ export function LiveTriageSummaryPanel({ isLoading, isError, data, errorMessage,
         <span aria-hidden className="text-kumo-subtle shrink-0"><ArrowRight size={16} /></span>
         <div className="min-w-0">
           <p className="font-mono font-bold text-kumo-strong text-lg leading-none">{data.metaAlerts ?? '-'}</p>
-          <p className="text-kumo-subtle mt-1">MetaAlert final</p>
+          <p className="text-kumo-subtle mt-1">Meta-alert selesai</p>
         </div>
         <span aria-hidden className="text-kumo-subtle shrink-0"><ArrowRight size={16} /></span>
         <div className="min-w-0">
           <p className="font-mono font-bold text-kumo-brand text-lg leading-none">{formatArr(data.arrPercent)}</p>
-          <p className="text-kumo-subtle mt-1">Reduksi live (ARR)</p>
+          <p className="text-kumo-subtle mt-1">Pengurangan (ARR)<Hint text={TERM_HINTS.ARR} /></p>
         </div>
       </div>
 
       <div className="flex flex-wrap items-end gap-x-8 gap-y-4">
         <div>
-          <p className="text-xs text-kumo-subtle font-medium">ESCALATE terbuka</p>
+          <p className="text-xs text-kumo-subtle font-medium">Perlu dicek segera <span className="font-mono text-[10px] opacity-60">ESCALATE</span></p>
           <p className={`font-mono font-bold text-3xl leading-tight ${escalate > 0 ? 'text-red-600' : 'text-emerald-600'}`}>
             {data.escalateOpen ?? '-'}
           </p>
-          <p className="text-[11px] text-kumo-subtle">menunggu triase analis</p>
+          <p className="text-[11px] text-kumo-subtle">menunggu dicek analyst</p>
         </div>
         <div>
           <p className="text-xs text-kumo-subtle font-medium">Antrean Telegram</p>
@@ -158,7 +160,7 @@ export function LiveTriageSummaryPanel({ isLoading, isError, data, errorMessage,
           </p>
         </div>
         <div>
-          <p className="text-xs text-kumo-subtle font-medium">Lag event</p>
+          <p className="text-xs text-kumo-subtle font-medium">{TERMS.eventLag}</p>
           <p className={`font-mono font-semibold text-xl leading-tight ${lagTone(data.eventLagSec, data.stale)}`}>
             {formatLag(data.eventLagSec)}
           </p>
@@ -167,27 +169,27 @@ export function LiveTriageSummaryPanel({ isLoading, isError, data, errorMessage,
 
       <div>
         <h4 className="font-semibold text-xs uppercase tracking-wider text-kumo-strong mb-2">
-          Distribusi level (live)
+          Sebaran level (live)
         </h4>
         {data.decisionUnavailable ? (
           <p className="text-xs text-kumo-subtle">
-            Distribusi level tidak tersedia. Daftar MetaAlert live gagal dimuat.
+            Sebaran level tidak tersedia. Daftar meta-alert live gagal dimuat.
           </p>
         ) : decisions.length === 0 ? (
           <p className="text-xs text-kumo-subtle">
-            Belum ada MetaAlert live untuk distribusi level.
+            Belum ada meta-alert live untuk sebaran level.
           </p>
         ) : (
           <div className="space-y-2">
             <div
               role="img"
-              aria-label={decisions.map(([name, value]) => `${name} ${value}`).join(', ')}
+              aria-label={decisions.map(([name, value]) => `${decisionLabel(name)?.label ?? name} ${value}`).join(', ')}
               className="flex h-3 overflow-hidden rounded-full bg-kumo-recessed"
             >
               {decisions.map(([name, value]) => (
                 <div
                   key={name}
-                  title={`${name}: ${value}`}
+                  title={`${decisionLabel(name)?.label ?? name}: ${value}`}
                   className={`h-full ${LEVEL_BAR[name] ?? 'bg-kumo-brand'}`}
                   style={{ width: `${(value / decisionTotal) * 100}%` }}
                 />
@@ -197,14 +199,17 @@ export function LiveTriageSummaryPanel({ isLoading, isError, data, errorMessage,
               {decisions.map(([name, value]) => (
                 <li key={name} className="flex items-center gap-1.5">
                   <span aria-hidden className={`inline-block w-2.5 h-2.5 rounded-sm ${LEVEL_BAR[name] ?? 'bg-kumo-brand'}`} />
-                  <span className="font-semibold text-kumo-default">{name}</span>
+                  <span className="font-semibold text-kumo-default" title={decisionLabel(name)?.hint}>
+                    {decisionLabel(name)?.label ?? name}
+                    {decisionLabel(name) && <span className="ml-1 font-mono text-[10px] font-normal opacity-60">{name}</span>}
+                  </span>
                   <span className="font-mono text-kumo-subtle">{value}</span>
                 </li>
               ))}
             </ul>
             {data.decisionSampled < data.decisionTotal && (
               <p className="text-[11px] text-kumo-subtle">
-                Agregat {data.decisionSampled} dari {data.decisionTotal} MetaAlert live (100 terbaru).
+                Dihitung dari {data.decisionSampled} dari {data.decisionTotal} meta-alert live (100 terbaru).
               </p>
             )}
           </div>

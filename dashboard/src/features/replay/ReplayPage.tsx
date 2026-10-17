@@ -23,6 +23,7 @@ import { DialogRoot, Dialog, DialogTitle, DialogDescription, DialogClose } from 
 import { Banner } from '@cloudflare/kumo/components/banner';
 import { Button } from '@cloudflare/kumo/components/button';
 import { formatNumber, formatDuration } from '@/lib/formatters';
+import { TERMS } from '@/lib/labels';
 import { Play, Pause, Stop, ArrowClockwise, FastForward, ArrowRight, CaretDown } from '@phosphor-icons/react';
 import { ReplayPipelineVisualizer, type PipelineStageId } from './ReplayPipelineVisualizer';
 import { CurrentMetaAlertCard } from './CurrentMetaAlertCard';
@@ -87,14 +88,14 @@ export function ReplayPage() {
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [activeStage, setActiveStage] = useState<PipelineStageId | null>(null);
 
-  // Set default dataset once loaded
+  // Pilih dataset default setelah daftar dimuat
   React.useEffect(() => {
     if (datasetsData?.items && datasetsData.items.length > 0 && !selectedDataset) {
       setSelectedDataset(datasetsData.items[0].name);
     }
   }, [datasetsData, selectedDataset]);
 
-  // Sync run_id with URL when replay is active
+  // Sinkronkan run_id ke URL saat replay aktif
   React.useEffect(() => {
     if (status?.run_id && searchParams.get('run_id') !== status.run_id) {
       const params = new URLSearchParams(searchParams);
@@ -153,9 +154,9 @@ export function ReplayPage() {
   return (
     <>
       <PageHeader
-        breadcrumbs={['Riset', 'Replay']}
-        title="Replay Sidang RBTA–Isolation Forest"
-        description="Ikuti alur alert mentah → meta-alert → fitur → skor keanehan → keputusan, lengkap dengan batas klaim dan bukti sumber."
+        breadcrumbs={['Riset', 'Replay sidang']}
+        title="Replay sidang RBTA–Isolation Forest"
+        description="Putar ulang data penelitian: alert masuk → meta-alert → 7 fitur → skor keanehan → keputusan, lengkap dengan batas klaim dan bukti asli."
       />
 
       <div className="px-6 py-8 lg:px-10 space-y-8">
@@ -171,7 +172,6 @@ export function ReplayPage() {
             disabled={!isIdle || isLoading}
             onRefresh={() => handleAction(refreshDatasetCatalog)}
           />
-          {/* Control Panel Card */}
           <div className="p-6 rounded-xl border border-kumo-hairline bg-kumo-canvas shadow-xs space-y-5">
             <div className="flex flex-wrap items-center justify-between gap-5">
               <div className="flex flex-wrap items-center gap-5">
@@ -218,7 +218,6 @@ export function ReplayPage() {
                 </div>
               </div>
 
-              {/* Action Buttons */}
               <div className="flex items-center gap-3 mt-2 sm:mt-0">
                 {isIdle && (
                   <Button
@@ -227,7 +226,7 @@ export function ReplayPage() {
                     onClick={() => handleAction(() => startReplay(selectedDataset, speed))}
                     disabled={isLoading || !selectedDataset || !selectedDatasetReady}
                   >
-                    <Play size={14} weight="fill" className="mr-1" /> Mulai Replay
+                    <Play size={14} weight="fill" className="mr-1" /> Mulai replay
                   </Button>
                 )}
 
@@ -270,12 +269,11 @@ export function ReplayPage() {
                   onClick={() => setShowResetConfirm(true)}
                   disabled={isLoading || status?.status === 'IDLE'}
                 >
-                  <ArrowClockwise size={14} className="mr-1" /> Siapkan run baru
+                  <ArrowClockwise size={14} className="mr-1" /> Siapkan sesi baru
                 </Button>
               </div>
             </div>
 
-            {/* Progress Bar */}
             {status && (
               <div className="pt-4 border-t border-kumo-hairline">
                 <div className="flex justify-between text-xs mb-2 font-mono">
@@ -297,13 +295,12 @@ export function ReplayPage() {
             )}
           </div>
 
-          {/* Error Alert if replay encountered a malformed line */}
           {status?.status === 'ERROR' && status.last_error && (
             <Banner
               variant="error"
               size="sm"
               title="Replay gagal dijalankan"
-              description={`Data berhenti di baris ${String(status.last_error.line_number)} pada ${String(status.last_error.dataset)}. Pilih data lain yang valid atau siapkan run baru. Detail: ${String(status.last_error.error_message)}`}
+              description={`Data berhenti di baris ${String(status.last_error.line_number)} pada ${String(status.last_error.dataset)}. Pilih data lain yang valid atau siapkan sesi baru. Detail: ${String(status.last_error.error_message)}`}
             />
           )}
         </ZoneSection>
@@ -313,7 +310,7 @@ export function ReplayPage() {
           zoneId="replay-zone-alur"
           index="Zona 2"
           title="Alur"
-          description="Visualisasi pipeline, meta-alert terkini, dan jejak pemrosesan."
+          description="Alur pemrosesan, meta-alert terkini, dan jejak pemrosesan."
         >
           <ReplayPipelineVisualizer
             status={status}
@@ -322,7 +319,6 @@ export function ReplayPage() {
             onSelectStage={setActiveStage}
           />
 
-          {/* Current Scored MetaAlert Card */}
           <CurrentMetaAlertCard
             latestMeta={latestMeta}
             rawProcessed={rawProcessed}
@@ -330,14 +326,12 @@ export function ReplayPage() {
             decisionCounts={decisionCounts}
           />
 
-          {/* Selected Pipeline Stage Deep Inspector */}
           <PipelineStageDetail
             activeStage={inspectedStage}
             telemetry={telemetry}
             status={status}
           />
 
-          {/* Live Processing Trace Ring Buffer */}
           <ProcessingTrace trace={telemetry?.trace} />
         </ZoneSection>
 
@@ -346,15 +340,14 @@ export function ReplayPage() {
           zoneId="replay-zone-bukti"
           index="Zona 3"
           title="Bukti"
-          description="Evaluasi, outbox payload, dan ringkasan bukti run."
+          description="Evaluasi, pesan Telegram yang belum dikirim, dan ringkasan bukti sesi replay."
         >
-          {/* Replay Completed Banner */}
           {status?.status === 'COMPLETED' && (
             <Banner
               variant="default"
               size="base"
-              title="Replay selesai dan evidence tersimpan"
-              description={`${formatNumber(status.total_count)} alert diproses dalam ${formatDuration(status.wall_clock_elapsed_seconds)} (${status.events_per_second.toFixed(1)} ev/s). Lanjutkan ke evaluasi lengkap atau telusuri meta-alert.`}
+              title="Replay selesai dan bukti asli tersimpan"
+              description={`${formatNumber(status.total_count)} alert diproses dalam ${formatDuration(status.wall_clock_elapsed_seconds)} (${status.events_per_second.toFixed(1)} alert/detik). Lanjutkan ke evaluasi lengkap atau telusuri meta-alert.`}
             >
               <Banner.Action onClick={() => navigate(withRunId('/meta-alerts'))}>
                 Telusuri meta-alert <ArrowRight size={14} className="ml-1" />
@@ -372,38 +365,36 @@ export function ReplayPage() {
             onDownload={() => void downloadEvaluationArtifact()}
           />
 
-          {/* Deferred Telegram Payload Outbox */}
           <DeferredTelegramOutbox />
 
-          {/* Consolidated run-evidence summary (menggantikan KPI grid + Details card yang duplikatif) */}
           <div className="p-6 rounded-xl border border-kumo-hairline bg-kumo-canvas shadow-xs space-y-5">
             <h3 className="font-semibold text-xs uppercase tracking-wider text-kumo-strong pb-3 border-b border-kumo-hairline">
-              Ringkasan bukti run
+              Ringkasan bukti sesi replay
             </h3>
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-5">
-              <MetricCard label="Status replay" value={status?.status || 'IDLE'} sub="Siklus hidup replay" />
+              <MetricCard label="Status replay" value={status?.status || 'IDLE'} sub="Status replay" />
               <MetricCard label="Alert diproses" value={status ? formatNumber(status.processed_count) : '0'} sub="Alert valid dari dataset" />
-              <MetricCard label="Total dataset" value={status ? formatNumber(status.total_count) : '0'} sub="Jumlah event pada manifest" />
-              <MetricCard label="Throughput" value={status ? `${formatNumber(status.events_per_second)} ev/s` : '0 ev/s'} sub="Kecepatan pada host replay" />
+              <MetricCard label="Total dataset" value={status ? formatNumber(status.total_count) : '0'} sub="Jumlah alert menurut manifest dataset" />
+              <MetricCard label={TERMS.throughput} value={status ? formatNumber(status.events_per_second) : '0'} sub="Kecepatan pada host replay" />
             </div>
             {status && status.run_id && (
               <div className="text-xs font-mono space-y-3 pt-2 border-t border-kumo-hairline">
                 <div className="flex justify-between items-center py-1.5 border-b border-kumo-hairline/40">
-                  <span className="text-kumo-subtle">Active Run Workspace ID:</span>
+                  <span className="text-kumo-subtle">ID sesi replay:</span>
                   <span className="font-semibold text-kumo-strong">{status.run_id}</span>
                 </div>
                 <div className="flex justify-between items-center py-1.5 border-b border-kumo-hairline/40">
-                  <span className="text-kumo-subtle">Dataset Source:</span>
+                  <span className="text-kumo-subtle">Sumber dataset:</span>
                   <span className="text-kumo-default">{status.dataset}</span>
                 </div>
                 {status.dataset_mode === 'all' && (
                   <>
                     <div className="flex justify-between items-center py-1.5 border-b border-kumo-hairline/40">
-                      <span className="text-kumo-subtle">Current File:</span>
+                      <span className="text-kumo-subtle">Berkas saat ini:</span>
                       <span className="text-kumo-default">{status.current_dataset || '-'}</span>
                     </div>
                     <div className="flex justify-between items-center py-1.5 border-b border-kumo-hairline/40">
-                      <span className="text-kumo-subtle">Dataset Index:</span>
+                      <span className="text-kumo-subtle">Urutan dataset:</span>
                       <span className="text-kumo-default">
                         {status.current_dataset_index !== undefined && status.dataset_count !== undefined
                           ? `${(status.current_dataset_index || 0) + 1} / ${status.dataset_count}`
@@ -413,15 +404,15 @@ export function ReplayPage() {
                   </>
                 )}
                 <div className="flex justify-between items-center py-1.5 border-b border-kumo-hairline/40">
-                  <span className="text-kumo-subtle">Current Event Timestamp:</span>
+                  <span className="text-kumo-subtle">Waktu kejadian saat ini:</span>
                   <span className="text-kumo-default">{status.current_event_time || '-'}</span>
                 </div>
                 <div className="flex justify-between items-center py-1.5 border-b border-kumo-hairline/40">
-                  <span className="text-kumo-subtle">Wall-Clock Elapsed Time:</span>
+                  <span className="text-kumo-subtle">Lama berjalan:</span>
                   <span className="text-kumo-default">{formatDuration(status.wall_clock_elapsed_seconds)}</span>
                 </div>
                 <div className="flex justify-between items-center py-1.5">
-                  <span className="text-kumo-subtle">Isolation Forest Model:</span>
+                  <span className="text-kumo-subtle">Model Isolation Forest:</span>
                   <span className="text-kumo-default">{status.model_version}</span>
                 </div>
               </div>
@@ -430,12 +421,11 @@ export function ReplayPage() {
         </ZoneSection>
       </div>
 
-      {/* Reset Confirmation Dialog */}
       <DialogRoot open={showResetConfirm} onOpenChange={(o) => { if (!o) setShowResetConfirm(false); }}>
         <Dialog className="max-w-md w-full p-6 bg-kumo-canvas border border-kumo-hairline shadow-2xl rounded-xl">
           <DialogTitle className="text-base font-bold text-kumo-strong">Siapkan run replay baru?</DialogTitle>
           <DialogDescription className="text-xs text-kumo-subtle mt-2 leading-relaxed">
-            Sistem akan membuat workspace terisolasi. Data dan evidence SQLite dari run {status?.run_id?.slice(0, 8)} tetap disimpan untuk audit.
+            Sistem akan membuat sesi terpisah. Data dan bukti asli dari sesi {status?.run_id?.slice(0, 8)} tetap disimpan untuk audit.
           </DialogDescription>
           <div className="flex justify-end gap-3 pt-4 mt-4 border-t border-kumo-hairline">
             <DialogClose>

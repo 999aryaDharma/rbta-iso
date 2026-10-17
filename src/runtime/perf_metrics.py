@@ -6,15 +6,14 @@ from typing import Dict, Any, Optional
 logger = logging.getLogger(__name__)
 
 class ReplayPerfMetrics:
-    """
-    Lightweight performance instrumentation for the RBTA replay pipeline.
-    Tracks stage timing and event counts with minimal overhead.
+    """Instrumentasi performa ringan untuk pipeline replay RBTA.
+    Mencatat waktu per tahap dan jumlah event dengan overhead minimal.
     """
     def __init__(self, report_interval: int = 1000, total_events: Optional[int] = None):
         self.report_interval = report_interval
         self.total_events = total_events
         
-        # Timing metrics (in seconds, will be converted to ms for reporting)
+        # Metrik waktu (dalam detik, dikonversi ke ms saat dilaporkan).
         self.times = {
             "json_parse": 0.0,
             "canonicalize": 0.0,
@@ -25,7 +24,7 @@ class ReplayPerfMetrics:
             "total_processing": 0.0,
         }
         
-        # Counters
+        # Counter
         self.counts = {
             "events_processed": 0,
             "meta_alerts_finalized": 0,
@@ -36,7 +35,7 @@ class ReplayPerfMetrics:
         
     @contextmanager
     def stage(self, name: str):
-        """Context manager to time a specific pipeline stage."""
+        """Context manager untuk mengukur waktu satu tahap pipeline."""
         start = time.perf_counter()
         try:
             yield
@@ -48,7 +47,7 @@ class ReplayPerfMetrics:
                 self.times[name] = elapsed
                 
     def increment(self, counter: str, amount: int = 1):
-        """Increment a counter by the specified amount."""
+        """Tambah counter sebesar nilai yang diberikan."""
         if counter in self.counts:
             self.counts[counter] += amount
         else:
@@ -58,7 +57,7 @@ class ReplayPerfMetrics:
             self.report()
             
     def summary(self) -> Dict[str, Any]:
-        """Return a dictionary of all metrics, with times in ms."""
+        """Kembalikan dict semua metrik, dengan waktu dalam ms."""
         elapsed_seconds = time.perf_counter() - self.start_time
         events_processed = self.counts.get("events_processed", 0)
         
@@ -84,7 +83,7 @@ class ReplayPerfMetrics:
         return result
         
     def report(self):
-        """Log the current summary at INFO level."""
+        """Catat ringkasan saat ini di level INFO."""
         data = self.summary()
         derived = data["derived"]
         counts = data["counts"]
@@ -105,8 +104,8 @@ class ReplayPerfMetrics:
             
         logger.info(log_msg)
         
-        # Log stage breakdown if there's any time recorded
-        total_time = sum(times_ms.values()) - times_ms.get("total_processing", 0) # Avoid double counting if total is included
+        # Catat rincian per tahap bila ada waktu yang tercatat.
+        total_time = sum(times_ms.values()) - times_ms.get("total_processing", 0) # hindari terhitung dua kali bila total ikut masuk
         if total_time > 0:
             breakdown = ", ".join(f"{k}: {v:.1f}ms" for k, v in times_ms.items() if k != "total_processing" and v > 0)
             logger.info(f"Stage times: {breakdown}")

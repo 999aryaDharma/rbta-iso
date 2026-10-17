@@ -1,4 +1,4 @@
-"""Unit tests for container runtime validator and environment parsing helper."""
+"""Unit test validator runtime container dan helper parsing environment."""
 
 from datetime import datetime, timedelta, timezone
 import gzip
@@ -37,7 +37,7 @@ def _make_test_alert(i: int, ts: datetime) -> CanonicalRawAlert:
 
 @pytest.fixture
 def test_env_fixtures(tmp_path: Path):
-    # 1. Models directory & bundle
+    # Direktori model & bundle.
     models_dir = tmp_path / "models"
     models_dir.mkdir()
     base_t = datetime(2026, 8, 29, 10, 0, 0, tzinfo=timezone.utc)
@@ -48,7 +48,7 @@ def test_env_fixtures(tmp_path: Path):
     registry = ModelRegistry(base_dir=models_dir)
     registry.publish_bundle(bundle, model_version="val-model-v1")
 
-    # 2. Replay directory & sample jsonl
+    # Direktori replay & sampel jsonl.
     replay_dir = tmp_path / "replay"
     replay_dir.mkdir()
     sample_jsonl = replay_dir / "valid_dataset.jsonl"
@@ -61,7 +61,7 @@ def test_env_fixtures(tmp_path: Path):
     }
     sample_jsonl.write_text(json.dumps(sample_wazuh_event) + "\n", encoding="utf-8")
 
-    # 3. State directory
+    # Direktori state.
     state_dir = tmp_path / "state"
     state_dir.mkdir()
 
@@ -74,13 +74,13 @@ def test_env_fixtures(tmp_path: Path):
 
 
 def test_runtime_validation_success_path(test_env_fixtures):
-    """Full runtime validation passes on valid model, valid replay JSONL, and writable state."""
+    """Validasi runtime lengkap lolos dengan model valid, JSONL replay valid, dan state yang bisa ditulis."""
     res = run_runtime_validation(
         models_dir=test_env_fixtures["models_dir"],
         model_version=test_env_fixtures["model_version"],
         replay_dir=test_env_fixtures["replay_dir"],
         state_dir=test_env_fixtures["state_dir"],
-        strict_uid=False,  # Running in pytest environment
+        strict_uid=False,  # berjalan di environment pytest
         verify_ro=False,
     )
     assert res["status"] == "PASS"
@@ -88,13 +88,13 @@ def test_runtime_validation_success_path(test_env_fixtures):
     assert res["replay"]["dataset_count"] == "1"
     assert res["replay"]["first_dataset"] == "valid_dataset.jsonl"
 
-    # Ensure no leftover probe files
+    # Pastikan tidak ada file probe yang tertinggal.
     probe_files = list(test_env_fixtures["state_dir"].glob("__rbta_probe_*"))
     assert len(probe_files) == 0
 
 
 def test_runtime_validation_fails_on_empty_replay_dir(tmp_path: Path, test_env_fixtures):
-    """Runtime validation fails when replay directory contains no *.jsonl datasets."""
+    """Validasi runtime gagal bila direktori replay tidak berisi dataset *.jsonl."""
     empty_replay = tmp_path / "empty_replay"
     empty_replay.mkdir()
 
@@ -103,7 +103,7 @@ def test_runtime_validation_fails_on_empty_replay_dir(tmp_path: Path, test_env_f
 
 
 def test_runtime_validation_accepts_valid_gzip_only_replay_dir(tmp_path: Path):
-    """Runtime validation accepts the gzip format supported by the replay engine."""
+    """Validasi runtime menerima format gzip yang didukung engine replay."""
     comp_replay = tmp_path / "compressed_replay"
     comp_replay.mkdir()
     payload = {
@@ -121,7 +121,7 @@ def test_runtime_validation_accepts_valid_gzip_only_replay_dir(tmp_path: Path):
 
 
 def test_runtime_validation_fails_on_corrupt_model(tmp_path: Path):
-    """Runtime validation fails fast when model version is missing or bundle invalid."""
+    """Validasi runtime langsung gagal bila versi model tidak ada atau bundle tidak valid."""
     empty_models = tmp_path / "empty_models"
     empty_models.mkdir()
 
@@ -130,7 +130,7 @@ def test_runtime_validation_fails_on_corrupt_model(tmp_path: Path):
 
 
 def test_runtime_validation_state_rw_proof(tmp_path: Path):
-    """validate_state_directory_rw performs write, flush, fsync, atomic rename, read, and delete."""
+    """validate_state_directory_rw menjalankan write, flush, fsync, atomic rename, read, dan delete."""
     state_dir = tmp_path / "state_test"
     validate_state_directory_rw(state_dir)
     assert state_dir.exists()
@@ -138,7 +138,7 @@ def test_runtime_validation_state_rw_proof(tmp_path: Path):
 
 
 def test_read_env_helper_deterministic(tmp_path: Path):
-    """read_env.py correctly parses KEY=VALUE, comments, quotes, and whitespace without eval."""
+    """read_env.py mem-parse KEY=VALUE, komentar, kutipan, dan whitespace dengan benar tanpa eval."""
     env_file = tmp_path / ".env.test"
     env_file.write_text(
         """
@@ -159,7 +159,7 @@ def test_read_env_helper_deterministic(tmp_path: Path):
     assert env_map["RBTA_MODEL_VERSION"] == "prod-v1"
     assert env_map["RBTA_SOURCE_MODE"] == "DEFERRED"
 
-    # Reject malformed lines
+    # Tolak baris yang rusak.
     bad_env = tmp_path / ".env.bad"
     bad_env.write_text("THIS IS NOT A VALID LINE\n", encoding="utf-8")
     with pytest.raises(ValueError, match="missing '=' delimiter"):

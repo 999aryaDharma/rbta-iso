@@ -86,11 +86,11 @@ from typing import Optional
 
 log = logging.getLogger(__name__)
 
-# ── Konstanta window ──────────────────────────────────────────────────────────
+# Konstanta window
 BASELINE_WINDOW_HOURS = 24
 DEVIATION_CLIP        = (-5.0, 5.0)   # Diperlebar dari [-3,3] untuk eliminasi ceiling effect
 
-# ── Feature cols sinkron dengan isolation_forest.py ──────────────────────────
+# Feature cols sinkron dengan isolation_forest.py
 # WAJIB: update isolation_forest.py FEATURE_COLS setelah perubahan ini
 FEATURE_COLS_V2 = [
     "alert_count_log",          # f1
@@ -107,9 +107,7 @@ FEATURE_COLS_V2 = [
 ]
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # f1 — alert_count_log  (log1p transform)
-# ══════════════════════════════════════════════════════════════════════════════
 
 def add_alert_count_log(df_meta: pd.DataFrame) -> pd.DataFrame:
     """
@@ -146,9 +144,7 @@ def add_alert_count_log(df_meta: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # f7 — alert_velocity  (NEW — menggantikan rule_firedtimes yang tidak ada)
-# ══════════════════════════════════════════════════════════════════════════════
 
 def add_alert_velocity(df_meta: pd.DataFrame) -> pd.DataFrame:
     """
@@ -195,9 +191,7 @@ def add_alert_velocity(df_meta: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # f9 — rule_concentration  (menggantikan rule_group_entropy)
-# ══════════════════════════════════════════════════════════════════════════════
 
 def _parse_json_dist(val: object) -> dict:
     """Helper: parse JSON string distribusi → dict. Return {} jika gagal."""
@@ -264,9 +258,7 @@ def add_rule_concentration(df_meta: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # f10 — severity_spread  (menggantikan tactic_progression_score)
-# ══════════════════════════════════════════════════════════════════════════════
 
 def _compute_severity_mean(severity_dist: dict) -> float:
     """Hitung rata-rata severity dari distribusi {level: count}."""
@@ -329,9 +321,7 @@ def add_severity_spread(df_meta: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # f11 — deviation_from_baseline  (clip diperlebar ke [-5, 5])
-# ══════════════════════════════════════════════════════════════════════════════
 
 def compute_deviation_from_baseline(
     df_meta:      pd.DataFrame,
@@ -424,9 +414,7 @@ def compute_deviation_from_baseline(
     return df
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # Pipeline: enrich_features — terapkan semua fitur v2
-# ══════════════════════════════════════════════════════════════════════════════
 
 def enrich_features(
     df_meta:               pd.DataFrame,
@@ -528,9 +516,7 @@ def _print_enrichment_summary(df: pd.DataFrame) -> None:
         )
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # Standalone entry point
-# ══════════════════════════════════════════════════════════════════════════════
 
 if __name__ == "__main__":
     import sys

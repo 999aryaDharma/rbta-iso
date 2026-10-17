@@ -1,18 +1,18 @@
-"""Canonical Research Orchestrator for RBTA + Isolation Forest.
+"""Orkestrator penelitian kanonis untuk RBTA + Isolation Forest.
 
-Executes the end-to-end research methodology pipeline across authoritative phases:
-Phase 1: Input Loading & Validation (Real JSONL or Explicit Engineering Fixture)
-Phase 2: Delta-t Sensitivity Analysis (adaptive=False)
-Phase 3: Base Delta-t Selection (Sensitivity Elbow vs Manual Override)
-Phase 4: Final RBTA Temporal Aggregation (Agent-Local ETW, adaptive=True, selected Delta-t)
-Phase 5: Fixed Tumbling Window Baseline (selected Delta-t)
-Phase 6: Noise Robustness Evaluation (selected Delta-t)
-Phase 7: Runtime Complexity Evaluation (8 subsets, selected Delta-t)
-Phase 8: Seven Canonical Feature Extraction
-Phase 9: Isolation Forest Reference Training & Model Publication
-Phase 10: Stream-Safe Anomaly Scoring & Decision Matrix Evaluation
-Phase 11: Phase B Structural Silhouette vs 100 Permutation Baseline
-Phase 12: Structured Run Artifact Publication
+Menjalankan pipeline metodologi penelitian end-to-end dengan urutan fase berikut:
+Fase 1: Pemuatan & validasi input (JSONL asli atau fixture engineering eksplisit)
+Fase 2: Analisis sensitivitas delta-t (adaptive=False)
+Fase 3: Pemilihan delta-t dasar (elbow sensitivitas atau override manual)
+Fase 4: Agregasi temporal RBTA final (ETW lokal per agent, adaptive=True, delta-t terpilih)
+Fase 5: Baseline Fixed Tumbling Window (delta-t terpilih)
+Fase 6: Evaluasi ketahanan noise (delta-t terpilih)
+Fase 7: Evaluasi kompleksitas runtime (8 subset, delta-t terpilih)
+Fase 8: Ekstraksi tujuh fitur kanonis
+Fase 9: Training reference Isolation Forest & publikasi model
+Fase 10: Scoring anomali yang aman untuk stream & evaluasi Decision Matrix
+Fase 11: Silhouette struktural vs baseline 100 permutasi
+Fase 12: Publikasi artefak run yang terstruktur
 """
 
 import argparse
@@ -52,15 +52,15 @@ from src.research.corpus_input import ResearchCorpusError, load_research_corpus
 
 
 class ResearchInputError(RuntimeError):
-    """Raised when research input is invalid, missing, or contradictory."""
+    """Dilempar bila input penelitian tidak valid, tidak ada, atau saling bertentangan."""
     pass
 
 
 def _generate_engineering_smoke_fixture(n_alerts: int = 250, seed: int = 42) -> List[CanonicalRawAlert]:
-    """Generate deterministic synthetic raw alerts for smoke testing and developer verification.
+    """Bangkitkan raw alert sintetis deterministik untuk smoke test dan verifikasi developer.
 
-    NOTE: This fixture is strictly for engineering smoke testing and must NOT be used
-    as real research data for seminar results.
+    CATATAN: fixture ini hanya untuk smoke test engineering dan TIDAK boleh dipakai
+    sebagai data penelitian untuk hasil seminar.
     """
     rng = np.random.default_rng(seed)
     base_t = datetime(2026, 8, 28, 8, 0, 0, tzinfo=timezone.utc)
@@ -73,7 +73,7 @@ def _generate_engineering_smoke_fixture(n_alerts: int = 250, seed: int = 42) -> 
     n_attack = min(30, max(5, n_alerts // 8))
     n_benign = max(1, n_alerts - n_attack)
 
-    # 1. Benign background traffic
+    # Trafik latar belakang yang benign.
     for i in range(n_benign):
         gap_sec = float(rng.exponential(scale=30.0) + 2.0)
         current_time += timedelta(seconds=gap_sec)
@@ -98,7 +98,7 @@ def _generate_engineering_smoke_fixture(n_alerts: int = 250, seed: int = 42) -> 
             )
         )
 
-    # 2. Severe anomalous attack burst
+    # Burst serangan anomali yang berat.
     attack_time = current_time + timedelta(minutes=10)
     for j in range(n_attack):
         attack_time += timedelta(seconds=float(rng.uniform(1.0, 5.0)))
@@ -125,7 +125,7 @@ def build_research_config_payload(
     random_seed: int,
     model_version: str,
 ) -> Dict[str, Any]:
-    """Construct deterministic configuration dictionary for cryptographic hashing."""
+    """Susun dict konfigurasi deterministik untuk di-hash."""
     return {
         "selected_delta_t_minutes": selected_delta_t_minutes,
         "adaptive_final": True,
@@ -147,13 +147,13 @@ def build_research_config_payload(
 
 
 def compute_research_config_hash(config_payload: Dict[str, Any]) -> str:
-    """Derive deterministic SHA-256 hash from research configuration payload."""
+    """Turunkan hash SHA-256 deterministik dari payload konfigurasi penelitian."""
     serialized = json.dumps(config_payload, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
 
 
 def resolve_git_commit(require_git: bool = True) -> str:
-    """Resolve current Git commit SHA-256."""
+    """Ambil SHA commit Git saat ini."""
     try:
         res = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True, check=True)
         sha = res.stdout.strip()
@@ -176,7 +176,7 @@ def run_canonical_research_pipeline(
     git_commit: Optional[str] = None,
     training_run_id: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """Execute the end-to-end canonical research orchestrator pipeline in authoritative phase order."""
+    """Jalankan pipeline orkestrator penelitian end-to-end sesuai urutan fase."""
     run_id = training_run_id or f"run_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}_{str(uuid.uuid4())[:8]}"
     run_dir = output_base_dir / run_id
     run_dir.mkdir(parents=True, exist_ok=True)
@@ -189,7 +189,7 @@ def run_canonical_research_pipeline(
     print(f"Model Version : {model_version}")
     print("=" * 70)
 
-    # Phase 1: Ingestion & Validation
+    # Fase 1: ingestion & validasi.
     print("\n[Phase 1] Ingestion & Input Validation...")
     alerts: List[CanonicalRawAlert] = []
     input_mode = "real_jsonl"
@@ -246,14 +246,14 @@ def run_canonical_research_pipeline(
         f"reference={len(reference_alerts)}, calibration={len(calibration_alerts)}, test={len(test_alerts)}"
     )
 
-    # Phase 2: Delta-t Sensitivity Analysis (adaptive=False)
+    # Fase 2: analisis sensitivitas delta-t (adaptive=False).
     print("\n[Phase 2] Delta-t Sensitivity Analysis (adaptive=False)...")
     sens_result = run_delta_t_sensitivity_analysis(reference_alerts)
     recommended_delta_t = sens_result.recommended_elbow_delta_t
     print(f"  Sensitivity Curve Evaluated: {list(SENSITIVITY_DELTA_T_MINUTES)}")
     print(f"  Calculated Recommended Elbow Delta-t: {recommended_delta_t} minutes")
 
-    # Phase 3: Base Delta-t Selection
+    # Fase 3: pemilihan delta-t dasar.
     print("\n[Phase 3] Delta-t Window Selection...")
     if str(delta_t_mode).lower() == "auto":
         selected_delta_t = recommended_delta_t
@@ -269,7 +269,7 @@ def run_canonical_research_pipeline(
 
     selected_duration = timedelta(minutes=selected_delta_t)
 
-    # Phase 4: Final RBTA Temporal Aggregation (Agent-Local ETW, adaptive=True, selected Delta-t)
+    # Fase 4: agregasi temporal RBTA final (ETW lokal per agent, adaptive=True, delta-t terpilih).
     print(f"\n[Phase 4] Final RBTA Temporal Aggregation (adaptive=True, base_delta_t={selected_delta_t}m)...")
     reference_result = BatchResearchRunner(base_delta_t=selected_duration, adaptive=True).run(reference_alerts)
     calibration_result = BatchResearchRunner(base_delta_t=selected_duration, adaptive=True).run(calibration_alerts)
@@ -283,7 +283,7 @@ def run_canonical_research_pipeline(
     print(f"  Test MetaAlerts: {n_meta}")
     print(f"  Alert Reduction Rate (ARR): {arr:.2f}%")
 
-    # Phase 5: Fixed Tumbling Window Baseline (selected Delta-t)
+    # Fase 5: baseline Fixed Tumbling Window (delta-t terpilih).
     print(f"\n[Phase 5] Fixed Tumbling Window Baseline (duration={selected_delta_t}m)...")
     baseline_result = run_fixed_window_baseline(test_alerts, window_duration=selected_duration)
     contextual_fixed_result = run_contextual_fixed_window_baseline(
@@ -295,11 +295,11 @@ def run_canonical_research_pipeline(
     rbta_quality = compute_context_quality(meta_alerts, test_alerts)
     print(f"  Fixed Window Baseline ARR: {baseline_result.arr:.2f}% (RBTA ARR: {arr:.2f}%)")
 
-    # Phase 6: Noise Robustness Evaluation (selected Delta-t)
+    # Fase 6: evaluasi ketahanan noise (delta-t terpilih).
     print(f"\n[Phase 6] Noise Robustness Evaluation (delta_t={selected_delta_t}m)...")
     noise_result = run_noise_robustness_evaluation(test_alerts, delta_t=selected_duration, random_seed=random_seed)
 
-    # Phase 7: Runtime Complexity Proof (selected Delta-t, exactly 8 subsets)
+    # Fase 7: kompleksitas runtime (delta-t terpilih, tepat 8 subset).
     print(f"\n[Phase 7] Runtime Complexity Evaluation (8 subsets, delta_t={selected_delta_t}m)...")
     complexity_result = run_runtime_complexity_evaluation(test_alerts, n_subsets=RUNTIME_EVALUATION_SUBSETS, delta_t=selected_duration)
     print(f"  Empirical runtime scaling R^2: {complexity_result.r_squared:.4f} (Slope: {complexity_result.slope:.6f} ms/alert)")
@@ -349,13 +349,13 @@ def run_canonical_research_pipeline(
     with (run_dir / "phase_a_results.json").open("w", encoding="utf-8") as f:
         json.dump(phase_a_summary, f, indent=2)
 
-    # Phase 8: Seven Canonical Feature Extraction (from final selected-delta meta_alerts)
+    # Fase 8: ekstraksi tujuh fitur kanonis (dari meta_alerts dengan delta-t terpilih).
     print("\n[Phase 8] Seven Canonical Feature Extraction...")
     df_features = SevenFeatureExtractor.extract_features_df(meta_alerts)
     print(f"  Extracted feature matrix shape: {df_features.shape}")
     print(f"  Feature columns: {list(FEATURE_COLUMNS)}")
 
-    # Phase 9: Isolation Forest Reference Training & Model Publication
+    # Fase 9: training reference Isolation Forest & publikasi model.
     print("\n[Phase 9] Isolation Forest Model Training & Artifact Publication...")
     config_payload = build_research_config_payload(selected_delta_t, random_seed, model_version)
     config_hash = compute_research_config_hash(config_payload)
@@ -376,7 +376,7 @@ def run_canonical_research_pipeline(
     print(f"  Published model bundle to: {published_dir}")
     print(f"  Tukey Threshold (theta)  : {bundle.threshold.threshold:.4f} (Q3={bundle.threshold.q3:.4f}, IQR={bundle.threshold.iqr:.4f})")
 
-    # Phase 10: Stream-Safe Anomaly Scoring & Decision Matrix Evaluation
+    # Fase 10: scoring anomali yang aman untuk stream & evaluasi Decision Matrix.
     print("\n[Phase 10] Anomaly Scoring & Decision Matrix Evaluation...")
     pipeline = ScoringPipeline(bundle)
     df_scored, scored_meta_alerts = pipeline.score_meta_alerts(meta_alerts)
@@ -384,7 +384,7 @@ def run_canonical_research_pipeline(
     df_scored.to_csv(scored_csv_path, index=False)
     print(f"  Scored results exported to: {scored_csv_path}")
 
-    # Phase 11: Phase B Structural Silhouette vs Permutations
+    # Fase 11: Silhouette struktural vs permutasi.
     print("\n[Phase 11] Phase B Structural Silhouette vs 100 Permutations...")
     silhouette_result = run_structural_silhouette_evaluation(
         scored_meta_alerts, bundle, n_permutations=100, random_seed=random_seed
@@ -414,7 +414,7 @@ def run_canonical_research_pipeline(
     else:
         print(f"  Silhouette evaluation not calculable: {silhouette_result.uncalculable_reason}")
 
-    # Phase 12: Structured Run Artifact Publication
+    # Fase 12: publikasi artefak run yang terstruktur.
     elapsed_total = time.perf_counter() - t_start
     manifest = {
         "run_id": run_id,
@@ -499,7 +499,7 @@ def run_canonical_research_pipeline(
 
 
 def build_argument_parser() -> argparse.ArgumentParser:
-    """Construct canonical research CLI argument parser."""
+    """Susun argument parser CLI penelitian."""
     parser = argparse.ArgumentParser(
         description="RBTA + Isolation Forest Canonical Research Orchestrator",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
@@ -522,7 +522,7 @@ def build_argument_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: Optional[Sequence[str]] = None) -> None:
-    """CLI entrypoint for running the research orchestrator."""
+    """Entrypoint CLI untuk menjalankan orkestrator penelitian."""
     parser = build_argument_parser()
     args = parser.parse_args(argv)
 

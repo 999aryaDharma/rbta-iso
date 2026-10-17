@@ -1,4 +1,4 @@
-"""Unit tests for WazuhIndexerLivePoller with fast poll, reconciliation, and fail-closed integrity."""
+"""Unit test WazuhIndexerLivePoller: fast poll, rekonsiliasi, dan integritas gagal-tertutup."""
 
 from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock, patch
@@ -60,7 +60,7 @@ def test_repeated_full_page_cursor_fails_instead_of_looping():
 
 
 def test_derive_daily_indices_midnight_spanning():
-    """Deriving daily indices across midnight spans exactly the two UTC dates without wildcard."""
+    """Index harian yang melewati tengah malam mencakup tepat dua tanggal UTC tanpa wildcard."""
     t_start = datetime(2026, 8, 28, 23, 55, 0, tzinfo=timezone.utc)
     t_end = datetime(2026, 8, 29, 0, 5, 0, tzinfo=timezone.utc)
 
@@ -70,8 +70,9 @@ def test_derive_daily_indices_midnight_spanning():
 
 
 def test_live_poller_bad_document_collected_per_hit_and_valid_continue():
-    """N1b per-hit poller: 1 corrupt doc mid-page is collected in last_bad_docs;
-    valid docs on both sides are still returned (replaces page-fail L1)."""
+    """Poller per hit: 1 dokumen rusak di tengah halaman dikumpulkan di last_bad_docs;
+    dokumen valid di kedua sisinya tetap dikembalikan.
+    """
     client = MagicMock(spec=WazuhIndexerClient)
     malformed_hit = {
         "_index": "wazuh-alerts-4.x-2026.08.28",
@@ -79,7 +80,7 @@ def test_live_poller_bad_document_collected_per_hit_and_valid_continue():
         "sort": [1775118765001, "alert_bad"],
         "_source": {
             "id": "alert_bad",
-            # missing timestamp and agent
+            # timestamp dan agent tidak ada
         },
     }
     client._request.return_value = MagicMock(
@@ -101,7 +102,7 @@ def test_live_poller_bad_document_collected_per_hit_and_valid_continue():
 
 
 def test_live_poller_last_bad_docs_reset_each_call():
-    """N1b: last_bad_docs resets on every paginate call (no cross-call leakage)."""
+    """last_bad_docs di-reset di setiap pemanggilan paginate (tidak bocor antar pemanggilan)."""
     client = MagicMock(spec=WazuhIndexerClient)
     malformed_hit = {
         "_index": "wazuh-alerts-4.x-2026.08.28",
@@ -127,7 +128,7 @@ def test_live_poller_last_bad_docs_reset_each_call():
 
 
 def test_live_poller_malformed_response_empty_dict_fails():
-    """Empty dictionary response from Indexer raises LiveSourceIntegrityError."""
+    """Response dict kosong dari Indexer melempar LiveSourceIntegrityError."""
     client = MagicMock(spec=WazuhIndexerClient)
     client._request.return_value = MagicMock(status_code=200, json=lambda: {})
 
@@ -138,7 +139,7 @@ def test_live_poller_malformed_response_empty_dict_fails():
 
 
 def test_live_poller_malformed_response_hits_not_dict_fails():
-    """Response with hits: None or non-dict raises LiveSourceIntegrityError."""
+    """Response dengan hits: None atau bukan dict melempar LiveSourceIntegrityError."""
     client = MagicMock(spec=WazuhIndexerClient)
     client._request.return_value = MagicMock(status_code=200, json=lambda: {"hits": None})
 
@@ -149,7 +150,7 @@ def test_live_poller_malformed_response_hits_not_dict_fails():
 
 
 def test_live_poller_malformed_response_hits_hits_not_list_fails():
-    """Response with hits.hits not a list raises LiveSourceIntegrityError."""
+    """Response dengan hits.hits yang bukan list melempar LiveSourceIntegrityError."""
     client = MagicMock(spec=WazuhIndexerClient)
     client._request.return_value = MagicMock(status_code=200, json=lambda: {"hits": {"hits": "not-a-list"}})
 
@@ -160,7 +161,7 @@ def test_live_poller_malformed_response_hits_hits_not_list_fails():
 
 
 def test_live_poller_valid_empty_hits_returns_empty_list():
-    """Valid empty response returns empty list normally."""
+    """Response kosong yang valid mengembalikan list kosong secara normal."""
     client = MagicMock(spec=WazuhIndexerClient)
     client._request.return_value = MagicMock(status_code=200, json=lambda: {"hits": {"hits": []}})
 
@@ -170,11 +171,11 @@ def test_live_poller_valid_empty_hits_returns_empty_list():
 
 
 def test_live_poller_full_page_missing_sort_cursor_fails():
-    """When a page has page_size items but missing 'sort' cursor, LiveSourceIntegrityError is raised."""
+    """Halaman berisi page_size item tetapi tanpa cursor 'sort' melempar LiveSourceIntegrityError."""
     client = MagicMock(spec=WazuhIndexerClient)
     hit1 = make_hit(1)
     hit2 = make_hit(2)
-    del hit2["sort"]  # remove sort on final hit of full page
+    del hit2["sort"]  # hapus sort pada hit terakhir halaman penuh
 
     client._request.return_value = MagicMock(
         status_code=200,
@@ -188,7 +189,7 @@ def test_live_poller_full_page_missing_sort_cursor_fails():
 
 
 def test_live_poller_full_page_invalid_sort_cursor_fails():
-    """When a page has page_size items but invalid 'sort' cursor, LiveSourceIntegrityError is raised."""
+    """Halaman berisi page_size item tetapi cursor 'sort' tidak valid melempar LiveSourceIntegrityError."""
     client = MagicMock(spec=WazuhIndexerClient)
     hit1 = make_hit(1)
     hit2 = make_hit(2)
@@ -206,7 +207,7 @@ def test_live_poller_full_page_invalid_sort_cursor_fails():
 
 
 def test_live_poller_discover_retained_daily_alert_indices():
-    """Poller filters and sorts only valid Wazuh daily alert indices from Indexer list."""
+    """Poller menyaring dan mengurutkan hanya index alert harian Wazuh yang valid dari daftar Indexer."""
     client = MagicMock(spec=WazuhIndexerClient)
     client.list_indices.return_value = [
         "wazuh-alerts-4.x-2026.08.29",
@@ -228,7 +229,7 @@ def test_live_poller_discover_retained_daily_alert_indices():
 
 
 def test_live_poller_full_reconciliation_scans_all_retained_indices():
-    """Full-retention reconciliation scans every discovered daily index without timestamp cutoffs."""
+    """Rekonsiliasi seluruh retensi memindai setiap index harian yang ditemukan tanpa batas timestamp."""
     client = MagicMock(spec=WazuhIndexerClient)
     client.list_indices.return_value = [
         "wazuh-alerts-4.x-2026.08.20",
@@ -247,12 +248,12 @@ def test_live_poller_full_reconciliation_scans_all_retained_indices():
 
     args, kwargs = client._request.call_args
     assert args[1] == "/wazuh-alerts-4.x-2026.08.20,wazuh-alerts-4.x-2026.08.29/_search"
-    # No range filter in full retention query
+    # Query seluruh retensi tidak memakai filter range.
     assert "query" not in kwargs["json_data"]
 
 
 def test_live_poller_pagination_normal_3_pages():
-    """Live poller requests pages with search_after until result length < page_size."""
+    """Live poller meminta halaman dengan search_after sampai panjang hasil < page_size."""
     client = MagicMock(spec=WazuhIndexerClient)
 
     client._request.side_effect = [
@@ -269,7 +270,7 @@ def test_live_poller_pagination_normal_3_pages():
 
 
 def test_live_poller_no_permanent_seen_registry():
-    """Poller does not swallow duplicate IDs on successive calls (core owns dedup)."""
+    """Poller tidak menelan ID duplikat pada pemanggilan berturut-turut (dedup tugas core)."""
     client = MagicMock(spec=WazuhIndexerClient)
     client._request.side_effect = [
         MagicMock(status_code=200, json=lambda: {"hits": {"hits": [make_hit(1), make_hit(2)]}}),
@@ -285,7 +286,7 @@ def test_live_poller_no_permanent_seen_registry():
 
 
 def test_live_poller_propagates_transport_error():
-    """Live poller does not silently swallow network exceptions."""
+    """Live poller tidak menelan exception jaringan diam-diam."""
     client = MagicMock(spec=WazuhIndexerClient)
     client._request.side_effect = Exception("Connection Refused")
 
@@ -308,10 +309,10 @@ def test_live_poller_cursor_message_includes_offending_value():
     assert "1775118765001" in str(exc_info.value)
 
 
-# --- F10 poller integrity helpers (TDD) ---
+# Helper integritas poller.
 
 def test_paginate_search_strict_params_when_allow_unavailable_false():
-    """F10: allow_unavailable=False sends strict index params (discovery/full-recon)."""
+    """allow_unavailable=False mengirim parameter index yang ketat (discovery/rekonsiliasi penuh)."""
     from src.runtime.live_source import WazuhIndexerLivePoller as _P
 
     client = MagicMock(spec=WazuhIndexerClient)
@@ -325,7 +326,7 @@ def test_paginate_search_strict_params_when_allow_unavailable_false():
 
 
 def test_paginate_search_default_stays_tolerant():
-    """F10: default allow_unavailable=True preserves legacy tolerant params."""
+    """Default allow_unavailable=True mempertahankan parameter toleran yang lama."""
     client = MagicMock(spec=WazuhIndexerClient)
     client._request.return_value.json.return_value = {"hits": {"hits": []}}
     WazuhIndexerLivePoller(client=client)._paginate_search(
@@ -338,7 +339,7 @@ def test_paginate_search_default_stays_tolerant():
 
 
 def test_validate_index_id_uniqueness_reports_duplicates():
-    """F10: smoke-test helper flags duplicate _source.id without network."""
+    """Helper smoke test menandai _source.id duplikat tanpa jaringan."""
     from src.runtime.live_source import validate_index_id_uniqueness
 
     hits = [make_hit(1), make_hit(2)]

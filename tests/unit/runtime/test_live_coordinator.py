@@ -1,4 +1,4 @@
-"""Unit tests for LiveIngestionCoordinator (fast poll + recent reconciliation + full-retention sweep)."""
+"""Unit test LiveIngestionCoordinator (fast poll + rekonsiliasi terbaru + sweep seluruh retensi)."""
 
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -56,7 +56,7 @@ def create_test_service(tmp_path: Path) -> LiveRBTAService:
 
 
 def test_coordinator_fast_poll_and_reconciliation_cycle(tmp_path: Path):
-    """Coordinator executes reconciliation and fast poll, deduplicating and ingesting candidates."""
+    """Coordinator menjalankan rekonsiliasi dan fast poll, men-dedup, lalu meng-ingest kandidat."""
     service = create_test_service(tmp_path)
     poller = MagicMock(spec=WazuhIndexerLivePoller)
 
@@ -89,7 +89,7 @@ def test_coordinator_fast_poll_and_reconciliation_cycle(tmp_path: Path):
 
 
 def test_coordinator_full_retention_reconciliation_recovers_old_alert(tmp_path: Path):
-    """Full-retention sweep discovers an alert from days earlier (Aug 20 when today is Aug 29)."""
+    """Sweep seluruh retensi menemukan alert dari beberapa hari sebelumnya (20 Agt saat hari ini 29 Agt)."""
     service = create_test_service(tmp_path)
     poller = MagicMock(spec=WazuhIndexerLivePoller)
 
@@ -112,7 +112,7 @@ def test_coordinator_full_retention_reconciliation_recovers_old_alert(tmp_path: 
 
 
 def _stub_service(tmp_path: Path):
-    """Cheap stub service: real DurableStateManager, mocked ingest paths."""
+    """Stub service yang murah: DurableStateManager asli, jalur ingest di-mock."""
     service = MagicMock()
     service.state_manager = DurableStateManager(tmp_path / "stub_state.json")
     service.is_seen.return_value = False
@@ -130,8 +130,9 @@ def _scale_alerts(n: int, t_now, step_s: int = 20, start: int = 0):
 
 
 def test_coordinator_bad_docs_quarantined_per_hit_and_cycle_commits(tmp_path: Path):
-    """N1b: per-hit bad docs drained from poller.last_bad_docs are quarantined
-    (error_type LiveCanonicalizationError); valid alerts still ingest; cursor commits."""
+    """Dokumen buruk per hit yang dikuras dari poller.last_bad_docs dikarantina
+    (error_type LiveCanonicalizationError); alert valid tetap di-ingest; cursor di-commit.
+    """
     from datetime import timezone as _tz
 
     service = _stub_service(tmp_path)
@@ -168,12 +169,13 @@ def test_coordinator_bad_docs_quarantined_per_hit_and_cycle_commits(tmp_path: Pa
     assert len(rows) == 1
     assert rows[0]["wazuh_alert_id"] == "doc_bad"
     assert rows[0]["error_type"] == "LiveCanonicalizationError"
-    assert service.update_live_source_state.called  # cursor committed on success
+    assert service.update_live_source_state.called  # cursor di-commit saat berhasil
 
 
 def test_coordinator_quarantines_rbta_and_temporal_errors_and_continues(tmp_path: Path):
-    """N1a: RBTAInvariantError + TemporalStateError are deterministic quarantine,
-    not transient halt; engine.process is failure-atomic (verified below)."""
+    """RBTAInvariantError + TemporalStateError adalah quarantine deterministik, bukan halt sementara;
+    engine.process atomik saat gagal (diverifikasi di bawah).
+    """
     from src.rbta.engine import RBTAInvariantError
     from src.rbta.temporal_state import TemporalStateError
 
@@ -206,7 +208,7 @@ def test_coordinator_quarantines_rbta_and_temporal_errors_and_continues(tmp_path
 
 
 def test_engine_process_invariant_error_is_failure_atomic():
-    """N1a evidence: contradictory criticality mutates zero engine state."""
+    """Bukti: kritikalitas yang bertentangan tidak mengubah state engine sama sekali."""
     from src.rbta.engine import RBTAEngine, RBTAInvariantError
 
     engine = RBTAEngine(base_delta_t=timedelta(minutes=15), adaptive=False)
@@ -225,11 +227,11 @@ def test_engine_process_invariant_error_is_failure_atomic():
 
 
 def test_engine_process_temporal_error_is_failure_atomic():
-    """N1a evidence: terminal-invalid temporal state mutates zero commit state."""
+    """Bukti: state temporal terminal-invalid tidak mengubah state commit sama sekali."""
     from src.rbta.engine import RBTAEngine
     from src.rbta.temporal_state import TemporalStateError
 
-    engine = RBTAEngine()  # adaptive: 100 identical gaps -> baseline 0 -> terminal invalid
+    engine = RBTAEngine()  # adaptive: 100 gap identik -> baseline 0 -> terminal invalid
     t = datetime(2026, 8, 28, 10, 0, 0, tzinfo=timezone.utc)
     for i in range(99):
         engine.process(make_raw_alert(i, t))
@@ -243,7 +245,7 @@ def test_engine_process_temporal_error_is_failure_atomic():
 
 
 def test_coordinator_quarantine_breaker_trips_on_fraction(tmp_path: Path):
-    """N5c: quarantine fraction >1% halts the cycle (no cursor commit)."""
+    """Fraksi quarantine >1% menghentikan siklus (cursor tidak di-commit)."""
     from src.runtime.raw_evidence import RawEvidenceConflictError
 
     service = _stub_service(tmp_path)
@@ -258,7 +260,7 @@ def test_coordinator_quarantine_breaker_trips_on_fraction(tmp_path: Path):
     coord = LiveIngestionCoordinator(service=service, poller=poller)
     with pytest.raises(RuntimeError, match="[Qq]uarantine"):
         coord.run_cycle(current_time=t_now)
-    # P1 latch: breaker_tripped persisted, transport cursor keys NOT committed.
+    # Latch: breaker_tripped tersimpan, key cursor transport TIDAK di-commit.
     assert service.update_live_source_state.called
     payload = service.update_live_source_state.call_args.args[0]
     assert payload["breaker_tripped"]["quarantined"] == 5
@@ -268,7 +270,7 @@ def test_coordinator_quarantine_breaker_trips_on_fraction(tmp_path: Path):
 
 
 def test_coordinator_quarantine_breaker_trips_on_absolute_count(tmp_path: Path):
-    """N5c: >100 quarantined in one cycle halts even when the fraction is <=1%."""
+    """>100 quarantine dalam satu siklus menghentikan siklus meski fraksinya <=1%."""
     from src.runtime.raw_evidence import RawEvidenceConflictError
 
     service = _stub_service(tmp_path)
@@ -292,7 +294,7 @@ def test_coordinator_quarantine_breaker_trips_on_absolute_count(tmp_path: Path):
     coord = LiveIngestionCoordinator(service=service, poller=poller)
     with pytest.raises(RuntimeError, match="[Qq]uarantine"):
         coord.run_cycle(current_time=t_now)
-    # P1 latch: breaker_tripped persisted, transport cursor keys NOT committed.
+    # Latch: breaker_tripped tersimpan, key cursor transport TIDAK di-commit.
     assert service.update_live_source_state.called
     payload = service.update_live_source_state.call_args.args[0]
     assert payload["breaker_tripped"]["quarantined"] == 110
@@ -302,7 +304,7 @@ def test_coordinator_quarantine_breaker_trips_on_absolute_count(tmp_path: Path):
 
 
 def test_coordinator_quarantine_flushes_once_per_cycle(tmp_path: Path, monkeypatch):
-    """N5b: per-cycle quarantine entries flush via a single add_many call."""
+    """Entri quarantine per siklus di-flush lewat satu panggilan add_many."""
     service = create_test_service(tmp_path)
     from src.runtime.raw_evidence import RawAlertEvidenceStore
 
@@ -333,11 +335,11 @@ def test_coordinator_quarantine_flushes_once_per_cycle(tmp_path: Path, monkeypat
     result = coord.run_cycle(current_time=t_now)
 
     assert result.quarantined == 1
-    assert calls == [1]  # exactly one batched flush
+    assert calls == [1]  # tepat satu flush batch
 
 
 def test_coordinator_quarantine_logs_error_only_on_first_offense(tmp_path: Path, caplog):
-    """N5a: first quarantine logs error; repeat offense for the same ID logs debug."""
+    """Quarantine pertama dicatat level error; pengulangan untuk ID yang sama dicatat level debug."""
     import logging
 
     service = create_test_service(tmp_path)
@@ -367,7 +369,7 @@ def test_coordinator_quarantine_logs_error_only_on_first_offense(tmp_path: Path,
     t2 = t_now + timedelta(minutes=30)
     with caplog.at_level(logging.DEBUG, logger="src.runtime.live_coordinator"):
         result2 = coord.run_cycle(current_time=t2)
-    # M2(b): already-quarantined alert_77 is skipped, never re-ingested.
+    # alert_77 yang sudah dikarantina dilewati, tidak pernah di-ingest ulang.
     assert result2.quarantined == 0
     assert result2.failures == 0
     assert not [r for r in caplog.records if r.levelno >= logging.ERROR and "Quarantin" in r.getMessage()]
@@ -375,7 +377,7 @@ def test_coordinator_quarantine_logs_error_only_on_first_offense(tmp_path: Path,
 
 
 def test_coordinator_buffer_seen_snapshot_single_lookup_per_candidate(tmp_path: Path, monkeypatch):
-    """F7b/minor: buffer-active cycle calls is_seen exactly once per candidate."""
+    """Siklus dengan buffer aktif memanggil is_seen tepat sekali per kandidat."""
     service = create_test_service(tmp_path)
     t_now = datetime(2026, 8, 28, 10, 30, 0, tzinfo=timezone.utc)
     a_seen = make_raw_alert(1, t_now - timedelta(minutes=2))
@@ -406,7 +408,7 @@ def test_coordinator_buffer_seen_snapshot_single_lookup_per_candidate(tmp_path: 
 
 
 def test_coordinator_full_retention_duplicates_are_safe(tmp_path: Path):
-    """When full retention sweeps all retained indices, already processed alerts are recognized as duplicate no-ops."""
+    """Saat sweep seluruh retensi membaca semua index, alert yang sudah diproses dikenali sebagai duplikat no-op."""
     service = create_test_service(tmp_path)
     poller = MagicMock(spec=WazuhIndexerLivePoller)
 
@@ -423,7 +425,7 @@ def test_coordinator_full_retention_duplicates_are_safe(tmp_path: Path):
     res1 = coord.run_cycle(current_time=t1 + timedelta(minutes=15), force_full_reconciliation=False)
     assert res1.processed_new_ids == 2
 
-    # Later full retention sweep returns a1, a2, and a3
+    # Sweep seluruh retensi berikutnya mengembalikan a1, a2, dan a3.
     poller.poll_recent.return_value = []
     poller.poll_reconciliation.return_value = []
     poller.poll_full_reconciliation.return_value = [a1, a2, a3]
@@ -435,7 +437,7 @@ def test_coordinator_full_retention_duplicates_are_safe(tmp_path: Path):
 
 
 def test_coordinator_persists_transport_state(tmp_path: Path):
-    """Coordinator preserves transport state (cursors and timestamps) in service durable state."""
+    """Coordinator menyimpan state transport (cursor dan timestamp) di state durable service."""
     service = create_test_service(tmp_path)
     poller = MagicMock(spec=WazuhIndexerLivePoller)
     poller.poll_recent.return_value = []
@@ -455,10 +457,11 @@ def test_coordinator_persists_transport_state(tmp_path: Path):
 
 
 def test_coordinator_quarantines_deterministic_conflict_and_continues(tmp_path: Path):
-    """F2 QUARANTINE policy: deterministic evidence conflict mid-cycle is quarantined durably;
-    other candidates are still ingested and the cycle succeeds (cursor commits).
+    """Kebijakan QUARANTINE: konflik evidence deterministik di tengah siklus dikarantina secara durable;
+    kandidat lain tetap di-ingest dan siklus berhasil (cursor di-commit).
 
-    120 candidates / 1 quarantine (0.83%) stays under the N5 circuit breaker (>1%)."""
+    120 kandidat / 1 quarantine (0.83%) masih di bawah batas circuit breaker (>1%).
+    """
     from src.runtime.raw_evidence import RawAlertEvidenceStore
 
     service = create_test_service(tmp_path)
@@ -471,7 +474,7 @@ def test_coordinator_quarantines_deterministic_conflict_and_continues(tmp_path: 
         for i in range(n)
     ]
 
-    # Pre-store conflicting canonical content under alert_77's ID, then flush to SQLite.
+    # Simpan dulu isi kanonis yang bertentangan dengan ID alert_77, lalu flush ke SQLite.
     poison_ts = t_now - timedelta(seconds=(n - 77) * 20)
     poison = make_raw_alert(77, poison_ts, level=9, crit=4)
     service.raw_evidence_store.store(poison)
@@ -497,13 +500,13 @@ def test_coordinator_quarantines_deterministic_conflict_and_continues(tmp_path: 
     assert quarantined[0]["error_type"] == "RawEvidenceConflictError"
     assert quarantined[0]["count"] == 1
 
-    # Cycle succeeded, so the transport cursor commits (no silent halt).
+    # Siklus berhasil, jadi cursor transport di-commit (tidak berhenti diam-diam).
     assert coord.last_fast_poll_at == t_now
     assert service.get_live_source_state()["last_fast_poll_at"] == t_now.isoformat()
 
 
 def test_coordinator_transient_error_still_fails_cycle_without_quarantine(tmp_path: Path):
-    """Transient (non-deterministic) ingest errors must still raise; cursor must not advance."""
+    """Error ingest sementara (non-deterministik) tetap harus dilempar; cursor tidak boleh maju."""
     service = create_test_service(tmp_path)
     poller = MagicMock(spec=WazuhIndexerLivePoller)
 
@@ -524,7 +527,7 @@ def test_coordinator_transient_error_still_fails_cycle_without_quarantine(tmp_pa
 
 
 def test_full_reconciliation_uses_strict_index_coverage(tmp_path: Path):
-    """Full-retention sweep fails hard on unavailable indices (no silent gaps)."""
+    """Sweep seluruh retensi langsung gagal bila ada index yang tidak tersedia (tidak ada celah diam-diam)."""
     service = create_test_service(tmp_path)
     poller = MagicMock(spec=WazuhIndexerLivePoller)
     poller.poll_recent.return_value = []
@@ -542,7 +545,7 @@ def test_full_reconciliation_uses_strict_index_coverage(tmp_path: Path):
 
 
 def test_cycle_records_newest_ingested_event_time(tmp_path: Path):
-    """Cycle commits the newest ingested event-time for honest lag telemetry."""
+    """Siklus meng-commit event-time terbaru yang di-ingest untuk telemetri lag yang jujur."""
     service = create_test_service(tmp_path)
     t_now = datetime(2026, 8, 28, 10, 30, 0, tzinfo=timezone.utc)
     a1 = make_raw_alert(1, t_now - timedelta(minutes=2))
@@ -560,7 +563,7 @@ def test_cycle_records_newest_ingested_event_time(tmp_path: Path):
 
 
 def test_buffer_skips_seen_ids_without_late_pollution(tmp_path: Path):
-    """F7b: reconciliation duplicates bypass the buffer (no late-count pollution)."""
+    """Duplikat dari rekonsiliasi melewati buffer (tidak mengotori hitungan alert terlambat)."""
     service = create_test_service(tmp_path)
     t_now = datetime(2026, 8, 28, 10, 30, 0, tzinfo=timezone.utc)
     a_seen = make_raw_alert(1, t_now - timedelta(minutes=2))
@@ -586,12 +589,12 @@ def test_buffer_skips_seen_ids_without_late_pollution(tmp_path: Path):
     assert coord.order_buffer.status()["size"] == 1
 
 
-def test_m2_persistent_quarantine_skipped_breaker_never_trips(tmp_path: Path, monkeypatch):
-    """M2: 6 persistent defects among 400 alerts over 20 cycles.
+def test_persistent_quarantine_skipped_breaker_never_trips(tmp_path: Path, monkeypatch):
+    """6 cacat persisten di antara 400 alert selama 20 siklus.
 
-    Steady state after the first halt: the 6 IDs are already quarantined, so
-    every cycle skips them (no re-ingest, no failures, no new quarantine) —
-    the breaker never trips and the cursor advances each cycle.
+    Kondisi stabil setelah halt pertama: 6 ID itu sudah dikarantina, jadi setiap siklus
+    melewatinya (tanpa ingest ulang, tanpa kegagalan, tanpa quarantine baru) —
+    breaker tidak pernah trip dan cursor maju di setiap siklus.
     """
     from src.runtime.raw_evidence import RawEvidenceConflictError
 
@@ -646,14 +649,15 @@ def test_m2_persistent_quarantine_skipped_breaker_never_trips(tmp_path: Path, mo
     assert result.processed_new_ids == 394
     assert coord.last_fast_poll_at == t0 + timedelta(minutes=19)
     assert service.state_manager.quarantine_count() == 6
-    assert set(ingest_calls).isdisjoint(poison_ids)  # never re-ingested
-    assert add_many_calls == []  # nothing new to flush
-    assert len(list_calls) == 20  # exactly one quarantine snapshot query per cycle
+    assert set(ingest_calls).isdisjoint(poison_ids)  # tidak pernah di-ingest ulang
+    assert add_many_calls == []  # tidak ada yang baru untuk di-flush
+    assert len(list_calls) == 20  # tepat satu query snapshot quarantine per siklus
 
 
-def test_m2_breaker_counts_only_new_quarantines(tmp_path: Path):
-    """M2(a): genuinely new quarantines still trip the breaker (6 new / 400 =
-    1.5% > 1%), proving the new-only counting did not disable protection."""
+def test_breaker_counts_only_new_quarantines(tmp_path: Path):
+    """Quarantine yang benar-benar baru tetap memicu breaker (6 baru / 400 = 1.5% > 1%),
+    membuktikan penghitungan khusus yang baru tidak mematikan proteksi.
+    """
     from src.runtime.raw_evidence import RawEvidenceConflictError
 
     service = _stub_service(tmp_path)
@@ -675,7 +679,7 @@ def test_m2_breaker_counts_only_new_quarantines(tmp_path: Path):
     coord = LiveIngestionCoordinator(service=service, poller=poller)
     with pytest.raises(RuntimeError, match="[Qq]uarantine"):
         coord.run_cycle(current_time=t_now)
-    # P1 latch: breaker_tripped persisted, transport cursor keys NOT committed.
+    # Latch: breaker_tripped tersimpan, key cursor transport TIDAK di-commit.
     assert service.update_live_source_state.called
     payload = service.update_live_source_state.call_args.args[0]
     assert payload["breaker_tripped"]["quarantined"] == 6
@@ -684,9 +688,10 @@ def test_m2_breaker_counts_only_new_quarantines(tmp_path: Path):
     assert "recent_poll_cursor" not in payload
 
 
-def test_m2_future_dated_alert_does_not_shift_newest(tmp_path: Path):
-    """M2(c): newest_ingested_event_time ignores future-dated (> now + 5 min)
-    candidates even when they ingest successfully."""
+def test_future_dated_alert_does_not_shift_newest(tmp_path: Path):
+    """newest_ingested_event_time mengabaikan kandidat dari masa depan (> now + 5 menit)
+    meski kandidat itu berhasil di-ingest.
+    """
     service = _stub_service(tmp_path)
     service.ingest_alert.side_effect = lambda a: []
     captured: dict = {}
@@ -708,9 +713,10 @@ def test_m2_future_dated_alert_does_not_shift_newest(tmp_path: Path):
     assert captured["newest_ingested_event_time"] == (t_now - timedelta(minutes=2)).isoformat()
 
 
-def test_m2_all_future_dated_writes_explicit_none(tmp_path: Path):
-    """M2(c): with no ingestible non-future candidate the key is written as
-    explicit None, never a stale value from an earlier cycle."""
+def test_all_future_dated_writes_explicit_none(tmp_path: Path):
+    """Tanpa kandidat non-masa-depan yang bisa di-ingest, key ditulis sebagai None eksplisit,
+    bukan nilai basi dari siklus sebelumnya.
+    """
     service = _stub_service(tmp_path)
     service.ingest_alert.side_effect = lambda a: []
     captured: dict = {}
@@ -730,9 +736,10 @@ def test_m2_all_future_dated_writes_explicit_none(tmp_path: Path):
     assert captured["newest_ingested_event_time"] is None
 
 
-def test_m2_quarantined_candidate_excluded_from_newest(tmp_path: Path):
-    """M2(c): the newest-timestamp candidate, when quarantined, must not shift
-    newest_ingested_event_time; the max over successfully ingested wins."""
+def test_quarantined_candidate_excluded_from_newest(tmp_path: Path):
+    """Kandidat dengan timestamp terbaru yang dikarantina tidak boleh menggeser
+    newest_ingested_event_time; yang dipakai adalah maksimum dari yang berhasil di-ingest.
+    """
     from src.runtime.raw_evidence import RawEvidenceConflictError
 
     service = _stub_service(tmp_path)
@@ -765,9 +772,10 @@ def test_m2_quarantined_candidate_excluded_from_newest(tmp_path: Path):
     assert captured["newest_ingested_event_time"] == (t_now - timedelta(hours=2)).isoformat()
 
 
-def test_p1_breaker_latch_halts_cycles_until_matching_ack(tmp_path: Path):
-    """P1 longitudinal: 30% burst trips cycle-1 and latches; cycles 2-3 raise
-    on the latch without work; a wrong ack still raises; matching ack resumes."""
+def test_breaker_latch_halts_cycles_until_matching_ack(tmp_path: Path):
+    """Jangka panjang: burst 30% memicu trip di siklus 1 dan latch; siklus 2-3 langsung error karena
+    latch tanpa bekerja; ack yang salah tetap error; ack yang cocok melanjutkan siklus.
+    """
     from src.runtime.raw_evidence import RawEvidenceConflictError
 
     service = _stub_service(tmp_path)
@@ -799,7 +807,7 @@ def test_p1_breaker_latch_halts_cycles_until_matching_ack(tmp_path: Path):
     assert latch["quarantined"] == 30
     assert latch["submitted"] == 100
     assert latch.get("at")
-    assert service.state_manager.quarantine_count() == 30  # flush persisted despite halt
+    assert service.state_manager.quarantine_count() == 30  # flush tetap tersimpan meski halt
 
     for step in (5, 10):
         service.ingest_alert.reset_mock()
@@ -823,9 +831,10 @@ def test_p1_breaker_latch_halts_cycles_until_matching_ack(tmp_path: Path):
     assert store.get("breaker_tripped") is None
 
 
-def test_minor_skip_quarantined_before_buffer_never_buffered(tmp_path: Path):
-    """Minor order-buffer: quarantined IDs are filtered before OrderBuffer.add,
-    so the buffer never holds them; the skip is observable via skipped_quarantined."""
+def test_skip_quarantined_before_buffer_never_buffered(tmp_path: Path):
+    """ID yang dikarantina disaring sebelum OrderBuffer.add sehingga buffer tidak pernah menahannya;
+    penyaringan ini terlihat lewat skipped_quarantined.
+    """
     service = _stub_service(tmp_path)
     service.ingest_alert.side_effect = lambda a: []
     service.state_manager.quarantine_add("alert_1", error_type="E1")
@@ -853,9 +862,10 @@ def test_minor_skip_quarantined_before_buffer_never_buffered(tmp_path: Path):
     assert "alert_1" not in tried
 
 
-def test_minor_unidentified_bad_doc_key_is_content_hash(tmp_path: Path):
-    """Minor(b): bad docs without doc_id key by sha256(content)[:12] — stable
-    across cycles (no :pos suffix), so the repeat is skipped, not re-quarantined."""
+def test_unidentified_bad_doc_key_is_content_hash(tmp_path: Path):
+    """Dokumen buruk tanpa doc_id diberi kunci sha256(content)[:12] — stabil antar siklus
+    (tanpa akhiran :pos), sehingga pengulangannya dilewati, bukan dikarantina ulang.
+    """
     import hashlib
     import json as _json
 
@@ -874,8 +884,8 @@ def test_minor_unidentified_bad_doc_key_is_content_hash(tmp_path: Path):
     coord.run_cycle(current_time=t_now)
     rows = service.state_manager.quarantine_list()
     assert len(rows) == 1
-    # Minor: the key hashes {index, doc_id} ONLY — page_pos embedded in the
-    # error text is excluded, so the key is stable across cycles.
+    # Kunci hanya meng-hash {index, doc_id} — page_pos yang ada di teks error tidak ikut,
+    # sehingga kunci stabil antar siklus.
     expected = "unidentified:" + hashlib.sha256(
         _json.dumps(
             {"index": "wazuh-alerts-4.x-2026.08.28", "doc_id": None},
@@ -885,8 +895,8 @@ def test_minor_unidentified_bad_doc_key_is_content_hash(tmp_path: Path):
     ).hexdigest()[:12]
     assert rows[0]["wazuh_alert_id"] == expected
 
-    # A re-polled identical doc at a different page_pos (different error
-    # text) maps to the SAME key: skipped, not re-quarantined.
+    # Dokumen identik yang di-poll ulang di page_pos berbeda (teks error berbeda)
+    # mendapat kunci YANG SAMA: dilewati, bukan dikarantina ulang.
     bad2 = {"index": "wazuh-alerts-4.x-2026.08.28", "doc_id": None, "error": "boom (page_pos=7)"}
     poller.poll_recent.side_effect = lambda **k: (setattr(poller, "last_bad_docs", [dict(bad2)]) or valid)
     result2 = coord.run_cycle(current_time=t_now + timedelta(minutes=5))

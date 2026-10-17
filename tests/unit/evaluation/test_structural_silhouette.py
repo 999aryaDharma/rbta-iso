@@ -1,4 +1,4 @@
-"""Unit tests for Structural Silhouette and Permutation Baseline Evaluation (Sprint 8)."""
+"""Unit test evaluasi Silhouette struktural dan baseline permutasi."""
 from datetime import datetime, timedelta, timezone
 import pytest
 
@@ -24,7 +24,7 @@ def make_alert(idx: int, ts: datetime, agent_id: str = "001", group: str = "pam"
 
 
 def test_structural_silhouette_and_permutation_baseline():
-    """Structural silhouette evaluates observed partition against 100 same-proportion permutations."""
+    """Silhouette struktural membandingkan partisi observasi dengan 100 permutasi berproporsi sama."""
     base_t = datetime(2026, 8, 28, 10, 0, 0, tzinfo=timezone.utc)
     alerts = [
         make_alert(
@@ -38,7 +38,7 @@ def test_structural_silhouette_and_permutation_baseline():
         for i in range(50)
     ]
 
-    # Batch run & train model
+    # Jalankan batch & latih model.
     batch_res = BatchResearchRunner(base_delta_t=timedelta(minutes=15), adaptive=False).run(alerts)
     bundle = train_reference_pipeline(batch_res.meta_alerts, random_state=42, model_version="eval-v1")
     scoring_pipe = ScoringPipeline(bundle)
@@ -61,14 +61,14 @@ def test_structural_silhouette_and_permutation_baseline():
         assert result.null_histogram is not None
         assert sum(result.null_histogram["counts"]) == result.n_valid_permutations
     else:
-        # If partition only had 1 class, is_calculable is False
+        # Bila partisi hanya punya 1 kelas, is_calculable bernilai False.
         assert result.uncalculable_reason is not None
 
 def test_structural_silhouette_action_partitioning():
-    """Verify explicit mapping and two/single-class edge cases for silhouette."""
+    """Pemetaan eksplisit serta edge case dua kelas/satu kelas untuk silhouette."""
     base_t = datetime(2026, 8, 28, 10, 0, 0, tzinfo=timezone.utc)
 
-    # Create dummy bundle for scaler
+    # Buat bundle dummy untuk scaler.
     alerts = [
         make_alert(
             i,
@@ -109,13 +109,13 @@ def test_structural_silhouette_action_partitioning():
         mock_sma("SUPPRESS", "NOISE", -1.0)
     ]
 
-    # 1. Controlled two-class test
+    # Uji dua kelas yang terkendali.
     res_two = run_structural_silhouette_evaluation(metas_two_class, bundle, n_permutations=100)
     assert res_two.is_calculable is True
     assert res_two.n_valid_permutations == 100
     assert res_two.random_mean is not None
 
-    # 2. Single-class test
+    # Uji satu kelas.
     metas_single = [
         mock_sma("SUPPRESS", "NOISE", 0.0),
         mock_sma("DAILY_DIGEST", "NOISE_HIGH", 0.0)
@@ -123,7 +123,7 @@ def test_structural_silhouette_action_partitioning():
     res_single = run_structural_silhouette_evaluation(metas_single, bundle, n_permutations=100)
     assert res_single.is_calculable is False
 
-    # 3. Explicit mapping assertion
+    # Assertion pemetaan eksplisit.
     import numpy as np
     observed = np.array([1 if s.action == "ESCALATE" else 0 for s in metas_two_class], dtype=int)
     assert list(observed) == [1, 1, 0, 0]

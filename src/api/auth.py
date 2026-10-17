@@ -5,7 +5,7 @@ import os
 
 
 def get_api_key(request: Request, authorization: Optional[str] = Header(None)) -> str:
-    """Dependency validating HTTP Authorization header against configured API key."""
+    """Dependency yang mencocokkan header Authorization dengan API key yang dikonfigurasi."""
     expected_key = getattr(request.app.state, "auth_key", None)
     if expected_key is None:
         expected_key = os.getenv("RBTA_API_KEY", "")

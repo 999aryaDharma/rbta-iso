@@ -1,13 +1,13 @@
-"""Live worker thread running ingestion cycles inside the FastAPI process (L2).
+"""Thread live worker yang menjalankan siklus ingestion di dalam proses FastAPI.
 
-Design decisions (locked 2026-09-29):
-- The worker is a single daemon thread owned by the backend process lifespan.
-  No separate process, no IPC; the service RLock already serializes mutations.
-- Constraint: exactly one backend process. Multi-worker uvicorn would start
-  one thread per process and is NOT supported (single-writer interprocess
-  lock is an explicit non-goal).
-- Disabled by default (RBTA_LIVE_WORKER_ENABLED=true to opt in) so normal
-  replay/demo operation is unaffected.
+Keputusan desain (dikunci 2026-09-29):
+- Worker adalah satu daemon thread milik lifespan proses backend. Tanpa proses
+  terpisah dan tanpa IPC; RLock service sudah menyerialkan semua mutasi.
+- Batasan: tepat satu proses backend. uvicorn multi-worker akan menjalankan satu
+  thread per proses dan TIDAK didukung (lock single-writer antar proses memang
+  sengaja tidak dikerjakan).
+- Nonaktif secara default (RBTA_LIVE_WORKER_ENABLED=true untuk mengaktifkan) agar
+  operasi replay/demo biasa tidak terpengaruh.
 """
 
 from datetime import datetime, timezone
@@ -25,44 +25,43 @@ logger = logging.getLogger(__name__)
 
 _JOIN_TIMEOUT_SEC = 30.0
 
-# Upper bound for exponential backoff between failed ingestion cycles.
+# Batas atas exponential backoff di antara siklus ingestion yang gagal.
 _BACKOFF_MAX_SEC = 300.0
 
-# Process-lifetime handles for OS-level state locks (held until the process
-# exits to guarantee a single live writer; released early only in tests via
-# release_state_lock).
+# Handle lock state level OS yang hidup selama proses berjalan (ditahan sampai proses
+# berhenti untuk menjamin hanya ada satu writer live; hanya dilepas lebih awal di test
+# lewat release_state_lock).
 _STATE_LOCK_HANDLES: list = []
 
-# Lock-file path (str) -> open handle, backing release_state_lock.
+# Path file lock (str) -> handle terbuka, dipakai oleh release_state_lock.
 _STATE_LOCK_PATHS: Dict[str, Any] = {}
 
 
 def worker_enabled_from_env(env_map: Mapping[str, str]) -> bool:
-    """Whether the live worker thread is opted in via environment."""
+    """Apakah thread live worker diaktifkan lewat environment."""
     return str(env_map.get("RBTA_LIVE_WORKER_ENABLED", "false")).strip().lower() == "true"
 
 
 def drain_on_stop_from_env(env_map: Mapping[str, str]) -> bool:
-    """Whether worker shutdown drains open buckets (default false).
+    """Apakah shutdown worker menguras bucket yang masih terbuka (default false).
 
-    Drain is an explicit decommission operation, not the normal shutdown
-    path: on plain restart open buckets stay preserved in durable state.
+    Drain adalah operasi decommission yang eksplisit, bukan jalur shutdown normal:
+    pada restart biasa bucket terbuka tetap tersimpan di state durable.
     """
     return str(env_map.get("RBTA_LIVE_WORKER_DRAIN_ON_STOP", "false")).strip().lower() == "true"
 
 
 def acquire_state_lock(state_path: Any):
-    """Hold an OS-level exclusive lock for ``<state>.lock`` (fail fast).
+    """Tahan lock eksklusif level OS untuk ``<state>.lock`` (langsung gagal bila sudah dipegang).
 
-    The lock is held for the lifetime of the process (handles are retained
-    in :data:`_STATE_LOCK_HANDLES` and never released, except in tests via
-    :func:`release_state_lock`) so that at most one backend process ever
-    writes the live runtime state.
+    Lock ditahan selama proses hidup (handle disimpan di :data:`_STATE_LOCK_HANDLES` dan
+    tidak pernah dilepas, kecuali di test lewat :func:`release_state_lock`) supaya paling
+    banyak satu proses backend yang menulis state runtime live.
 
     Raises
     ------
     RuntimeError
-        If another live writer already holds the lock.
+        Bila writer live lain sudah memegang lock.
     """
     lock_path = Path(str(state_path) + ".lock")
     lock_path.parent.mkdir(parents=True, exist_ok=True)
@@ -107,12 +106,12 @@ def acquire_state_lock(state_path: Any):
 
 
 def release_state_lock(state_path: Any) -> bool:
-    """Best-effort release of a lock held via :func:`acquire_state_lock`.
+    """Lepaskan lock yang diambil lewat :func:`acquire_state_lock` (best effort).
 
-    Unlocks, closes, and forgets the registry handle for ``<state>.lock``.
-    Production never calls this (the lock is process-lifetime); it exists
-    so tests can release and re-acquire. Never raises: returns True when a
-    held lock was released, False when nothing was held.
+    Unlock, tutup, dan lupakan handle registry untuk ``<state>.lock``. Produksi tidak
+    pernah memanggil ini (lock berlaku selama proses hidup); fungsi ini ada agar test
+    bisa melepas dan mengambil ulang lock. Tidak pernah error: True bila lock yang
+    dipegang berhasil dilepas, False bila tidak ada yang dipegang.
     """
     lock_path = str(Path(str(state_path) + ".lock"))
     handle = _STATE_LOCK_PATHS.pop(lock_path, None)
@@ -148,7 +147,7 @@ def release_state_lock(state_path: Any) -> bool:
 
 
 def poll_interval_from_env(env_map: Mapping[str, str]) -> float:
-    """Seconds between ingestion cycles (default 5.0)."""
+    """Jeda antar siklus ingestion dalam detik (default 5.0)."""
     try:
         return max(0.1, float(env_map.get("RBTA_LIVE_POLL_INTERVAL_SEC", "5.0")))
     except (TypeError, ValueError):
@@ -156,11 +155,11 @@ def poll_interval_from_env(env_map: Mapping[str, str]) -> float:
 
 
 class LiveWorker:
-    """Runs LiveIngestionCoordinator cycles on a background thread.
+    """Menjalankan siklus LiveIngestionCoordinator di thread latar belakang.
 
-    A failed cycle is recorded (last_error, consecutive_failures) and the
-    worker continues: the coordinator only commits transport cursors on
-    success, so a failed cycle never advances state.
+    Siklus yang gagal dicatat (last_error, consecutive_failures) dan worker tetap jalan:
+    coordinator hanya meng-commit cursor transport saat berhasil, jadi siklus yang gagal
+    tidak pernah memajukan state.
     """
 
     def __init__(
@@ -178,9 +177,9 @@ class LiveWorker:
         self.poll_interval = max(0.01, float(poll_interval))
         self.drain_on_stop = drain_on_stop
         self._sleep_fn = sleep_fn
-        # Raw one-time override values forwarded from the bootstrap env_map
-        # (None -> fall back to os.environ at pin time, so callers that only
-        # set the process environment keep working).
+        # Nilai override sekali pakai yang diteruskan dari env_map bootstrap
+        # (None -> pakai os.environ saat pinning, agar pemanggil yang hanya mengatur
+        # environment proses tetap berfungsi).
         self.model_override = model_override
         self.derivation_override = derivation_override
         self._stop_event = threading.Event()
@@ -193,7 +192,7 @@ class LiveWorker:
         self.last_cycle_at: Optional[str] = None
 
     def start(self) -> bool:
-        """Start the worker thread. Returns False if already running."""
+        """Jalankan thread worker. False bila sudah berjalan."""
         with self._guard:
             if self._thread is not None and self._thread.is_alive():
                 return False
@@ -206,11 +205,11 @@ class LiveWorker:
             return True
 
     def stop(self, drain: Optional[bool] = None) -> None:
-        """Stop the worker thread (idempotent) and optionally drain buckets.
+        """Hentikan thread worker (idempoten) dan opsional menguras bucket.
 
-        Drain is cooperative: it only runs once the worker thread has exited.
-        If the thread is still alive after the join timeout, the drain is
-        skipped with a warning so an in-flight cycle is never raced.
+        Drain bersifat kooperatif: hanya dijalankan setelah thread worker selesai.
+        Bila thread masih hidup setelah batas waktu join, drain dilewati dengan peringatan
+        agar tidak balapan dengan siklus yang sedang berjalan.
         """
         with self._guard:
             self._stop_event.set()
@@ -228,12 +227,12 @@ class LiveWorker:
             self.service.shutdown(drain=True)
 
     def is_alive(self) -> bool:
-        """Whether the worker thread is currently running."""
+        """Apakah thread worker sedang berjalan."""
         with self._guard:
             return self._thread is not None and self._thread.is_alive()
 
     def status(self) -> Dict[str, Any]:
-        """Operational snapshot for the read-only live status API (L3)."""
+        """Snapshot operasional untuk API status live yang read-only."""
         with self._state_lock:
             return {
                 "alive": self.is_alive(),
@@ -244,14 +243,13 @@ class LiveWorker:
             }
 
     def _pin_model_version(self) -> None:
-        """Record the frozen scoring model version for this live session.
+        """Catat versi model scoring beku untuk sesi live ini.
 
-        A previously pinned version that differs from the current pipeline
-        rejects startup (stale-model fail-fast), unless the operator passes
-        a one-time override whose value equals the current version
-        (``RBTA_LIVE_MODEL_OVERRIDE=<version>``) or the service carries a
-        new ``run_id``. Missing ``model_version`` metadata is a hard error:
-        the worker never falls back to ``"unknown"``.
+        Versi yang sudah di-pin sebelumnya dan berbeda dari pipeline saat ini menolak startup
+        (model basi langsung gagal), kecuali operator memberi override sekali pakai yang nilainya
+        sama dengan versi saat ini (``RBTA_LIVE_MODEL_OVERRIDE=<version>``) atau service membawa
+        ``run_id`` baru. Metadata ``model_version`` yang tidak ada adalah error keras: worker tidak
+        pernah fallback ke ``"unknown"``.
         """
         pipeline = getattr(self.service, "scoring_pipeline", None)
         metadata = getattr(pipeline, "metadata", None)
@@ -281,9 +279,12 @@ class LiveWorker:
             "live_model_version": version,
             "live_worker_started_at": now,
         }
-        # M1: first-seen start marker, written exactly once per state file.
-        # Unlike live_worker_started_at (refreshed every start), this key is
-        # only set when absent so restarts never overwrite the original.
+        # Log start terbatas untuk worker_restarts di ekspor bukti harian (T6).
+        start_log = [s for s in (source_state.get("live_worker_start_log") or []) if isinstance(s, str)]
+        payload["live_worker_start_log"] = (start_log + [now])[-400:]
+        # Penanda waktu mulai pertama, ditulis tepat satu kali per file state.
+        # Berbeda dengan live_worker_started_at (diperbarui setiap start), key ini hanya diisi
+        # bila belum ada sehingga restart tidak pernah menimpa nilai aslinya.
         if "live_first_started_at" not in source_state:
             payload["live_first_started_at"] = now
         if current_run:
@@ -305,7 +306,7 @@ class LiveWorker:
 
     @staticmethod
     def _resolve_override(raw: Any, env_name: str) -> Optional[str]:
-        """Raw override value: explicit constructor value wins, else os.environ."""
+        """Nilai override mentah: nilai dari constructor diutamakan, selain itu os.environ."""
         value = raw if raw is not None else os.environ.get(env_name)
         if value is None or value is False:
             return None
@@ -323,12 +324,11 @@ class LiveWorker:
         current_run: Any,
         old_run: Any,
     ) -> bool:
-        """Fail fast on a stale pin; exact-value override or new run allows.
+        """Langsung gagal bila pin sudah basi; override dengan nilai persis atau run baru diizinkan.
 
-        The override is one-time and version-bound: it must equal the
-        current target value, never a blanket ``"true"``. A set-but-wrong
-        override raises instead of being ignored (fail-closed). Returns
-        True when startup may continue.
+        Override bersifat sekali pakai dan terikat versi: harus sama dengan nilai target saat ini,
+        bukan ``"true"`` sembarangan. Override yang diisi tapi salah akan error alih-alih diabaikan
+        (gagal tertutup). True bila startup boleh lanjut.
         """
         if not pinned or pinned == current:
             return True
@@ -365,16 +365,15 @@ class LiveWorker:
     def _check_derivation_hash(
         self, source_state: Dict[str, Any], current_run: Any, old_run: Any
     ) -> Optional[str]:
-        """Reject startup on derivation-config drift; store baseline when unset.
+        """Tolak startup bila konfigurasi derivasi berubah; simpan baseline bila belum ada.
 
-        Fail-closed: a hash that cannot be computed raises here and is never
-        swallowed by the worker.
+        Gagal tertutup: hash yang tidak bisa dihitung langsung error di sini dan tidak pernah
+        ditelan oleh worker.
 
-        Returns the re-pinned hash when a stored-vs-current mismatch was
-        tolerated (exact-value override or new run_id) and the stored
-        baseline was rewritten, else None. The caller audits a non-None
-        return in ``live_pin_history`` so the next restart without an
-        override succeeds against the new baseline.
+        Mengembalikan hash yang di-pin ulang bila ketidakcocokan tersimpan-vs-sekarang ditoleransi
+        (override nilai persis atau run_id baru) dan baseline tersimpan sudah ditulis ulang, selain
+        itu None. Pemanggil mencatat nilai non-None di ``live_pin_history`` agar restart berikutnya
+        tanpa override berhasil terhadap baseline yang baru.
         """
         state_manager = self.service.state_manager
         stored = state_manager.get_derivation_hash()
@@ -392,17 +391,17 @@ class LiveWorker:
             state_manager.set_derivation_hash(current)
             return None
         if stored != current:
-            # Mismatch was tolerated above (override accepted or new run):
-            # re-pin the baseline so restarts without the override succeed.
+            # Ketidakcocokan sudah ditoleransi di atas (override diterima atau run baru):
+            # pin ulang baseline agar restart tanpa override berhasil.
             state_manager.set_derivation_hash(current)
             return current
         return None
 
     def _backoff_delay(self) -> float:
-        """Exponential backoff with jitter after consecutive cycle failures.
+        """Exponential backoff dengan jitter setelah siklus gagal berturut-turut.
 
-        Grows from the base poll interval (``base * 2**(failures-1)``) up to
-        a 5-minute cap; a small proportional jitter avoids lock-step retries.
+        Tumbuh dari interval poll dasar (``base * 2**(failures-1)``) sampai batas 5 menit;
+        jitter proporsional kecil mencegah retry yang serempak.
         """
         base = max(0.01, float(self.poll_interval))
         failures = max(1, self.consecutive_failures)
@@ -411,7 +410,7 @@ class LiveWorker:
         return delay + jitter
 
     def _sleep(self, delay: float) -> None:
-        """Wait between cycles on the stop event (or the injected sleep_fn verbatim)."""
+        """Tunggu di antara siklus pada stop event (atau sleep_fn yang di-inject apa adanya)."""
         (self._sleep_fn or self._stop_event.wait)(delay)
 
     def _run(self) -> None:

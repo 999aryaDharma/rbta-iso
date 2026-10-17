@@ -1,4 +1,4 @@
-"""Unit tests for the canonical SevenFeatureExtractor (Sprint 3)."""
+"""Unit test SevenFeatureExtractor kanonis."""
 import math
 from datetime import datetime, timezone
 import pytest
@@ -23,7 +23,7 @@ def make_meta_alert(
     critical_mitre_present: bool = False,
     agent_criticality: int = 1,
 ) -> MetaAlert:
-    """Helper to construct valid MetaAlert for feature extraction tests."""
+    """Helper untuk membuat MetaAlert valid bagi test ekstraksi fitur."""
     rule_dist = rule_id_distribution if rule_id_distribution is not None else {"5501": alert_count}
     sev_dist = severity_distribution if severity_distribution is not None else {max_severity: alert_count}
 
@@ -46,7 +46,7 @@ def make_meta_alert(
 
 
 def test_feature_columns_exact_order_and_names():
-    """Authoritative FEATURE_COLUMNS must match exactly 7 features in research order."""
+    """FEATURE_COLUMNS harus tepat 7 fitur sesuai urutan penelitian."""
     expected = (
         "max_severity",
         "mitre_tactic_count",
@@ -60,7 +60,7 @@ def test_feature_columns_exact_order_and_names():
 
 
 def test_singleton_entropy_and_dispersion_are_zero():
-    """Singleton meta-alert (alert_count=1) must have rule_diversity_shannon=0.0 and severity_dispersion=0.0."""
+    """Meta-alert singleton (alert_count=1) harus punya rule_diversity_shannon=0.0 dan severity_dispersion=0.0."""
     meta = make_meta_alert(alert_count=1, max_severity=5, rule_id_distribution={"5501": 1}, severity_distribution={5: 1})
     features = SevenFeatureExtractor.extract_features_dict(meta)
 
@@ -72,21 +72,21 @@ def test_singleton_entropy_and_dispersion_are_zero():
 
 
 def test_repeated_same_rule_entropy_is_zero():
-    """Meta-alert with multiple alerts but only 1 unique rule must have normalized entropy = 0.0."""
+    """Meta-alert dengan banyak alert tetapi hanya 1 rule unik harus punya entropi ternormalisasi = 0.0."""
     meta = make_meta_alert(alert_count=100, rule_id_distribution={"5501": 100})
     entropy = compute_rule_diversity_shannon(meta.rule_id_distribution)
     assert entropy == 0.0
 
 
 def test_balanced_two_rules_normalized_entropy_is_one():
-    """Two rules with equal proportions (50%/50%) must yield normalized Shannon entropy = 1.0."""
+    """Dua rule dengan proporsi sama (50%/50%) harus menghasilkan entropi Shannon ternormalisasi = 1.0."""
     rule_dist = {"rule_A": 50, "rule_B": 50}
     entropy = compute_rule_diversity_shannon(rule_dist)
     assert entropy == pytest.approx(1.0)
 
 
 def test_unbalanced_multiple_rules_shannon_entropy():
-    """Shannon entropy for proportions [0.5, 0.25, 0.25] normalized by ln(3)."""
+    """Entropi Shannon untuk proporsi [0.5, 0.25, 0.25] dinormalisasi dengan ln(3)."""
     rule_dist = {"r1": 10, "r2": 5, "r3": 5}
     # H = -(0.5*ln(0.5) + 0.25*ln(0.25) + 0.25*ln(0.25)) = 0.5*0.693147 + 0.5*1.386294 = 1.03972
     # H_norm = 1.03972 / ln(3) = 1.03972 / 1.098612 = 0.94639
@@ -96,18 +96,18 @@ def test_unbalanced_multiple_rules_shannon_entropy():
 
 
 def test_severity_dispersion_calculation():
-    """Severity dispersion is the population standard deviation of rule levels."""
-    # 5 alerts of level 3 and 5 alerts of level 7 -> mean = 5.0, std = 2.0
+    """Severity dispersion adalah simpangan baku populasi dari rule level."""
+    # 5 alert level 3 dan 5 alert level 7 -> mean = 5.0, std = 2.0
     sev_dist = {3: 5, 7: 5}
     dispersion = compute_severity_dispersion(sev_dist)
     assert dispersion == pytest.approx(2.0)
 
-    # Identical severity -> dispersion = 0.0
+    # Severity identik -> dispersion = 0.0
     assert compute_severity_dispersion({4: 20}) == 0.0
 
 
 def test_mitre_tactics_count_and_critical_flag():
-    """MITRE tactics are counted uniquely and critical flag is represented as 1.0 / 0.0."""
+    """Taktik MITRE dihitung unik dan flag kritis direpresentasikan sebagai 1.0 / 0.0."""
     meta1 = make_meta_alert(
         mitre_tactics=("Execution", "Initial Access", "Defense Evasion"),
         critical_mitre_present=True,
@@ -126,21 +126,21 @@ def test_mitre_tactics_count_and_critical_flag():
 
 
 def test_alert_count_log_is_log1p():
-    """alert_count_log must equal math.log1p(alert_count)."""
+    """alert_count_log harus sama dengan math.log1p(alert_count)."""
     meta = make_meta_alert(alert_count=42)
     features = SevenFeatureExtractor.extract_features_dict(meta)
     assert features["alert_count_log"] == pytest.approx(math.log1p(42))
 
 
 def test_agent_criticality_float_conversion():
-    """agent_criticality is extracted as a float matching domain range [1.0, 4.0]."""
+    """agent_criticality diekstrak sebagai float dalam rentang domain [1.0, 4.0]."""
     meta = make_meta_alert(agent_criticality=4)
     features = SevenFeatureExtractor.extract_features_dict(meta)
     assert features["agent_criticality"] == 4.0
 
 
 def test_extract_features_vector_exact_order():
-    """extract_features_vector returns tuple of floats matching exact FEATURE_COLUMNS order."""
+    """extract_features_vector mengembalikan tuple float sesuai urutan FEATURE_COLUMNS."""
     meta = make_meta_alert(
         alert_count=10,
         max_severity=8,
@@ -154,18 +154,18 @@ def test_extract_features_vector_exact_order():
     assert isinstance(vec, tuple)
     assert len(vec) == 7
 
-    # Check order
+    # Cek urutan.
     assert vec[0] == 8.0  # max_severity
     assert vec[1] == 1.0  # mitre_tactic_count
     assert vec[2] == 1.0  # critical_mitre_tactic_present
     assert vec[3] == pytest.approx(math.log1p(10))  # alert_count_log
-    assert vec[4] == pytest.approx(1.0)  # rule_diversity_shannon (balanced 2 rules)
-    assert vec[5] == pytest.approx(1.0)  # severity_dispersion (6 and 8, mean 7, std 1)
+    assert vec[4] == pytest.approx(1.0)  # rule_diversity_shannon (2 rule seimbang)
+    assert vec[5] == pytest.approx(1.0)  # severity_dispersion (6 dan 8, mean 7, std 1)
     assert vec[6] == 3.0  # agent_criticality
 
 
 def test_extract_features_df_schema_and_dtypes():
-    """extract_features_df returns pd.DataFrame with exact FEATURE_COLUMNS and float64 dtypes."""
+    """extract_features_df mengembalikan pd.DataFrame dengan FEATURE_COLUMNS persis dan dtype float64."""
     meta1 = make_meta_alert(alert_count=5, max_severity=4)
     meta2 = make_meta_alert(alert_count=20, max_severity=12)
 
@@ -177,7 +177,7 @@ def test_extract_features_df_schema_and_dtypes():
 
 
 def test_missing_required_aggregate_raises_error():
-    """Invalid input object missing required MetaAlert attributes must raise FeatureExtractionError without silent fallback."""
+    """Objek input yang tidak punya atribut MetaAlert wajib harus melempar FeatureExtractionError tanpa fallback diam-diam."""
     class FakeMeta:
         pass
 

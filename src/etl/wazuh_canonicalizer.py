@@ -1,13 +1,13 @@
-"""Canonicalizer for converting raw Wazuh events and OpenSearch search hits into CanonicalRawAlert.
+"""Canonicalizer yang mengubah event Wazuh mentah dan hit pencarian OpenSearch menjadi CanonicalRawAlert.
 
-Supports:
-- Raw Wazuh alert JSON (from alerts.json or REST API)
-- OpenSearch search hits ({_index, _id, _source, sort})
-- Nested MITRE (rule.mitre.tactic / technique / id)
-- Flattened MITRE (rule.mitre_tactics / rule.mitre_techniques)
-- Strict timezone normalization to UTC (rejection of naive timestamps)
-- Case-insensitive MITRE tactic deduplication (preserving first encountered casing)
-- Safe malformed rule group normalization
+Mendukung:
+- JSON alert Wazuh mentah (dari alerts.json atau REST API)
+- Hit pencarian OpenSearch ({_index, _id, _source, sort})
+- MITRE bersarang (rule.mitre.tactic / technique / id)
+- MITRE datar (rule.mitre_tactics / rule.mitre_techniques)
+- Normalisasi timezone ketat ke UTC (timestamp naive ditolak)
+- Dedup taktik MITRE tanpa membedakan huruf besar/kecil (penulisan pertama dipertahankan)
+- Normalisasi rule group yang tidak valid secara aman
 """
 
 from datetime import datetime, timezone
@@ -21,12 +21,12 @@ _OFFSET_REGEX = re.compile(r"([+-]\d{2}:?\d{2}|Z|z)$")
 
 
 class CanonicalizationError(ValueError):
-    """Raised when raw alert data is missing mandatory fields or malformed."""
+    """Dilempar bila data raw alert tidak punya field wajib atau formatnya rusak."""
     pass
 
 
 def _clean_str_field(val: Any) -> str | None:
-    """Clean a string field, returning None if value is None, empty, or 'none'/'null'."""
+    """Bersihkan field string; kembalikan None bila nilainya None, kosong, atau 'none'/'null'."""
     if val is None:
         return None
     s = str(val).strip()
@@ -36,28 +36,28 @@ def _clean_str_field(val: Any) -> str | None:
 
 
 def parse_wazuh_timestamp(val: Any) -> datetime:
-    """Parse a valid Wazuh timestamp representation into a timezone-aware UTC datetime.
+    """Parse representasi timestamp Wazuh menjadi datetime UTC yang timezone-aware.
 
-    Strict Policy:
-    - Timezone-aware datetime: converted to UTC.
-    - Explicit 'Z' or offset (e.g. +08:00, +0000): converted to UTC.
-    - Numeric epoch: converted to UTC.
-    - Naive datetime or naive string: REJECTED with CanonicalizationError.
+    Aturan:
+    - Datetime timezone-aware: dikonversi ke UTC.
+    - 'Z' atau offset eksplisit (mis. +08:00, +0000): dikonversi ke UTC.
+    - Epoch numerik: dikonversi ke UTC.
+    - Datetime atau string naive: DITOLAK dengan CanonicalizationError.
 
     Parameters
     ----------
     val : Any
-        Timestamp value (ISO8601 string, epoch number, or datetime).
+        Nilai timestamp (string ISO8601, angka epoch, atau datetime).
 
     Returns
     -------
     datetime
-        Timezone-aware datetime in UTC.
+        Datetime UTC yang timezone-aware.
 
     Raises
     ------
     CanonicalizationError
-        If timestamp is missing, naive, or unparseable.
+        Bila timestamp tidak ada, naive, atau tidak bisa di-parse.
     """
     if val is None or val == "":
         raise CanonicalizationError("Event timestamp is required and cannot be empty")
@@ -68,7 +68,7 @@ def parse_wazuh_timestamp(val: Any) -> datetime:
         return val.astimezone(timezone.utc)
 
     if isinstance(val, (int, float)):
-        # If timestamp is in milliseconds (epoch > 1e11)
+        # Epoch dalam milidetik (epoch > 1e11).
         epoch_sec = val / 1000.0 if val > 1e11 else float(val)
         try:
             return datetime.fromtimestamp(epoch_sec, tz=timezone.utc)
@@ -80,13 +80,13 @@ def parse_wazuh_timestamp(val: Any) -> datetime:
         if not ts_str:
             raise CanonicalizationError("Event timestamp string is empty")
 
-        # Check for timezone offset or Z
+        # Cek offset timezone atau Z.
         if not _OFFSET_REGEX.search(ts_str):
             raise CanonicalizationError(
                 f"Invalid or naive timestamp '{val}'; explicit UTC 'Z' or timezone offset is required"
             )
 
-        # Normalize trailing Z/z to standard +00:00 for fromisoformat
+        # Ubah akhiran Z/z menjadi +00:00 agar bisa dibaca fromisoformat.
         if ts_str.endswith("Z") or ts_str.endswith("z"):
             ts_iso = ts_str[:-1] + "+00:00"
         else:
@@ -100,7 +100,7 @@ def parse_wazuh_timestamp(val: Any) -> datetime:
         except Exception:
             pass
 
-        # Try strptime with standard offset formats
+        # Coba strptime dengan format offset standar.
         for fmt in (
             "%Y-%m-%dT%H:%M:%S.%f%z",
             "%Y-%m-%dT%H:%M:%S%z",
@@ -121,26 +121,26 @@ def parse_wazuh_timestamp(val: Any) -> datetime:
 
 
 def extract_mitre_tactics(rule_dict: Mapping[str, Any]) -> tuple[str, ...]:
-    """Extract unique MITRE ATT&CK tactic names with case-insensitive deduplication.
+    """Ambil nama taktik MITRE ATT&CK unik, dedup tanpa membedakan huruf besar/kecil.
 
-    Supports:
-    - rule.mitre.tactic (list of strings, single string, or pipe-separated)
-    - rule.mitre_tactics (list of strings)
-    - rule.mitre_tactic (string or list)
+    Mendukung:
+    - rule.mitre.tactic (list string, string tunggal, atau dipisah pipe)
+    - rule.mitre_tactics (list string)
+    - rule.mitre_tactic (string atau list)
 
     Parameters
     ----------
     rule_dict : Mapping[str, Any]
-        Rule dictionary from Wazuh alert.
+        Dict rule dari alert Wazuh.
 
     Returns
     -------
     tuple[str, ...]
-        Tuple of unique MITRE tactic names preserving discovery order and first representation.
+        Tuple nama taktik unik sesuai urutan ditemukan dan penulisan pertamanya.
     """
     raw_candidates: list[str] = []
 
-    # Check nested rule.mitre
+    # Cek rule.mitre bersarang.
     mitre_block = rule_dict.get("mitre")
     if isinstance(mitre_block, dict):
         raw_tactic = mitre_block.get("tactic")
@@ -155,7 +155,7 @@ def extract_mitre_tactics(rule_dict: Mapping[str, Any]) -> tuple[str, ...]:
                 if clean:
                     raw_candidates.append(clean)
 
-    # Check flattened rule.mitre_tactics
+    # Cek rule.mitre_tactics versi datar.
     flat_tactics = rule_dict.get("mitre_tactics")
     if isinstance(flat_tactics, (list, tuple)):
         for item in flat_tactics:
@@ -168,7 +168,7 @@ def extract_mitre_tactics(rule_dict: Mapping[str, Any]) -> tuple[str, ...]:
             if clean:
                 raw_candidates.append(clean)
 
-    # Check flattened rule.mitre_tactic
+    # Cek rule.mitre_tactic versi datar.
     single_flat = rule_dict.get("mitre_tactic")
     if isinstance(single_flat, str):
         for part in single_flat.split("|"):
@@ -181,7 +181,7 @@ def extract_mitre_tactics(rule_dict: Mapping[str, Any]) -> tuple[str, ...]:
             if clean:
                 raw_candidates.append(clean)
 
-    # Deduplicate case-insensitively while preserving first representation and discovery order
+    # Dedup tanpa membedakan huruf besar/kecil, pertahankan penulisan dan urutan pertama.
     seen_keys: set[str] = set()
     deduped: list[str] = []
     for t in raw_candidates:
@@ -194,19 +194,19 @@ def extract_mitre_tactics(rule_dict: Mapping[str, Any]) -> tuple[str, ...]:
 
 
 def extract_source_ip(data_dict: Mapping[str, Any], raw_dict: Mapping[str, Any]) -> str | None:
-    """Extract source IP from data.srcip or top-level srcip.
+    """Ambil IP sumber dari data.srcip atau srcip di level atas.
 
     Parameters
     ----------
     data_dict : Mapping[str, Any]
-        Data payload dictionary.
+        Dict payload data.
     raw_dict : Mapping[str, Any]
-        Raw alert dictionary.
+        Dict raw alert.
 
     Returns
     -------
     str | None
-        Normalized source IP address or None.
+        IP sumber yang sudah dinormalisasi, atau None.
     """
     raw_ip = data_dict.get("srcip") if isinstance(data_dict, dict) else None
     if raw_ip is None:
@@ -216,7 +216,7 @@ def extract_source_ip(data_dict: Mapping[str, Any], raw_dict: Mapping[str, Any])
 
 
 def extract_clean_rule_groups(rule_dict: Mapping[str, Any]) -> tuple[str, ...]:
-    """Extract valid cleaned rule groups, filtering out None, null, empty strings, and 'none'."""
+    """Ambil rule group yang valid; buang None, null, string kosong, dan 'none'."""
     raw_groups = rule_dict.get("groups")
     if isinstance(raw_groups, (list, tuple)):
         items = raw_groups
@@ -239,29 +239,29 @@ def extract_clean_rule_groups(rule_dict: Mapping[str, Any]) -> tuple[str, ...]:
 
 
 def canonicalize_wazuh_alert(event: Mapping[str, Any]) -> CanonicalRawAlert:
-    """Canonicalize a raw Wazuh alert dictionary or OpenSearch search hit into CanonicalRawAlert.
+    """Kanonisasi dict alert Wazuh mentah atau hit OpenSearch menjadi CanonicalRawAlert.
 
     Parameters
     ----------
     event : Mapping[str, Any]
-        Raw Wazuh alert or OpenSearch hit dictionary.
+        Dict alert Wazuh mentah atau hit OpenSearch.
 
     Returns
     -------
     CanonicalRawAlert
-        Normalized, validated, immutable canonical raw alert.
+        Raw alert kanonis yang sudah dinormalisasi, divalidasi, dan immutable.
 
     Raises
     ------
     CanonicalizationError
-        If mandatory fields are missing or schema is invalid.
+        Bila field wajib tidak ada atau skema tidak valid.
     """
     if not isinstance(event, (dict, Mapping)):
         raise CanonicalizationError(f"Expected event dictionary/mapping, got {type(event)}")
 
     envelope_meta: dict[str, Any] = {}
 
-    # Check for OpenSearch hit envelope
+    # Cek apakah ini envelope hit OpenSearch.
     if "_source" in event and isinstance(event["_source"], dict):
         alert_body = event["_source"]
         if "_index" in event:
@@ -273,18 +273,18 @@ def canonicalize_wazuh_alert(event: Mapping[str, Any]) -> CanonicalRawAlert:
     else:
         alert_body = event
 
-    # 1. Wazuh Alert ID — MUST come from alert_body.id (or _source.id), NEVER OpenSearch _id
+    # ID alert Wazuh HARUS dari alert_body.id (atau _source.id), JANGAN dari _id OpenSearch.
     raw_id = alert_body.get("id")
     cleaned_id = _clean_str_field(raw_id)
     if cleaned_id is None:
         raise CanonicalizationError("Wazuh alert must contain a valid top-level 'id'")
     wazuh_alert_id = cleaned_id
 
-    # 2. Timestamp
+    # Timestamp
     raw_ts = alert_body.get("timestamp")
     timestamp = parse_wazuh_timestamp(raw_ts)
 
-    # 3. Rule Block
+    # Blok rule
     rule = alert_body.get("rule")
     if not isinstance(rule, dict) or not rule:
         raise CanonicalizationError("Wazuh alert missing required 'rule' dictionary")
@@ -295,7 +295,7 @@ def canonicalize_wazuh_alert(event: Mapping[str, Any]) -> CanonicalRawAlert:
         raise CanonicalizationError("Wazuh alert rule missing required 'rule.id'")
     rule_id = cleaned_rule_id
 
-    # Strict rule.level validation
+    # Validasi rule.level secara ketat.
     raw_level = rule.get("level")
     if raw_level is None or isinstance(raw_level, bool):
         raise CanonicalizationError("Wazuh alert rule missing required 'rule.level'")
@@ -308,11 +308,11 @@ def canonicalize_wazuh_alert(event: Mapping[str, Any]) -> CanonicalRawAlert:
     if not (0 <= rule_level <= 15):
         raise CanonicalizationError(f"Rule level {rule_level} outside valid Wazuh range [0, 15]")
 
-    # Cleaned rule groups
+    # Rule group yang sudah dibersihkan.
     clean_groups = extract_clean_rule_groups(rule)
     rule_group_primary = resolve_primary_rule_group(clean_groups)
 
-    # 4. Agent Block (deterministic null and whitespace normalization)
+    # Blok agent (normalisasi null dan whitespace secara deterministik).
     agent = alert_body.get("agent")
     if isinstance(agent, dict):
         agent_id_clean = _clean_str_field(agent.get("id"))
@@ -322,7 +322,7 @@ def canonicalize_wazuh_alert(event: Mapping[str, Any]) -> CanonicalRawAlert:
         agent_id = "000"
         agent_name_clean = None
 
-    # Fallback to manager name if agent name is not present
+    # Fallback ke nama manager bila nama agent tidak ada.
     if agent_name_clean is not None:
         agent_name = agent_name_clean
     else:
@@ -335,14 +335,14 @@ def canonicalize_wazuh_alert(event: Mapping[str, Any]) -> CanonicalRawAlert:
 
     agent_criticality = get_agent_criticality(agent_name=agent_name, agent_id=agent_id)
 
-    # 5. MITRE Tactics
+    # Taktik MITRE
     mitre_tactics = extract_mitre_tactics(rule)
 
-    # 6. Source IP
+    # IP sumber
     data_block = alert_body.get("data", {})
     srcip = extract_source_ip(data_block if isinstance(data_block, dict) else {}, alert_body)
 
-    # 7. Metadata preservation
+    # Simpan metadata.
     metadata: dict[str, Any] = {**envelope_meta}
     if "description" in rule:
         metadata["rule_description"] = rule["description"]

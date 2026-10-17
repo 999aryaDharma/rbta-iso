@@ -79,7 +79,7 @@ describe('PipelineStageDetail component', () => {
       />
     );
 
-    expect(screen.getByText(/Level Threshold/i)).toBeDefined();
+    expect(screen.getByText(/Batas skor & tindakan/i)).toBeDefined();
     expect(screen.getByText(/\+0.050000/)).toBeDefined();
   });
 });

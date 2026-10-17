@@ -1,8 +1,8 @@
-"""Scored meta-alert contract for Isolation Forest inference and operational outbox."""
+"""Kontrak meta-alert terskor untuk inferensi Isolation Forest dan outbox operasional."""
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Mapping
+from typing import Any, Mapping, Optional
 
 from src.contracts.immutability import freeze_value
 
@@ -23,52 +23,56 @@ VALID_ACTIONS: frozenset[str] = frozenset({
 
 @dataclass(frozen=True, slots=True)
 class ScoredMetaAlert:
-    """Immutable domain representation of a scored and prioritized Meta-Alert.
+    """Representasi domain immutable dari Meta-Alert yang sudah diskor dan diprioritaskan.
 
     Attributes
     ----------
     meta_id : int
-        Meta-alert ID.
+        ID meta-alert.
     agent_id : str
-        Agent identifier.
+        ID agent.
     agent_name : str
-        Agent host name.
+        Nama host agent.
     rule_group_primary : str
-        Primary rule group.
+        Rule group primer.
     start_time : datetime
-        Timezone-aware start timestamp.
+        Timestamp awal (timezone-aware).
     end_time : datetime
-        Timezone-aware end timestamp.
+        Timestamp akhir (timezone-aware).
     alert_count : int
-        Number of raw alerts aggregated.
+        Jumlah raw alert yang diagregasi.
     max_severity : int
-        Maximum rule severity.
+        Severity rule tertinggi.
     mitre_tactics : tuple[str, ...]
-        Unique MITRE ATT&CK tactics.
+        Taktik MITRE ATT&CK unik.
     seven_features : Mapping[str, float]
-        Recursively immutable dictionary mapping feature name to normalized value for the canonical 7 features.
+        Dict immutable nama fitur -> nilai ternormalisasi untuk 7 fitur kanonis.
     raw_model_score : float
-        Oriented raw anomaly score from Isolation Forest.
+        Skor anomali mentah Isolation Forest (sudah diorientasikan).
     anomaly_score : float
-        Calibrated stream-safe anomaly score [calibrated against reference].
+        Skor anomali terkalibrasi yang aman untuk stream (dikalibrasi terhadap reference).
     threshold_used : float
-        Tukey IQR threshold used for decision.
+        Threshold Tukey IQR yang dipakai untuk keputusan.
     decision : str
-        Decision Matrix quadrant or contextual anomaly classification.
+        Kuadran Decision Matrix atau klasifikasi anomali kontekstual.
     action : str
-        Action recommendation ('ESCALATE', 'DAILY_DIGEST', 'SUPPRESS').
+        Rekomendasi tindakan ('ESCALATE', 'DAILY_DIGEST', 'SUPPRESS').
     escalate : bool
-        Flag indicating if action is ESCALATE.
+        Penanda apakah action bernilai ESCALATE.
     model_version : str
-        Version identifier of the loaded Isolation Forest model artifact.
+        ID versi artefak model Isolation Forest yang dimuat.
     feature_schema_version : str
-        Version of the feature schema.
+        Versi skema fitur.
     score_calibration_version : str
-        Version of the score calibration transform.
+        Versi transformasi kalibrasi skor.
     source_alert_ids : tuple[str, ...]
-        Traceable tuple of all member Wazuh alert IDs.
+        Tuple semua ID alert Wazuh anggota, untuk penelusuran.
     metadata : Mapping[str, Any]
-        Recursively immutable audit metadata.
+        Metadata audit (immutable).
+    top_deviations : tuple[tuple[str, float], ...] | None
+        Opsional (T11): dua fitur dengan |nilai RobustScaler| terbesar, yaitu (x - median reference)
+        / IQR reference (sklearn memakai skala 1 bila IQR = 0). Penjelasan ringan, BUKAN atribusi
+        skor Isolation Forest; None untuk record lama.
     """
 
     meta_id: int
@@ -92,6 +96,7 @@ class ScoredMetaAlert:
     score_calibration_version: str
     source_alert_ids: tuple[str, ...]
     metadata: Mapping[str, Any] = field(default_factory=dict)
+    top_deviations: Optional[tuple[tuple[str, float], ...]] = None
 
     def __post_init__(self) -> None:
         if self.decision not in VALID_DECISIONS:
@@ -108,3 +113,7 @@ class ScoredMetaAlert:
 
         object.__setattr__(self, "seven_features", freeze_value(self.seven_features))
         object.__setattr__(self, "metadata", freeze_value(self.metadata))
+        if self.top_deviations is not None:
+            object.__setattr__(
+                self, "top_deviations", tuple((str(n), float(v)) for n, v in self.top_deviations)
+            )

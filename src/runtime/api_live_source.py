@@ -1,11 +1,10 @@
-"""Drop-in live poller over the frozen flat custom API.
+"""Live poller pengganti langsung di atas flat custom API.
 
-Implements the same minimal poller interface
-``LiveIngestionCoordinator`` uses (``poll_recent`` /
-``poll_reconciliation`` / ``poll_full_reconciliation`` / ``poll_once`` +
-``last_bad_docs``) so the coordinator, worker, order buffer, quarantine,
-and Telegram paths are reused unchanged. No daily indices here: every
-path paginates the intermediary ``{events,total,limit,offset}`` API.
+Mengimplementasikan antarmuka poller minimal yang dipakai ``LiveIngestionCoordinator``
+(``poll_recent`` / ``poll_reconciliation`` / ``poll_full_reconciliation`` / ``poll_once`` +
+``last_bad_docs``), sehingga jalur coordinator, worker, order buffer, quarantine, dan
+Telegram dipakai ulang tanpa perubahan. Di sini tidak ada index harian: semua jalur
+memakai paginasi API perantara ``{events,total,limit,offset}``.
 """
 
 from datetime import datetime
@@ -19,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 
 class WazuhAPILivePoller:
-    """Polls the custom intermediary API and returns canonical alerts."""
+    """Polling API perantara kustom dan mengembalikan alert kanonis."""
 
     def __init__(
         self,

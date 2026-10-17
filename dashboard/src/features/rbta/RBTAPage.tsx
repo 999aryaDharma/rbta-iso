@@ -5,6 +5,7 @@ import { fetchAgents, fetchBuckets } from '@/api/dashboard';
 import { MetricCard } from '@/components/shared/MetricCard';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { formatNumber, formatSeconds, formatDateTime } from '@/lib/formatters';
+import { TERMS } from '@/lib/labels';
 import { Table } from '@cloudflare/kumo/components/table';
 import { Badge } from '@cloudflare/kumo/components/badge';
 import { Pagination } from '@cloudflare/kumo/components/pagination';
@@ -31,42 +32,42 @@ export function RBTAPage() {
   return (
     <>
       <PageHeader
-        breadcrumbs={['Security Analytics', 'RBTA Engine']}
-        title="RBTA Aggregation Engine Telemetry"
-        description="Real-time agent temporal state tracking, dynamic window adaptation (Δt), and active in-memory buckets"
+        breadcrumbs={['Analisis', 'Status pengelompokan']}
+        title="Status pengelompokan RBTA"
+        description="Kelompok terbuka dan jendela waktu (Δt) per agen. RBTA = pengelompokan per agen dan kategori aturan, tanpa mencampur agen"
       />
 
       <div className="px-6 py-8 lg:px-10 space-y-8">
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-5">
-          <MetricCard label="Active Agents" value={formatNumber(activeAgents)} sub="Monitored host agents" />
-          <MetricCard label="Warmed-up Agents" value={formatNumber(warmedUp)} sub="Baseline calibrated" />
-          <MetricCard label="Seen Alerts" value={formatNumber(seenAlerts)} sub="Total incoming raw events" />
-          <MetricCard label="Open Active Buckets" value={formatNumber(activeBuckets)} sub="In-flight aggregation windows" />
+          <MetricCard label="Agen aktif" value={formatNumber(activeAgents)} sub="Agen yang dipantau" />
+          <MetricCard label="Agen selesai masa belajar awal" hint={TERMS.warmup} value={formatNumber(warmedUp)} sub="Rata-rata jeda awal sudah terbentuk" />
+          <MetricCard label="Alert diterima" value={formatNumber(seenAlerts)} sub="Total alert masuk" />
+          <MetricCard label={TERMS.bucketOpen} value={formatNumber(activeBuckets)} sub="Masih menunggu alert berikutnya" />
         </div>
 
         <div className="rounded-xl border border-kumo-hairline bg-kumo-canvas shadow-xs overflow-hidden">
           <div className="px-6 py-4 border-b border-kumo-hairline flex items-center justify-between">
             <div>
               <h2 className="text-sm font-semibold text-kumo-strong">
-                Agent Temporal States ({agents.length})
+                Jendela waktu per agen ({agents.length})
               </h2>
               <p className="text-xs text-kumo-subtle mt-0.5">
-                Dynamic inter-arrival timing, exponential moving averages, and adaptive Δt windows
+                Jeda antar-alert, rata-rata bergerak, dan jendela waktu adaptif (Δt) tiap agen
               </p>
             </div>
           </div>
           <Table>
             <Table.Header>
               <Table.Row className="bg-kumo-recessed/50 text-[11px] uppercase tracking-wider">
-                <Table.Head>Agent ID</Table.Head>
-                <Table.Head>Name</Table.Head>
-                <Table.Head className="text-right">Events</Table.Head>
-                <Table.Head className="text-center">Warmup</Table.Head>
-                <Table.Head className="text-right">Baseline Gap</Table.Head>
-                <Table.Head className="text-right">EMA Gap</Table.Head>
-                <Table.Head className="text-right">Base Δt</Table.Head>
-                <Table.Head className="text-right">Current Δt</Table.Head>
-                <Table.Head className="text-right">Buckets</Table.Head>
+                <Table.Head>ID agen</Table.Head>
+                <Table.Head>Nama</Table.Head>
+                <Table.Head className="text-right">Alert</Table.Head>
+                <Table.Head className="text-center">Masa belajar awal</Table.Head>
+                <Table.Head className="text-right">{TERMS.baselineGap}</Table.Head>
+                <Table.Head className="text-right">{TERMS.emaGap}</Table.Head>
+                <Table.Head className="text-right">{TERMS.baseDeltaT}</Table.Head>
+                <Table.Head className="text-right">{TERMS.currentDeltaT}</Table.Head>
+                <Table.Head className="text-right">Kelompok</Table.Head>
                 <Table.Head className="text-center">Status</Table.Head>
               </Table.Row>
             </Table.Header>
@@ -96,7 +97,7 @@ export function RBTAPage() {
               {agents.length === 0 && (
                 <Table.Row>
                   <Table.Cell colSpan={10} className="py-12 text-center text-xs text-kumo-subtle font-mono">
-                    No agent states active yet.
+                    Belum ada agen aktif.
                   </Table.Cell>
                 </Table.Row>
               )}
@@ -123,22 +124,22 @@ export function RBTAPage() {
           <div className="px-6 py-4 border-b border-kumo-hairline flex items-center justify-between">
             <div>
               <h2 className="text-sm font-semibold text-kumo-strong">
-                Active In-Flight Aggregation Buckets ({buckets.length})
+                {TERMS.bucketOpen} ({buckets.length})
               </h2>
               <p className="text-xs text-kumo-subtle mt-0.5">
-                Open temporal buffers awaiting expiration timeout before Isolation Forest evaluation
+                Kelompok yang menunggu batas waktu sebelum dinilai Isolation Forest
               </p>
             </div>
           </div>
           <Table>
             <Table.Header>
               <Table.Row className="bg-kumo-recessed/50 text-[11px] uppercase tracking-wider">
-                <Table.Head>Agent / Host</Table.Head>
-                <Table.Head>Primary Rule Group</Table.Head>
-                <Table.Head>Window Opened At</Table.Head>
-                <Table.Head>Last Alert Time</Table.Head>
-                <Table.Head className="text-right">Accumulated Events</Table.Head>
-                <Table.Head className="text-right">Max Severity</Table.Head>
+                <Table.Head>Agen</Table.Head>
+                <Table.Head>Kategori aturan (Rule Group)</Table.Head>
+                <Table.Head>Mulai dikelompokkan</Table.Head>
+                <Table.Head>Alert terakhir</Table.Head>
+                <Table.Head className="text-right">Jumlah alert</Table.Head>
+                <Table.Head className="text-right">Keparahan maks.</Table.Head>
               </Table.Row>
             </Table.Header>
             <Table.Body>
@@ -155,7 +156,7 @@ export function RBTAPage() {
               {buckets.length === 0 && (
                 <Table.Row>
                   <Table.Cell colSpan={6} className="py-12 text-center text-xs text-kumo-subtle font-mono">
-                    No open buckets currently active in runtime memory.
+                    Tidak ada kelompok alert yang terbuka saat ini.
                   </Table.Cell>
                 </Table.Row>
               )}

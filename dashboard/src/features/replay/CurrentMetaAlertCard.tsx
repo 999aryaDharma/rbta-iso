@@ -30,7 +30,7 @@ export function CurrentMetaAlertCard({
       <div className="flex flex-wrap items-center justify-between gap-4 pb-3 border-b border-kumo-hairline">
         <div className="flex items-center gap-3">
           <div className="text-xs font-semibold uppercase tracking-wider text-kumo-strong">
-            MetaAlert terbaru
+            Meta-alert terbaru
           </div>
           {latestMeta ? (
             <Badge variant="secondary">
@@ -43,17 +43,17 @@ export function CurrentMetaAlertCard({
 
         <div className="flex flex-wrap items-center gap-4 text-xs font-mono">
           <div className="flex items-center gap-1.5 text-kumo-subtle">
-            <span>Pengurangan:</span>
+            <span>Pengurangan alert:</span>
             <span className="font-semibold text-kumo-strong">{reductionRate.toFixed(1)}%</span>
             <span className="text-[11px] text-kumo-subtle">({formatNumber(rawProcessed)} alert → {formatNumber(metaFinalized)} kelompok)</span>
           </div>
 
           <div className="flex items-center gap-3 pl-3 border-l border-kumo-hairline">
             <span className="text-rose-500 font-semibold flex items-center gap-1">
-              <Warning size={13} /> Perlu perhatian: {decisionCounts.ESCALATE || 0}
+              <Warning size={13} /> Perlu dicek segera: {decisionCounts.ESCALATE || 0}
             </span>
             <span className="text-kumo-subtle flex items-center gap-1">
-              Disembunyikan: {decisionCounts.SUPPRESS || 0}
+              Tidak ditampilkan di antrean: {decisionCounts.SUPPRESS || 0}
             </span>
             {decisionCounts.DAILY_DIGEST ? (
               <span className="text-kumo-subtle flex items-center gap-1">
@@ -72,7 +72,7 @@ export function CurrentMetaAlertCard({
               {latestMeta.agent_name} ({latestMeta.agent_id})
             </div>
             <div className="font-mono text-xs text-kumo-subtle">
-              Kelompok aturan: <span className="text-kumo-default font-medium">{latestMeta.rule_group_primary}</span>
+              Kategori aturan: <span className="text-kumo-default font-medium">{latestMeta.rule_group_primary}</span>
             </div>
           </div>
 
@@ -82,7 +82,7 @@ export function CurrentMetaAlertCard({
               <span className="font-mono font-bold text-kumo-strong">{latestMeta.alert_count}</span> alert digabungkan
             </div>
             <div className="text-xs text-kumo-subtle">
-              Tingkat tertinggi: <span className="font-mono font-semibold text-kumo-default">{latestMeta.max_severity}</span> / 15
+              Keparahan maks.: <span className="font-mono font-semibold text-kumo-default">{latestMeta.max_severity}</span> / 15
             </div>
           </div>
 
@@ -95,8 +95,8 @@ export function CurrentMetaAlertCard({
               </span>
             </div>
             <div className="flex justify-between text-[10px] font-mono text-kumo-subtle">
-              <span>Skor: {score.toFixed(4)}</span>
-              <span>Batas: {threshold.toFixed(4)}</span>
+              <span>Skor keanehan: {score.toFixed(4)}</span>
+              <span>Batas skor: {threshold.toFixed(4)}</span>
             </div>
             <p className="text-[10px] leading-4 text-kumo-subtle">{margin >= 0 ? 'Skor berada di atas batas.' : 'Skor berada di bawah batas.'} Angka asli ditampilkan tanpa dipotong.</p>
           </div>
@@ -114,7 +114,7 @@ export function CurrentMetaAlertCard({
         </div>
       ) : (
         <div className="py-6 text-center text-xs text-kumo-subtle font-mono">
-          Data sedang diproses. MetaAlert akan muncul setelah satu kelompok alert selesai.
+          Data sedang diproses. Meta-alert akan muncul setelah satu kelompok alert selesai.
         </div>
       )}
     </div>

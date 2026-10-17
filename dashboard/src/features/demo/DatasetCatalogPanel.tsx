@@ -30,11 +30,11 @@ export function DatasetCatalogPanel({
         <div className="flex max-w-3xl gap-3">
           <div>
             <h2 id="catalog-title" className="font-bold text-kumo-strong">
-              Indeks corpus replay
+              Indeks data replay
             </h2>
             <p className="mt-1 text-sm leading-relaxed text-kumo-subtle">
-              Indeks menghitung event, rentang waktu, validitas, dan SHA-256 di
-              background sebelum replay seluruh corpus. File <code>.meta</code>{" "}
+              Indeks menghitung jumlah alert, rentang waktu, validitas, dan SHA-256 di
+              latar belakang sebelum replay seluruh data. File <code>.meta</code>{" "}
               tidak dibaca sebagai alert; hanya <code>.jsonl</code> dan{" "}
               <code>.jsonl.gz</code>.
             </p>
@@ -80,7 +80,7 @@ export function DatasetCatalogPanel({
             ? "Siap untuk Semua dataset"
             : running
               ? "Sedang mengindeks"
-              : `${status?.pending_files ?? total} pending`}
+              : `${status?.pending_files ?? total} menunggu`}
         </span>
       </div>
       {running && status?.current_file && (
@@ -90,14 +90,14 @@ export function DatasetCatalogPanel({
       )}
       {status?.last_error && (
         <p className="mt-2 text-xs text-red-600">
-          Indeks menemukan masalah. Periksa file sebelum menjalankan seluruh
-          corpus.
+          Indeks menemukan masalah. Periksa berkas sebelum menjalankan seluruh
+          data.
         </p>
       )}
       {Boolean(status?.invalid_files) && (
         <p className="mt-2 text-xs text-red-600">
           {status?.invalid_files} dataset berisi alert tidak valid. Replay
-          seluruh corpus diblokir sampai diperbaiki.
+          seluruh data diblokir sampai diperbaiki.
         </p>
       )}
     </section>

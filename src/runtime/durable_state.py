@@ -134,6 +134,18 @@ class DurableStateManager:
                 """
             )
             self._ensure_column(conn, "notification_log", "sent_at", "TEXT")
+            # Label analyst (T8). Satu label terbaru per MetaAlert; history label tidak disimpan.
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS analyst_verdict (
+                    meta_id INTEGER PRIMARY KEY,
+                    verdict TEXT NOT NULL CHECK (verdict IN ('incident', 'actionable_benign', 'noise')),
+                    note TEXT NOT NULL DEFAULT '',
+                    labeled_by TEXT NOT NULL DEFAULT '',
+                    labeled_at TEXT NOT NULL
+                )
+                """
+            )
 
     @staticmethod
     def _ensure_column(conn: sqlite3.Connection, table: str, column: str, decl: str) -> None:
@@ -392,6 +404,26 @@ class DurableStateManager:
         with sqlite3.connect(self.history_db_path) as conn:
             rows = conn.execute("SELECT agent, COUNT(*) FROM excluded_alerts GROUP BY agent ORDER BY agent").fetchall()
         return {str(agent): int(count) for agent, count in rows}
+
+    def verdict_set(self, meta_id: int, verdict: str, note: str = "", labeled_by: str = "") -> Dict[str, Any]:
+        """Simpan (atau ganti) label analyst untuk satu MetaAlert final."""
+        labeled_at = datetime.now(timezone.utc).isoformat()
+        with sqlite3.connect(self.history_db_path) as conn:
+            conn.execute(
+                "INSERT OR REPLACE INTO analyst_verdict (meta_id, verdict, note, labeled_by, labeled_at)"
+                " VALUES (?, ?, ?, ?, ?)",
+                (int(meta_id), str(verdict), str(note or ""), str(labeled_by or ""), labeled_at),
+            )
+            conn.commit()
+        return {"meta_id": int(meta_id), "verdict": verdict, "note": note or "", "labeled_by": labeled_by or "",
+                "labeled_at": labeled_at}
+
+    def verdict_map(self) -> Dict[int, Dict[str, Any]]:
+        """Semua label analyst, meta_id -> {meta_id, verdict, note, labeled_by, labeled_at}."""
+        with sqlite3.connect(self.history_db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute("SELECT meta_id, verdict, note, labeled_by, labeled_at FROM analyst_verdict").fetchall()
+        return {int(r["meta_id"]): dict(r) for r in rows}
 
     def suppression_add(self, meta_id: int, reason: str) -> None:
         """Tahan notifikasi untuk satu meta ID final (idempoten, alasan pertama yang dipakai).

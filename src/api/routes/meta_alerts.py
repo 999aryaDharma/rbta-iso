@@ -1,5 +1,7 @@
+from datetime import date, datetime, timedelta
 from typing import Any, Dict, List, Literal, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from pydantic import BaseModel, Field
 
 from src.api.auth import get_api_key
 from src.runtime.context_resolver import DashboardRuntimeResolver
@@ -74,6 +76,47 @@ def list_meta_alerts(
     }
 
 
+class VerdictIn(BaseModel):
+    verdict: Literal["incident", "actionable_benign", "noise"]
+    note: str = Field("", max_length=2000)
+    labeled_by: str = Field("", max_length=100)
+
+
+@router.get("/review-queue")
+def review_queue(
+    end_date: Optional[date] = Query(None, description="Hari terakhir (WITA, YYYY-MM-DD); default hari ini"),
+    days: int = Query(7, ge=1, le=31, description="Jumlah hari ke belakang"),
+    resolver: DashboardRuntimeResolver = Depends(_get_resolver),
+    api_key: str = Depends(get_api_key),
+) -> Dict[str, Any]:
+    """Antrean review live: semua ESCALATE + sampel deterministik 5% SUPPRESS dan 5% DAILY_DIGEST per hari."""
+    from src.runtime.evidence_export import WITA
+    from src.runtime.review_queue import SAMPLE_RATE, build_review_queue, summarize_queue
+
+    service, _, _ = resolver.resolve(None)
+    if service is None:
+        raise HTTPException(status_code=503, detail="Live service uninitialized")
+    last = end_date or datetime.now(WITA).date()
+    day_list = [last - timedelta(days=i) for i in range(days)]
+    items = build_review_queue(service.state_manager, day_list)
+    return {"items": items, "summary": summarize_queue(items), "sample_rate": SAMPLE_RATE,
+            "days": [d.isoformat() for d in day_list]}
+
+
+@router.post("/{meta_id}/verdict")
+def set_meta_alert_verdict(
+    meta_id: int,
+    body: VerdictIn,
+    resolver: DashboardRuntimeResolver = Depends(_get_resolver),
+    api_key: str = Depends(get_api_key),
+) -> Dict[str, Any]:
+    """Simpan label analyst untuk MetaAlert live (tidak mengubah decision/action model)."""
+    service, _, _ = resolver.resolve(None)
+    if service is None or service.get_meta_detail(meta_id) is None:
+        raise HTTPException(status_code=404, detail=f"MetaAlert #{meta_id} not found")
+    return service.state_manager.verdict_set(meta_id, body.verdict, body.note.strip(), body.labeled_by.strip())
+
+
 @router.get("/{meta_id}")
 def get_meta_alert_detail(
     meta_id: int,
@@ -84,7 +127,11 @@ def get_meta_alert_detail(
     service, evidence_store, _ = resolver.resolve(run_id)
     m = service.get_meta_detail(meta_id)
     if m is not None:
-        return _scored_alert_to_dict(m)
+        payload = _scored_alert_to_dict(m)
+        if not run_id:
+            # Label analyst hanya untuk MetaAlert live.
+            payload["analyst_verdict"] = service.state_manager.verdict_map().get(meta_id)
+        return payload
     raise HTTPException(status_code=404, detail=f"MetaAlert #{meta_id} not found")
 
 

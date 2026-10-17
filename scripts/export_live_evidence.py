@@ -17,7 +17,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from src.runtime.durable_state import DurableStateManager  # noqa: E402
-from src.runtime.evidence_export import WITA, export_day, load_source_state  # noqa: E402
+from src.runtime.evidence_export import WITA, export_analyst_verdicts, export_day, load_source_state  # noqa: E402
 
 
 def main() -> int:
@@ -44,6 +44,7 @@ def main() -> int:
     data = export_day(
         manager, Path(args.evidence_db), out_dir, day, identity, load_source_state(manager.history_db_path)
     )
+    export_analyst_verdicts(manager, out_dir)
     print(json.dumps(data["summary"], indent=1, default=str))
     return 0
 

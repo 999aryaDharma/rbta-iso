@@ -23,6 +23,7 @@ import {
   MagnifyingGlass,
   CaretUpDown,
   Pulse,
+  ListChecks,
 } from "@phosphor-icons/react";
 
 export function AppSidebar() {
@@ -177,6 +178,16 @@ export function AppSidebar() {
                 onClick={() => navigate(withRunId("/live"))}
               >
                 Live
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                icon={ListChecks}
+                active={isPathActive("/review-queue")}
+                tooltip="Antrean review analyst (live)"
+                onClick={() => navigate("/review-queue")}
+              >
+                Review Queue
               </SidebarMenuButton>
             </SidebarMenuItem>
             <SidebarMenuItem>

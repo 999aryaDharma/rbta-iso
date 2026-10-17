@@ -40,7 +40,9 @@ WITA = ZoneInfo("Asia/Makassar")
 SUMMARY_FILE = "daily_summary.csv"
 PER_AGENT_FILE = "daily_per_agent.csv"
 QUANTILE_FILE = "feature_quantiles_live.csv"
-EVIDENCE_FILES = frozenset({SUMMARY_FILE, PER_AGENT_FILE, QUANTILE_FILE})
+VERDICT_FILE = "analyst_verdicts.csv"
+VERDICT_SUMMARY_FILE = "analyst_verdicts_summary.csv"
+EVIDENCE_FILES = frozenset({SUMMARY_FILE, PER_AGENT_FILE, QUANTILE_FILE, VERDICT_FILE, VERDICT_SUMMARY_FILE})
 
 SUMMARY_COLUMNS = [
     "date", "model_version", "model_sha256", "raw_alerts", "excluded_alerts", "meta_alerts", "arr",
@@ -50,6 +52,10 @@ SUMMARY_COLUMNS = [
 ]
 PER_AGENT_COLUMNS = ["date", "agent", "raw", "meta", "escalate", "digest", "suppress"]
 QUANTILE_COLUMNS = ["date", "feature", "n", "q1", "median", "q3", "p95"]
+VERDICT_COLUMNS = [
+    "meta_id", "date", "agent", "rule_group_primary", "decision", "action", "anomaly_score",
+    "queue_reason", "verdict", "note", "labeled_by", "labeled_at",
+]
 
 
 def wita_day_bounds(day: date) -> tuple:
@@ -212,6 +218,53 @@ def export_day(
     return data
 
 
+def _write_csv(path: Path, columns: List[str], rows: List[Dict[str, Any]]) -> None:
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    with tmp.open("w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=columns, extrasaction="ignore")
+        writer.writeheader()
+        writer.writerows({c: ("" if r.get(c) is None else r.get(c)) for c in columns} for r in rows)
+    os.replace(tmp, path)
+
+
+def export_analyst_verdicts(state_manager: Any, out_dir: Path) -> int:
+    """Tulis ulang analyst_verdicts.csv (satu baris per MetaAlert berlabel) + ringkasan per hari.
+
+    Ringkasan dihitung atas antrean review hari-hari yang punya label: precision@ESCALATE
+    (incident / labeled, dan incident+actionable_benign / labeled) serta jumlah temuan di sampel
+    SUPPRESS/DIGEST. Label analyst pada sampel, bukan ground truth seluruh korpus.
+    """
+    from src.runtime.review_queue import build_review_queue, summarize_queue
+
+    verdicts = state_manager.verdict_map()
+    rows: List[Dict[str, Any]] = []
+    days = set()
+    for meta_id in sorted(verdicts):
+        meta = state_manager.get_finalized(meta_id) or {}
+        end_time = meta.get("end_time")
+        day = datetime.fromisoformat(end_time).astimezone(WITA).date() if end_time else None
+        if day is not None:
+            days.add(day)
+        rows.append({
+            **verdicts[meta_id],
+            "date": day.isoformat() if day else "",
+            "agent": _agent_label(meta.get("agent_name"), meta.get("agent_id")),
+            "rule_group_primary": meta.get("rule_group_primary"),
+            "decision": meta.get("decision"),
+            "action": meta.get("action"),
+            "anomaly_score": meta.get("anomaly_score"),
+        })
+    queue = build_review_queue(state_manager, sorted(days))
+    reasons = {i["meta_id"]: i["queue_reason"] for i in queue}
+    for row in rows:
+        row["queue_reason"] = reasons.get(row["meta_id"], "OUT_OF_QUEUE")
+    summary = summarize_queue(queue)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    _write_csv(out_dir / VERDICT_FILE, VERDICT_COLUMNS, rows)
+    _write_csv(out_dir / VERDICT_SUMMARY_FILE, list(summary[0]) if summary else ["date"], summary)
+    return len(rows)
+
+
 def exported_dates(out_dir: Path) -> set:
     path = out_dir / SUMMARY_FILE
     if not path.exists():
@@ -303,6 +356,7 @@ def make_evidence_export_job(service: Any, out_dir: Path, model_identity: Option
             model_identity=model_identity,
             source_state=service.get_live_source_state(),
         )
+        export_analyst_verdicts(service.state_manager, out_dir)
         logger.info("Live evidence exported for %s -> %s", day, out_dir)
 
     return DailyJob("evidence-export", task, at, is_done=lambda d: d.isoformat() in exported_dates(out_dir))

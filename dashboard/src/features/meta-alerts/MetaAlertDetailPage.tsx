@@ -6,6 +6,7 @@ import { DecisionBadge } from '@/components/shared/DecisionBadge';
 import { formatDateTime, formatScore } from '@/lib/formatters';
 import { Button } from '@cloudflare/kumo/components/button';
 import { ArrowRight } from '@phosphor-icons/react';
+import { AnalystVerdictPanel } from './AnalystVerdictPanel';
 
 export function MetaAlertDetailPage() {
   const { metaId } = useParams();
@@ -145,6 +146,7 @@ export function MetaAlertDetailPage() {
               </dl>
             </div>
           </div>
+        {!runId && <AnalystVerdictPanel key={id} metaId={id} current={data.analyst_verdict} />}
       </div>
     </>
   );

@@ -6,9 +6,9 @@ import { DecisionBadge } from '@/components/shared/DecisionBadge';
 import { formatScore } from '@/lib/formatters';
 
 const REASON_LABELS: Record<string, string> = {
-  ESCALATE: 'Semua ESCALATE',
-  SAMPLE_SUPPRESS: 'Sampel SUPPRESS',
-  SAMPLE_DIGEST: 'Sampel DAILY_DIGEST',
+  ESCALATE: 'Semua "perlu dicek segera" (ESCALATE)',
+  SAMPLE_SUPPRESS: 'Sampel dari "tidak ditampilkan" (SUPPRESS)',
+  SAMPLE_DIGEST: 'Sampel dari "ringkasan harian" (DAILY_DIGEST)',
 };
 
 export function ReviewQueuePage() {
@@ -22,9 +22,9 @@ export function ReviewQueuePage() {
   return (
     <>
       <PageHeader
-        breadcrumbs={['Operasi', 'Review Queue']}
-        title="Review Queue"
-        description="Semua ESCALATE + sampel acak deterministik 5% SUPPRESS dan 5% DAILY_DIGEST per hari (seed = tanggal), 7 hari terakhir"
+        breadcrumbs={['Operasi', 'Antrean review']}
+        title="Antrean review"
+        description="Semua yang perlu dicek segera + sampel 5% dari yang tidak ditampilkan dan ringkasan harian, per hari (sampel dapat diulang: seed = tanggal), 7 hari terakhir"
       />
       <div className="px-6 py-8 lg:px-10 space-y-4">
         {isLoading && <p role="status" className="text-xs text-kumo-subtle">Memuat antrean review…</p>}
@@ -39,7 +39,7 @@ export function ReviewQueuePage() {
           </div>
         )}
         {data && data.items.length === 0 && (
-          <p role="status" className="text-xs text-kumo-subtle">Belum ada MetaAlert live untuk direview pada rentang ini.</p>
+          <p role="status" className="text-xs text-kumo-subtle">Belum ada meta-alert live untuk direview pada rentang ini.</p>
         )}
         {data && data.items.length > 0 && (
           <>
@@ -51,10 +51,10 @@ export function ReviewQueuePage() {
                 <thead className="bg-kumo-recessed text-kumo-subtle text-left">
                   <tr>
                     <th className="p-2">Tanggal</th>
-                    <th className="p-2">MetaAlert</th>
-                    <th className="p-2">Agent · Group</th>
-                    <th className="p-2">Level / Action</th>
-                    <th className="p-2">Skor</th>
+                    <th className="p-2">Meta-alert</th>
+                    <th className="p-2">Agen · kategori aturan</th>
+                    <th className="p-2">Level & aksi</th>
+                    <th className="p-2">Skor keanehan</th>
                     <th className="p-2">Alasan antre</th>
                     <th className="p-2">Status</th>
                   </tr>

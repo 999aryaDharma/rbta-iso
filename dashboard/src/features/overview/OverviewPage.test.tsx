@@ -64,7 +64,7 @@ describe('OverviewPage kosakata Replay-vs-Live', () => {
     await screen.findByRole('heading', { name: /ringkasan live/i });
     expect(screen.getAllByText(/pengurangan jumlah yang perlu dicek analyst, bukan akurasi/i).length).toBeGreaterThan(0);
     expect(screen.getByText(/prioritas, bukan insiden terbukti/i)).toBeInTheDocument();
-    expect(screen.getByText(/prioritas rendah, bukan label aman/i)).toBeInTheDocument();
+    expect(screen.getByText(/bukan label aman/i)).toBeInTheDocument();
   });
 
   it('mode Live: batas klaim tesis eksplisit (skor = prioritas, bukan vonis serangan)', async () => {
@@ -78,7 +78,7 @@ describe('OverviewPage kosakata Replay-vs-Live', () => {
     expect(await screen.findByRole('heading', { name: /ringkasan replay/i })).toBeInTheDocument();
     expect(screen.getAllByText(/run-abc-123/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/data historis/i).length).toBeGreaterThan(0);
-    expect(screen.getByText(/pada sesi replay ini/i)).toBeInTheDocument();
+    expect(screen.getByText(/per agen, sesi replay ini/i)).toBeInTheDocument();
   });
 
   it('mode Replay: batas klaim dan definisi ARR tetap eksplisit', async () => {

@@ -5,7 +5,7 @@ import { PageHeader } from '@/components/shared/PageHeader';
 import { DecisionBadge } from '@/components/shared/DecisionBadge';
 import { formatDateTime, formatScore } from '@/lib/formatters';
 import { Hint } from '@/components/shared/Hint';
-import { FEATURE_LABELS, TERM_HINTS, decisionLabel, featureLabel } from '@/lib/labels';
+import { TERM_HINTS, decisionLabel, featureLabel } from '@/lib/labels';
 import { Button } from '@cloudflare/kumo/components/button';
 import { ArrowRight } from '@phosphor-icons/react';
 import { AnalystVerdictPanel } from './AnalystVerdictPanel';
@@ -166,22 +166,6 @@ export function MetaAlertDetailPage() {
               </dl>
             </div>
           </div>
-        <div className="p-6 rounded-xl border border-kumo-hairline bg-kumo-canvas shadow-xs">
-          <h3 className="font-semibold text-xs uppercase tracking-wider text-kumo-strong mb-4 pb-3 border-b border-kumo-hairline">
-            7 fitur penilaian
-          </h3>
-          <dl className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-4 text-xs">
-            {(Object.keys(FEATURE_LABELS) as Array<keyof typeof FEATURE_LABELS>).map((name) => (
-              <div key={name} title={FEATURE_LABELS[name].hint}>
-                <dt className="text-kumo-subtle font-medium">{FEATURE_LABELS[name].label}</dt>
-                <dd className="font-mono font-semibold text-kumo-strong text-sm">
-                  {data.seven_features[name] !== undefined ? Number(data.seven_features[name].toFixed(3)) : '-'}
-                </dd>
-                <dd className="font-mono text-[10px] text-kumo-subtle">{name}</dd>
-              </div>
-            ))}
-          </dl>
-        </div>
         {!runId && <AnalystVerdictPanel key={id} metaId={id} current={data.analyst_verdict} />}
       </div>
     </>

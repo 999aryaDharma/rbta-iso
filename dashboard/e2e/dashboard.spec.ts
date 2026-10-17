@@ -103,8 +103,8 @@ const MOCK_META_ALERTS = [
     raw_model_score: -0.21,
     anomaly_score: 0.892,
     threshold_used: 0.672,
-    decision: 'ESCALATE',
-    action: 'DISPATCH',
+    decision: 'CRITICAL',
+    action: 'ESCALATE',
     escalate: true,
     model_version: 'iso-forest-v1.0',
     feature_schema_version: '1.0',
@@ -134,8 +134,8 @@ const MOCK_META_ALERTS = [
     raw_model_score: 0.12,
     anomaly_score: 0.231,
     threshold_used: 0.672,
-    decision: 'SUPPRESS',
-    action: 'RECORD_ONLY',
+    decision: 'NOISE',
+    action: 'SUPPRESS',
     escalate: false,
     model_version: 'iso-forest-v1.0',
     feature_schema_version: '1.0',
@@ -280,8 +280,8 @@ async function setupRouteMocks(page: Page) {
           source_alert_ids: ['wazuh-alt-001', 'wazuh-alt-002', 'wazuh-alt-003'],
           agent_id: 'agent-001',
           rule_group_primary: 'authentication_failed',
-          decision: 'ESCALATE',
-          action: 'DISPATCH',
+          decision: 'CRITICAL',
+          action: 'ESCALATE',
           model_version: 'iso-forest-v1.0',
         },
       });
@@ -351,6 +351,18 @@ async function setupRouteMocks(page: Page) {
     });
   });
 
+  // Didaftarkan setelah route datasets (yang juga cocok dengan pola ini) agar menang.
+  await page.route(/\/api\/v1\/replay\/datasets\/catalog-status/, async (route: Route) => {
+    await route.fulfill({
+      status: 200,
+      json: {
+        status: 'COMPLETED', total_files: 2, completed_files: 2, failed_files: 0, invalid_files: 0,
+        pending_files: 0, current_file: null, last_error: null, errors: [],
+        started_at_utc: '2026-08-29T10:00:00Z', completed_at_utc: '2026-08-29T10:00:05Z',
+      },
+    });
+  });
+
   await page.route(/\/api\/v1\/replay\/status/, async (route: Route) => {
     await route.fulfill({ status: 200, json: replayState });
   });
@@ -396,7 +408,7 @@ async function setupRouteMocks(page: Page) {
       dataset: postData.dataset_name || 'eval_dataset_demo.jsonl',
       speed: postData.speed_factor || 'MAX',
       processed_count: 250,
-      progress: 25.0,
+      progress: 0.25,
       events_per_second: 150,
       telemetry: {
         raw: {
@@ -531,7 +543,7 @@ test.describe('RBTA + Cloudflare Kumo Dashboard Complete E2E Suite', () => {
     await page.goto('/dashboard/');
     const input = page.locator('input[type="password"]');
     await input.fill('invalid-token-456');
-    await page.locator('button:has-text("Sign In to Control Plane")').click();
+    await page.locator('button:has-text("Masuk")').click();
 
     await expect(page.locator('text=Invalid API key')).toBeVisible({ timeout: 5000 });
     await expect(page.locator('text=Security Analytics Overview')).not.toBeVisible();
@@ -541,7 +553,7 @@ test.describe('RBTA + Cloudflare Kumo Dashboard Complete E2E Suite', () => {
     await page.goto('/dashboard/');
     const input = page.locator('input[type="password"]');
     await input.fill(VALID_API_KEY);
-    await page.locator('button:has-text("Sign In to Control Plane")').click();
+    await page.locator('button:has-text("Masuk")').click();
 
     await expect(page.getByRole('heading', { name: 'Ringkasan Live' })).toBeVisible({ timeout: 5000 });
   });
@@ -552,11 +564,11 @@ test.describe('RBTA + Cloudflare Kumo Dashboard Complete E2E Suite', () => {
     }, VALID_API_KEY);
     await page.goto('/dashboard/overview');
 
-    await expect(page.locator('text=Alert Mentah Masuk').first()).toBeVisible();
-    await expect(page.getByText('MetaAlert Final', { exact: true })).toBeVisible();
-    await expect(page.locator('text=Alert Reduction Rate').first()).toBeVisible();
+    await expect(page.locator('text=Alert masuk').first()).toBeVisible();
+    await expect(page.getByText('Meta-alert selesai', { exact: true })).toBeVisible();
+    await expect(page.locator('text=Pengurangan alert (ARR)').first()).toBeVisible();
     await expect(page.locator('text=98.73%').first()).toBeVisible();
-    await expect(page.locator('text=MetaAlert ESCALATE').first()).toBeVisible();
+    await expect(page.locator('text=Perlu dicek segera').first()).toBeVisible();
   });
 
   test('4. ESCALATE / Needs Investigation deep-link navigates to filtered MetaAlerts', async ({ page }) => {
@@ -565,7 +577,7 @@ test.describe('RBTA + Cloudflare Kumo Dashboard Complete E2E Suite', () => {
     }, VALID_API_KEY);
     await page.goto('/dashboard/overview');
 
-    const viewAllBtn = page.locator('button:has-text("Lihat semua MetaAlert")');
+    const viewAllBtn = page.locator('button:has-text("Lihat semua meta-alert")');
     await viewAllBtn.click();
     await expect(page).toHaveURL(/.*\/meta-alerts/);
   });
@@ -576,7 +588,7 @@ test.describe('RBTA + Cloudflare Kumo Dashboard Complete E2E Suite', () => {
     }, VALID_API_KEY);
     await page.goto('/dashboard/meta-alerts');
 
-    await expect(page.getByRole('heading', { name: 'MetaAlerts Investigation Explorer' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Daftar meta-alert' })).toBeVisible();
     await expect(page.locator('text=authentication_failed').first()).toBeVisible();
     await expect(page.locator('text=0.8920').first()).toBeVisible();
   });
@@ -587,10 +599,10 @@ test.describe('RBTA + Cloudflare Kumo Dashboard Complete E2E Suite', () => {
     }, VALID_API_KEY);
     await page.goto('/dashboard/meta-alerts/101');
 
-    await expect(page.locator('text=MetaAlert #101')).toBeVisible();
+    await expect(page.locator('text=Meta-alert #101')).toBeVisible();
 
-    await expect(page.locator('text=Temporal Aggregation Profile')).toBeVisible();
-    await expect(page.locator('text=Isolation Forest Evaluation & Scoring')).toBeVisible();
+    await expect(page.locator('text=Profil pengelompokan')).toBeVisible();
+    await expect(page.locator('text=Penilaian Isolation Forest')).toBeVisible();
   });
 
   test('7. ESCALATE MetaAlert -> Investigate Raw Alerts CTA navigates to raw cluster', async ({ page }) => {
@@ -599,7 +611,7 @@ test.describe('RBTA + Cloudflare Kumo Dashboard Complete E2E Suite', () => {
     }, VALID_API_KEY);
     await page.goto('/dashboard/meta-alerts/101');
 
-    const rawBtn = page.locator('button:has-text("Investigate 42 Raw Alerts")');
+    const rawBtn = page.locator('button:has-text("Periksa 42 alert asli")');
     await rawBtn.click();
     await expect(page).toHaveURL(/.*\/meta-alerts\/101\/raw-alerts/);
   });
@@ -610,7 +622,7 @@ test.describe('RBTA + Cloudflare Kumo Dashboard Complete E2E Suite', () => {
     }, VALID_API_KEY);
     await page.goto('/dashboard/meta-alerts/101/raw-alerts');
 
-    await expect(page.locator('text=Member Raw Alerts for MetaAlert #101')).toBeVisible();
+    await expect(page.locator('text=Alert asli dalam meta-alert #101')).toBeVisible();
     await expect(page.locator('text=wazuh-alt-001')).toBeVisible();
     await expect(page.locator('text=198.51.100.42').first()).toBeVisible();
   });
@@ -621,10 +633,10 @@ test.describe('RBTA + Cloudflare Kumo Dashboard Complete E2E Suite', () => {
     }, VALID_API_KEY);
     await page.goto('/dashboard/meta-alerts/101/raw-alerts/wazuh-alt-001');
 
-    await expect(page.locator('text=Raw Alert Forensic Evidence')).toBeVisible();
+    await expect(page.locator('text=Detail alert asli')).toBeVisible();
     await expect(page.locator('text=wazuh-alt-001').first()).toBeVisible();
 
-    const nextBtn = page.locator('button[title*="Next Alert"]');
+    const nextBtn = page.locator('button[title*="Alert berikutnya"]');
     if (await nextBtn.isVisible()) {
       await nextBtn.click();
       await expect(page).toHaveURL(/.*\/raw-alerts\/wazuh-alt-002/);
@@ -637,7 +649,7 @@ test.describe('RBTA + Cloudflare Kumo Dashboard Complete E2E Suite', () => {
     }, VALID_API_KEY);
     await page.goto('/dashboard/meta-alerts/101/raw-alerts');
 
-    await expect(page.locator('text=Member Raw Alerts for MetaAlert #101')).toBeVisible();
+    await expect(page.locator('text=Alert asli dalam meta-alert #101')).toBeVisible();
   });
 
   test('11. run_id query param survives MetaAlert -> Raw Alert navigation', async ({ page }) => {
@@ -646,7 +658,7 @@ test.describe('RBTA + Cloudflare Kumo Dashboard Complete E2E Suite', () => {
     }, VALID_API_KEY);
     await page.goto('/dashboard/meta-alerts/101?run_id=test-replay-run');
 
-    const rawBtn = page.locator('button:has-text("Investigate 42 Raw Alerts")');
+    const rawBtn = page.locator('button:has-text("Periksa 42 alert asli")');
     await rawBtn.click();
     await expect(page).toHaveURL(/.*run_id=test-replay-run/);
   });
@@ -674,7 +686,7 @@ test.describe('RBTA + Cloudflare Kumo Dashboard Complete E2E Suite', () => {
 
     const startBtn = page.locator('button:has-text("Mulai Replay")');
     await startBtn.click();
-    await expect(page.locator('text=RUNNING').first()).toBeVisible();
+    await expect(page.getByText('Berjalan', { exact: true }).first()).toBeVisible();
   });
 
   test('14. Replay pause and resume control states transition cleanly', async ({ page }) => {
@@ -700,12 +712,12 @@ test.describe('RBTA + Cloudflare Kumo Dashboard Complete E2E Suite', () => {
     }, VALID_API_KEY);
     await page.goto('/dashboard/demo');
 
-    const resetBtn = page.locator('button:has-text("Siapkan run baru")');
+    const resetBtn = page.locator('button:has-text("Siapkan sesi baru")');
     if (await resetBtn.isVisible()) {
       await resetBtn.click();
       await expect(page.locator('text=Siapkan run replay baru?')).toBeVisible();
       await page.locator('button:has-text("Konfirmasi")').click();
-      await expect(page.locator('text=IDLE').first()).toBeVisible();
+      await expect(page.locator('text=Belum berjalan').first()).toBeVisible();
     }
   });
 
@@ -715,7 +727,7 @@ test.describe('RBTA + Cloudflare Kumo Dashboard Complete E2E Suite', () => {
     }, VALID_API_KEY);
     await page.goto('/dashboard/overview');
 
-    const themeBtn = page.locator('button[aria-label^="Theme:"]');
+    const themeBtn = page.locator('button[aria-label^="Tema:"]');
     await themeBtn.click();
     const mode = await page.evaluate(() => document.documentElement.getAttribute('data-mode'));
     expect(['light', 'dark']).toContain(mode);
@@ -738,7 +750,7 @@ test.describe('RBTA + Cloudflare Kumo Dashboard Complete E2E Suite', () => {
     }, VALID_API_KEY);
     await page.goto('/dashboard/meta-alerts/101/raw-alerts/wazuh-alt-001');
 
-    await expect(page.locator('text=Raw Alert Forensic Evidence')).toBeVisible();
+    await expect(page.locator('text=Detail alert asli')).toBeVisible();
     await expect(page.locator('text=wazuh-alt-001').first()).toBeVisible();
   });
 
@@ -749,13 +761,13 @@ test.describe('RBTA + Cloudflare Kumo Dashboard Complete E2E Suite', () => {
     await page.goto('/dashboard/overview');
 
     // Klik tombol shortcut di topbar
-    const shortcutsBtn = page.locator('button[aria-label="Keyboard shortcuts"]');
+    const shortcutsBtn = page.locator('button[aria-label="Pintasan keyboard"]');
     await shortcutsBtn.click();
-    await expect(page.getByRole('heading', { name: 'Keyboard Shortcuts' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Pintasan keyboard' })).toBeVisible();
 
     // Tutup modal
     await page.keyboard.press('Escape');
-    await expect(page.getByRole('heading', { name: 'Keyboard Shortcuts' })).not.toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Pintasan keyboard' })).not.toBeVisible();
   });
 
   test('20. All-datasets option is selectable and starts sequential replay run', async ({ page }) => {
@@ -769,7 +781,7 @@ test.describe('RBTA + Cloudflare Kumo Dashboard Complete E2E Suite', () => {
 
     const startBtn = page.locator('button:has-text("Mulai Replay")');
     await startBtn.click();
-    await expect(page.locator('text=RUNNING').first()).toBeVisible();
+    await expect(page.getByText('Berjalan', { exact: true }).first()).toBeVisible();
   });
 
   test('21. MetaAlerts search input updates table query and preserves run_id', async ({ page }) => {
@@ -778,7 +790,7 @@ test.describe('RBTA + Cloudflare Kumo Dashboard Complete E2E Suite', () => {
     }, VALID_API_KEY);
     await page.goto('/dashboard/meta-alerts?run_id=test-run-123');
 
-    const searchInput = page.getByPlaceholder('Filter Meta ID, Agent, Rule Group...');
+    const searchInput = page.getByPlaceholder('Filter nomor meta-alert, agen, kategori aturan…');
     await searchInput.fill('authentication_failed');
     await expect(page.locator('text=authentication_failed').first()).toBeVisible();
     expect(page.url()).toContain('run_id=test-run-123');
@@ -792,22 +804,22 @@ test.describe('RBTA + Cloudflare Kumo Dashboard Complete E2E Suite', () => {
 
     const startBtn = page.locator('button:has-text("Mulai Replay")');
     await startBtn.click();
-    await expect(page.locator('text=Operational Processing Pipeline')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Alur pemrosesan' })).toBeVisible();
 
     // Pastikan 9 tahap ada
     await expect(page.locator('text=1. Dataset')).toBeVisible();
-    await expect(page.locator('text=2. Canonicalize')).toBeVisible();
-    await expect(page.locator('text=3. Raw Evidence')).toBeVisible();
-    await expect(page.locator('text=4. RBTA Window')).toBeVisible();
-    await expect(page.locator('text=5. MetaAlert')).toBeVisible();
-    await expect(page.locator('text=6. 7 Features')).toBeVisible();
+    await expect(page.locator('text=2. Standarisasi')).toBeVisible();
+    await expect(page.locator('text=3. Bukti asli')).toBeVisible();
+    await expect(page.locator('text=4. Jendela RBTA')).toBeVisible();
+    await expect(page.locator('text=5. Meta-alert')).toBeVisible();
+    await expect(page.locator('text=6. 7 fitur')).toBeVisible();
     await expect(page.locator('text=7. IsoForest')).toBeVisible();
     await expect(page.locator('text=8. Level')).toBeVisible();
-    await expect(page.locator('text=9. Output Sink')).toBeVisible();
+    await expect(page.locator('text=9. Keluaran')).toBeVisible();
 
     // Klik tahap '6. 7 Features' untuk membuka detailnya
-    await page.locator('button:has-text("6. 7 Features")').click();
-    await expect(page.locator('text=Stage Inspection: FEATURES')).toBeVisible();
+    await page.locator('button:has-text("6. 7 fitur")').click();
+    await expect(page.locator('text=Detail tahap: 7 fitur')).toBeVisible();
   });
 
   test('23. Seven-feature inspector displays exact numerical feature vector', async ({ page }) => {
@@ -819,7 +831,7 @@ test.describe('RBTA + Cloudflare Kumo Dashboard Complete E2E Suite', () => {
     const startBtn = page.locator('button:has-text("Mulai Replay")');
     await startBtn.click();
 
-    await page.locator('button:has-text("6. 7 Features")').click();
+    await page.locator('button:has-text("6. 7 fitur")').click();
     await expect(page.locator('text=max_severity')).toBeVisible();
     await expect(page.locator('text=mitre_tactic_count')).toBeVisible();
     await expect(page.locator('text=critical_mitre_tactic_present')).toBeVisible();
@@ -832,8 +844,50 @@ test.describe('RBTA + Cloudflare Kumo Dashboard Complete E2E Suite', () => {
     }, VALID_API_KEY);
     await page.goto('/dashboard/demo');
 
-    await expect(page.locator('text=Deferred Telegram Payload Outbox')).toBeVisible();
-    await expect(page.locator('text=1 ESCALATE Payloads')).toBeVisible();
+    await expect(page.locator('text=Pesan Telegram yang belum dikirim').first()).toBeVisible();
+    await expect(page.locator("text=1 pesan 'perlu dicek segera'")).toBeVisible();
     await expect(page.locator('text=replay-test-run-001:5')).toBeVisible();
+  });
+
+  // Tangkap screenshot untuk lampiran skripsi (docs/ui-copy). Default dilewati; jalankan dengan
+  // CAPTURE_UI_COPY_DIR=<folder> npx playwright test -g "25\."
+  test('25. Tangkap screenshot salinan UI (opsional)', async ({ page }) => {
+    test.setTimeout(90_000);
+    const outDir = process.env.CAPTURE_UI_COPY_DIR;
+    test.skip(!outDir, 'Set CAPTURE_UI_COPY_DIR untuk menangkap screenshot');
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await page.addInitScript((key) => {
+      window.sessionStorage.setItem('rbta.dashboard.apiKey', key);
+      window.localStorage.setItem('theme', 'light');
+    }, VALID_API_KEY);
+    await page.route(/\/api\/v1\/live\/status/, async (route: Route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          worker_alive: true, cycles_completed: 120, consecutive_failures: 0, last_error: null,
+          last_cycle_at: new Date().toISOString(), live_model_version: 'rbta-if-thesis-v1',
+          recent_poll_cursor: new Date().toISOString(), lag_sec: 4.2, buffer_size: null, buffer_stats: null,
+          outbox_pending: 1, ingested_total: 1899, dispatcher: null, quarantine_total: 0,
+          newest_scored_event_time: null, newest_ingested_event_time: new Date().toISOString(),
+          event_lag_sec: 6.5, tls_verify: true,
+        }),
+      });
+    });
+    const shot = async (name: string, url: string, wait: () => Promise<unknown>) => {
+      await page.goto(url);
+      await wait();
+      await page.waitForTimeout(600);
+      await page.screenshot({ path: `${outDir}/${name}.png`, fullPage: true });
+    };
+    await shot('overview', '/dashboard/overview', () => page.locator('text=98.73%').first().waitFor());
+    await shot('live', '/dashboard/live', () => page.locator('text=1420').first().waitFor());
+    await shot('meta-alert-detail', '/dashboard/meta-alerts/101', () => page.locator('text=0.8920').first().waitFor());
+    await page.goto('/dashboard/demo');
+    await page.locator('select').first().selectOption('eval_dataset_demo.jsonl');
+    await page.locator('button:has-text("Mulai Replay")').click();
+    await page.getByText(/^(Berjalan|RUNNING)$/).first().waitFor({ timeout: 10_000 });
+    await page.waitForTimeout(1500);
+    await page.screenshot({ path: `${outDir}/replay-sidang.png`, fullPage: true });
   });
 });

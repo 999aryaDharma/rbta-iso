@@ -24,10 +24,10 @@ export function AnalystVerdictPanel({ metaId, current }: AnalystVerdictPanelProp
   return (
     <div className="p-6 rounded-xl border border-kumo-hairline bg-kumo-canvas shadow-xs space-y-4">
       <h3 className="font-semibold text-xs uppercase tracking-wider text-kumo-strong pb-3 border-b border-kumo-hairline">
-        Verdict analyst
+        Penilaian analyst
       </h3>
       <p className="text-xs text-kumo-subtle">
-        Label manusia untuk evaluasi; tidak mengubah keputusan model. Anomaly score bukan label serangan.
+        Penilaian manusia untuk evaluasi; tidak mengubah keputusan model. Skor keanehan bukan label serangan.
       </p>
       <p role="status" className="text-xs">
         {shown ? (

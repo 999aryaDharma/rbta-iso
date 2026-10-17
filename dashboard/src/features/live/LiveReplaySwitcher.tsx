@@ -15,18 +15,18 @@ interface LiveReplaySwitcherProps {
 const STATUS_LABEL: Record<Exclude<SwitcherStatus, "idle">, string> = {
   loading: "Memuat konteks…",
   error: "Gagal memuat konteks",
-  empty: "Belum ada MetaAlert pada konteks ini",
+  empty: "Belum ada meta-alert pada konteks ini",
 };
 
 const CONTEXT_META = {
   live: {
     label: "Live",
-    caption: "Menampilkan: Live (arus alert langsung).",
+    caption: "Menampilkan: Live (data langsung).",
     Icon: Pulse,
   },
   replay: {
     label: "Replay",
-    caption: "Menampilkan: Replay (dataset historis).",
+    caption: "Menampilkan: Replay (data historis).",
     Icon: Play,
   },
 } as const;
@@ -105,8 +105,8 @@ export function LiveReplaySwitcher({
           {mode === "live" ? CONTEXT_META.live.caption : CONTEXT_META.replay.caption}{" "}
           <span className="text-kumo-subtle font-normal">
             {mode === "live"
-              ? "Kontrak provenance sama dengan replay."
-              : "Pilih Live untuk kembali ke arus langsung."}
+              ? "Sumber data dapat ditelusuri, sama seperti replay."
+              : "Pilih Live untuk kembali ke data langsung."}
           </span>
         </p>
       )}

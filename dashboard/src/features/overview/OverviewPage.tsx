@@ -127,7 +127,7 @@ export function OverviewPage() {
           <MetricCard
             label="Meta-alert selesai"
             value={summary ? formatNumber(summary.meta_alert_count) : '-'}
-            sub="Kelompok alert hasil pengelompokan RBTA"
+            sub="Hasil pengelompokan RBTA"
             hint={TERM_HINTS.RBTA}
           />
           <MetricCard
@@ -137,7 +137,7 @@ export function OverviewPage() {
                 ? `${summary.alert_reduction_rate_percent}%`
                 : '-'
             }
-            sub="Pengurangan yang perlu dicek, bukan akurasi"
+            sub="Bukan akurasi deteksi"
             hint={TERM_HINTS.ARR}
           />
           <div
@@ -147,14 +147,14 @@ export function OverviewPage() {
             <MetricCard
               label="Perlu dicek segera"
               value={summary ? formatNumber(summary.escalate_count) : '-'}
-              sub="Kode ESCALATE. Prioritas, bukan insiden terbukti"
-              hint={ACTION_LABELS.ESCALATE.hint}
+              sub="Prioritas, bukan insiden terbukti"
+              hint={`Kode ESCALATE. ${ACTION_LABELS.ESCALATE.hint}`}
             />
           </div>
           <MetricCard
             label="Melewati batas skor"
             value={summary ? formatNumber(summary.anomalies_detected) : '-'}
-            sub="Skor di atas batas; prioritas, bukan vonis serangan"
+            sub="Prioritas, bukan vonis serangan"
           />
           <div
             onClick={() => navigate(withRunId('/rbta'))}
@@ -163,20 +163,20 @@ export function OverviewPage() {
             <MetricCard
               label="Kelompok alert terbuka"
               value={summary ? formatNumber(summary.active_buckets_count) : '-'}
-              sub={isReplay ? 'Kelompok per agen pada sesi replay ini' : 'Kelompok per agen pada data langsung'}
+              sub={isReplay ? 'Per agen, sesi replay ini' : 'Per agen, data langsung'}
             />
           </div>
           <MetricCard
             label="Ringkasan harian"
             value={summary ? formatNumber(summary.digest_count) : '-'}
-            sub="Kode DAILY_DIGEST. Ditinjau berkala"
-            hint={ACTION_LABELS.DAILY_DIGEST.hint}
+            sub="Ditinjau berkala"
+            hint={`Kode DAILY_DIGEST. ${ACTION_LABELS.DAILY_DIGEST.hint}`}
           />
           <MetricCard
-            label="Tidak ditampilkan di antrean"
+            label="Tidak ditampilkan"
             value={summary ? formatNumber(summary.suppress_count) : '-'}
-            sub="Kode SUPPRESS. Prioritas rendah, bukan label aman"
-            hint={ACTION_LABELS.SUPPRESS.hint}
+            sub="Bukan label aman"
+            hint={`Kode SUPPRESS. ${ACTION_LABELS.SUPPRESS.hint}`}
           />
         </div>
 

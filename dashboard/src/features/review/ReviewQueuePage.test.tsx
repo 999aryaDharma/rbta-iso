@@ -47,14 +47,14 @@ describe('ReviewQueuePage', () => {
     wrap(<ReviewQueuePage />);
     expect(await screen.findByText('#61')).toBeInTheDocument();
     expect(screen.getByText('Belum dilabel')).toBeInTheDocument();
-    expect(screen.getByText('Sampel SUPPRESS')).toBeInTheDocument();
+    expect(screen.getByText(/sampel dari .tidak ditampilkan./i)).toBeInTheDocument();
     expect(screen.getByText(/1 dari 2 item sudah dilabel/)).toBeInTheDocument();
   });
 
   it('menampilkan state kosong', async () => {
     mockFetchReviewQueue.mockResolvedValue({ items: [], summary: [], sample_rate: 0.05, days: [] });
     wrap(<ReviewQueuePage />);
-    expect(await screen.findByText(/belum ada metaalert live/i)).toBeInTheDocument();
+    expect(await screen.findByText(/belum ada meta-alert live/i)).toBeInTheDocument();
   });
 });
 

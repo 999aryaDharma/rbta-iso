@@ -133,6 +133,8 @@ docs/*
 !docs/demo/
 !docs/demo/**
 !docs/KNOWN-LIMITATIONS.md
+!docs/ui-copy/
+!docs/ui-copy/**
 
 # Large Data Files & Research Run Outputs
 data/*

@@ -39,6 +39,8 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, Deque, Dict, List, Optional, Protocol, Set
 
+from html import escape
+
 from src.runtime.telegram_formatter import format_telegram_alert
 
 logger = logging.getLogger(__name__)
@@ -53,6 +55,8 @@ CHAT_ID_ENV = "RBTA_TELEGRAM_CHAT_ID"
 NOTIFY_MAX_AGE_ENV = "RBTA_TELEGRAM_NOTIFY_MAX_AGE_SEC"
 DRY_RUN_ENV = "RBTA_TELEGRAM_DRY_RUN"
 MIN_INTERVAL_ENV = "RBTA_TELEGRAM_MIN_INTERVAL_SEC"
+COOLDOWN_ENV = "RBTA_ESCALATION_COOLDOWN_MIN"
+DEFAULT_COOLDOWN_MIN = 60.0
 DEFAULT_NOTIFY_MAX_AGE_SEC = 3600.0
 # Jeda default antar pengiriman. Grup Telegram membatasi ~20 pesan/menit, jadi naikkan
 # RBTA_TELEGRAM_MIN_INTERVAL_SEC ke >= 3.0 untuk pengiriman ke grup.
@@ -83,6 +87,8 @@ class DispatchResult:
     dry_run: int = 0
     duplicate_skipped: int = 0
     suppressed_historical: int = 0
+    suppressed_cooldown: int = 0
+    cooldown_summaries: int = 0
     attempts: int = 0
     sleeps_sec: List[float] = field(default_factory=list)
 
@@ -198,6 +204,19 @@ def _resolve_min_interval_sec(raw: Optional[float]) -> float:
     return MIN_SEND_INTERVAL_SEC
 
 
+def _resolve_cooldown_min(raw: Optional[float]) -> float:
+    """``cooldown_min`` eksplisit diutamakan; selain itu env; selain itu 60. 0 = nonaktif."""
+    if raw is not None:
+        return max(0.0, float(raw))
+    env_raw = os.environ.get(COOLDOWN_ENV)
+    if env_raw is not None and env_raw.strip():
+        try:
+            return max(0.0, float(env_raw))
+        except (TypeError, ValueError):
+            logger.warning("Invalid %s=%r; falling back to default %.0f", COOLDOWN_ENV, env_raw, DEFAULT_COOLDOWN_MIN)
+    return DEFAULT_COOLDOWN_MIN
+
+
 def _default_sender(_payload: Dict[str, Any]) -> None:
     raise RuntimeError(
         "No Telegram sender configured: pass sender= explicitly or wire "
@@ -285,6 +304,8 @@ class TelegramDispatcher:
         dry_run: Optional[bool] = None,
         monotonic_fn: Callable[[], float] = time.monotonic,
         min_interval_sec: Optional[float] = None,
+        cooldown_min: Optional[float] = None,
+        clock_fn: Optional[Callable[[], datetime]] = None,
     ) -> None:
         self._service = service
         self._sender = sender or _default_sender
@@ -317,6 +338,13 @@ class TelegramDispatcher:
         self._failed_total = 0
         self._suppressed_historical_total = 0
         self._dry_run_total = 0
+        # Cooldown eskalasi berulang (T10): kebijakan PENGIRIMAN saja, decision/action tidak berubah.
+        # (agent_id, rule_group_primary) -> {"sent_at", "agent_name", "suppressed": [meta_id, ...]}.
+        # In-memory: restart mereset cooldown (paling buruk satu eskalasi ekstra, tidak ada yang hilang).
+        self._cooldown = timedelta(minutes=_resolve_cooldown_min(cooldown_min))
+        self._clock = clock_fn or (lambda: datetime.now(timezone.utc))
+        self._cooldowns: Dict[tuple, Dict[str, Any]] = {}
+        self._suppressed_cooldown_total = 0
 
     @property
     def enabled(self) -> bool:
@@ -345,6 +373,8 @@ class TelegramDispatcher:
                 "failed_total": self._failed_total,
                 "suppressed_historical_total": self._suppressed_historical_total,
                 "dry_run_total": self._dry_run_total,
+                "suppressed_cooldown_total": self._suppressed_cooldown_total,
+                "cooldown_min": self._cooldown.total_seconds() / 60.0,
                 "mode": self.mode,
             }
 
@@ -452,6 +482,40 @@ class TelegramDispatcher:
             return False
         return True
 
+    def _flush_cooldowns(self, result: DispatchResult) -> None:
+        """Kirim satu ringkasan "+N meta-alert serupa" untuk setiap cooldown yang sudah berakhir."""
+        now = self._clock()
+        for ck in list(self._cooldowns):
+            entry = self._cooldowns[ck]
+            if now - entry["sent_at"] < self._cooldown:
+                continue
+            ids = entry["suppressed"]
+            if ids:
+                shown = ", ".join(f"#{i}" for i in ids[:20]) + (" ..." if len(ids) > 20 else "")
+                message = (
+                    f"<b>+{len(ids)} meta-alert serupa</b>\n"
+                    f"<code>{escape(str(entry['agent_name']))} ({escape(ck[0])}) · {escape(ck[1])}</code>\n"
+                    f"Tidak dikirim terpisah selama cooldown {self._cooldown.total_seconds() / 60:.0f} mnt "
+                    f"setelah eskalasi terakhir: {shown}\n"
+                    "<i>Keputusan tetap ESCALATE; lihat dashboard untuk detail.</i>"
+                )
+                if self.send_text(message, kind=f"cooldown:{ck[0]}:{ck[1]}:{ids[0]}") not in ("sent", "dry_run"):
+                    continue  # coba lagi di putaran berikutnya
+                result.cooldown_summaries += 1
+            del self._cooldowns[ck]
+
+    def _in_cooldown(self, scored: Any) -> bool:
+        if self._cooldown.total_seconds() <= 0:
+            return False
+        entry = self._cooldowns.get((str(scored.agent_id), str(scored.rule_group_primary)))
+        return entry is not None and self._clock() - entry["sent_at"] < self._cooldown
+
+    def _start_cooldown(self, scored: Any) -> None:
+        if self._cooldown.total_seconds() > 0:
+            self._cooldowns[(str(scored.agent_id), str(scored.rule_group_primary))] = {
+                "sent_at": self._clock(), "agent_name": scored.agent_name, "suppressed": [],
+            }
+
     def _build_payload(self, scored: Any) -> Dict[str, Any]:
         message = format_telegram_alert(scored, run_id=self._run_id)
         return {
@@ -536,6 +600,8 @@ class TelegramDispatcher:
         mode = self.mode
         unknown_warned = False
         hold_warned = False
+        if mode != "hold":
+            self._flush_cooldowns(result)
         for scored in snapshot:
             if scored.action != "ESCALATE":
                 result.skipped += 1
@@ -582,6 +648,25 @@ class TelegramDispatcher:
                     hold_warned = True
                 result.skipped += 1
                 continue
+            if self._in_cooldown(scored):
+                suppress = getattr(getattr(self._service, "state_manager", None), "suppression_add", None)
+                try:
+                    if callable(suppress):
+                        suppress(int(scored.meta_id), "cooldown")
+                except Exception:
+                    with self._lock:
+                        self._failed_total += 1
+                    result.failed += 1
+                    continue
+                entry = self._cooldowns[(str(scored.agent_id), str(scored.rule_group_primary))]
+                entry["suppressed"].append(scored.meta_id)
+                result.suppressed_cooldown += 1
+                with self._lock:
+                    self._suppressed_cooldown_total += 1
+                self._remember_sent_key(key)
+                self._service.commit_outbox([scored.meta_id])
+                logger.info("Telegram dispatcher cooldown-suppressed %s", key)
+                continue
             if mode == "dry_run":
                 payload = self._build_payload(scored)
                 if not self._record_notification(scored.meta_id, "DRY_RUN"):
@@ -593,6 +678,7 @@ class TelegramDispatcher:
                 with self._lock:
                     self._dry_run_total += 1
                 self._remember_sent_key(key)
+                self._start_cooldown(scored)
                 self.dry_run_payloads.append(payload)
                 del self.dry_run_payloads[:-MAX_DRY_RUN_PAYLOADS]
                 self._service.commit_outbox([scored.meta_id])
@@ -609,6 +695,7 @@ class TelegramDispatcher:
                     result.failed += 1
                     continue
                 self._remember_sent_key(key)
+                self._start_cooldown(scored)
                 with self._lock:
                     self._sent_total += 1
                 try:

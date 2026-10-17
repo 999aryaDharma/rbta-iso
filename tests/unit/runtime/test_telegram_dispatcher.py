@@ -14,6 +14,13 @@ from src.contracts.scored_meta_alert import ScoredMetaAlert
 from src.runtime.telegram_dispatcher import TelegramDispatcher, make_telegram_sender
 
 
+
+@pytest.fixture(autouse=True)
+def _no_cooldown(monkeypatch):
+    """Tes lama menguji perilaku per item; cooldown T10 diuji di test_escalation_cooldown.py."""
+    monkeypatch.setenv("RBTA_ESCALATION_COOLDOWN_MIN", "0")
+
+
 def _scored(
     meta_id: int,
     action: str = "ESCALATE",
@@ -528,6 +535,8 @@ def test_status_exposes_required_counters():
         "failed_total": 0,
         "suppressed_historical_total": 0,
         "dry_run_total": 0,
+        "suppressed_cooldown_total": 0,
+        "cooldown_min": 0.0,
         "mode": "live",
     }
 

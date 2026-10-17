@@ -76,7 +76,8 @@ def test_deferred_telegram_sink_escalate_emits(tmp_path: Path):
     assert p["max_severity"] == 9
     assert "authentication_failed" in p["message"]
     assert p["parse_mode"] == "HTML"
-    assert "Run:</b> <code>run-alpha</code>" in p["message"]
+    # Formatter sejak ba347c2 menulis run_id di baris provenance "<model> · <run_id>".
+    assert "· run-alpha</code>" in p["message"]
 
 
 def test_deferred_telegram_sink_ignores_non_escalate(tmp_path: Path):

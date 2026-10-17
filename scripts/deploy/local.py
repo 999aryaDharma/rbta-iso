@@ -4,7 +4,7 @@
 import argparse
 import json
 import os
-from pathlib import Path, PureWindowsPath
+from pathlib import Path, PurePosixPath, PureWindowsPath
 import subprocess
 import sys
 import time
@@ -33,6 +33,9 @@ def normalize_docker_host_path(value: str, platform: Optional[str] = None) -> st
     expanded = os.path.expandvars(value.strip())
     if active_platform.startswith("win"):
         return PureWindowsPath(expanded).as_posix()
+    if os.name == "nt":
+        # Host Windows mensimulasikan platform POSIX: resolve() akan menempelkan huruf drive.
+        return PurePosixPath(os.path.expanduser(expanded)).as_posix()
     return str(Path(expanded).expanduser().resolve())
 
 

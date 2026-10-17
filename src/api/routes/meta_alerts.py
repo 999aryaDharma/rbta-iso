@@ -38,6 +38,7 @@ def _scored_alert_to_dict(scored: Any) -> Dict[str, Any]:
         "score_calibration_version": scored.score_calibration_version,
         "source_alert_ids": list(scored.source_alert_ids),
         "metadata": dict(scored.metadata),
+        "top_deviations": [list(p) for p in scored.top_deviations] if getattr(scored, "top_deviations", None) else None,
     }
 
 

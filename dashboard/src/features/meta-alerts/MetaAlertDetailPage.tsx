@@ -139,6 +139,19 @@ export function MetaAlertDetailPage() {
                   <dt className="text-kumo-subtle font-medium">SOC Action Trigger:</dt>
                   <dd><DecisionBadge decision={data.decision} action={data.action} /></dd>
                 </div>
+                {data.top_deviations && data.top_deviations.length > 0 && (
+                  <div className="flex justify-between items-center py-1.5 border-b border-kumo-hairline/40">
+                    <dt
+                      className="text-kumo-subtle font-medium"
+                      title="(nilai - median reference) / IQR reference; skala 1 bila IQR reference = 0. Bukan atribusi skor Isolation Forest."
+                    >
+                      Penyebab (deviasi robust):
+                    </dt>
+                    <dd className="font-mono text-kumo-default text-right">
+                      {data.top_deviations.map(([name, value]) => `${name} ${value >= 0 ? '+' : ''}${value.toFixed(1)}`).join(', ')}
+                    </dd>
+                  </div>
+                )}
                 <div className="flex justify-between items-center py-1">
                   <dt className="text-kumo-subtle font-medium">Model Artifact Registry:</dt>
                   <dd className="font-mono text-kumo-subtle">{data.model_version}</dd>

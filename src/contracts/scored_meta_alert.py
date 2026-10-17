@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Mapping
+from typing import Any, Mapping, Optional
 
 from src.contracts.immutability import freeze_value
 
@@ -69,6 +69,10 @@ class ScoredMetaAlert:
         Tuple semua ID alert Wazuh anggota, untuk penelusuran.
     metadata : Mapping[str, Any]
         Metadata audit (immutable).
+    top_deviations : tuple[tuple[str, float], ...] | None
+        Opsional (T11): dua fitur dengan |nilai RobustScaler| terbesar, yaitu (x - median reference)
+        / IQR reference (sklearn memakai skala 1 bila IQR = 0). Penjelasan ringan, BUKAN atribusi
+        skor Isolation Forest; None untuk record lama.
     """
 
     meta_id: int
@@ -92,6 +96,7 @@ class ScoredMetaAlert:
     score_calibration_version: str
     source_alert_ids: tuple[str, ...]
     metadata: Mapping[str, Any] = field(default_factory=dict)
+    top_deviations: Optional[tuple[tuple[str, float], ...]] = None
 
     def __post_init__(self) -> None:
         if self.decision not in VALID_DECISIONS:
@@ -108,3 +113,7 @@ class ScoredMetaAlert:
 
         object.__setattr__(self, "seven_features", freeze_value(self.seven_features))
         object.__setattr__(self, "metadata", freeze_value(self.metadata))
+        if self.top_deviations is not None:
+            object.__setattr__(
+                self, "top_deviations", tuple((str(n), float(v)) for n, v in self.top_deviations)
+            )

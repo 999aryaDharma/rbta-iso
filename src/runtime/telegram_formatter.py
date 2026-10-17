@@ -31,6 +31,15 @@ def _format_window(scored_meta: ScoredMetaAlert) -> str:
     return f"{_short_dt(start)} - {_short_dt(end)} WITA"
 
 
+def _format_deviations(scored_meta: ScoredMetaAlert) -> str:
+    """Satu baris penyebab (T11); kosong untuk record tanpa top_deviations."""
+    devs = getattr(scored_meta, "top_deviations", None)
+    if not devs:
+        return ""
+    parts = ", ".join(f"{escape(name)} {value:+.1f}" for name, value in devs)
+    return f"Penyebab (deviasi robust dari median reference): {parts}\n"
+
+
 def format_telegram_alert(scored_meta: ScoredMetaAlert, run_id: str = "live") -> str:
     """Format MetaAlert terskor menjadi HTML Telegram yang sudah di-escape; tanpa logika routing.
 
@@ -53,6 +62,7 @@ def format_telegram_alert(scored_meta: ScoredMetaAlert, run_id: str = "live") ->
         f"\n"
         f"Skor {scored_meta.anomaly_score:.4f} "
         f"(ambang {scored_meta.threshold_used:.4f}, margin {margin:+.4f})\n"
+        f"{_format_deviations(scored_meta)}"
         f"<code>{escape(scored_meta.model_version)} · {escape(run_id)}</code>\n"
         f"\n"
         "<i>Skor anomaly bukan bukti serangan; ini prioritas triase.</i>"

@@ -72,6 +72,8 @@ export const MetaAlertSchema = z.object({
   metadata: z.record(z.string(), z.unknown()).optional(),
   // Hanya di detail live (T8); null = belum dilabel.
   analyst_verdict: AnalystVerdictSchema.nullable().optional(),
+  // T11: dua fitur dengan |nilai RobustScaler| terbesar; null untuk record lama.
+  top_deviations: z.array(z.tuple([z.string(), z.number()])).nullable().optional(),
 });
 
 export type MetaAlert = z.infer<typeof MetaAlertSchema>;

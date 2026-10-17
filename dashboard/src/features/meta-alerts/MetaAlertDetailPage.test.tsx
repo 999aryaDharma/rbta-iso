@@ -88,4 +88,17 @@ describe('MetaAlertDetailPage contract states', () => {
     expect(screen.getByText(/Temporal Aggregation Profile/)).toBeInTheDocument();
     expect(screen.queryByText(/Provenance Trace/)).not.toBeInTheDocument();
   });
+  it('menampilkan penyebab deviasi robust bila tersedia', async () => {
+    mockFetchMetaAlert.mockResolvedValue({
+      ...detail,
+      raw_model_score: 0.5,
+      escalate: true,
+      feature_schema_version: '1.0',
+      score_calibration_version: 'minmax-v1',
+      source_alert_ids: [],
+      top_deviations: [['mitre_tactic_count', 4], ['rule_diversity_shannon', 2.1]],
+    });
+    renderAt('/meta-alerts/5');
+    expect(await screen.findByText('mitre_tactic_count +4.0, rule_diversity_shannon +2.1')).toBeInTheDocument();
+  });
 });

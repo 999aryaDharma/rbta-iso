@@ -100,6 +100,7 @@ def _serialize_scored_alert(scored: ScoredMetaAlert) -> Dict[str, Any]:
         "score_calibration_version": scored.score_calibration_version,
         "source_alert_ids": list(scored.source_alert_ids),
         "metadata": dict(scored.metadata),
+        "top_deviations": [list(p) for p in scored.top_deviations] if scored.top_deviations else None,
     }
 
 
@@ -183,6 +184,7 @@ class LiveRBTAService:
                     score_calibration_version=item.get("score_calibration_version", "minmax-v1"),
                     source_alert_ids=tuple(item.get("source_alert_ids", ())),
                     metadata=item.get("metadata", {}),
+                    top_deviations=item.get("top_deviations") or None,
                 )
             except Exception as exc:
                 logger.warning("Error parsing scored alert: %s", exc)

@@ -173,6 +173,12 @@ def train_reference_pipeline(
     )
 
 
+def top_scaled_deviations(scaled_row: Sequence[float], k: int = 2) -> Tuple[Tuple[str, float], ...]:
+    """k fitur dengan |nilai RobustScaler| terbesar (seri: urutan FEATURE_COLUMNS). Tidak memengaruhi skor."""
+    order = sorted(range(len(FEATURE_COLUMNS)), key=lambda j: (-abs(float(scaled_row[j])), j))
+    return tuple((FEATURE_COLUMNS[j], float(scaled_row[j])) for j in order[:k])
+
+
 class ScoringPipeline:
     """Scoring pipeline inferensi yang hanya berjalan dalam mode prediksi (read-only)."""
 
@@ -242,6 +248,7 @@ class ScoringPipeline:
             feature_schema_version=str(self.schema.get("schema_version", "1.0")),
             score_calibration_version=str(self.calibration.version),
             source_alert_ids=meta.wazuh_alert_ids,
+            top_deviations=top_scaled_deviations(X_scaled[0]),
         )
 
     def score_batch(self, metas: Sequence[MetaAlert]) -> List[ScoredMetaAlert]:
@@ -302,6 +309,7 @@ class ScoringPipeline:
                     feature_schema_version=str(self.schema.get("schema_version", "1.0")),
                     score_calibration_version=str(self.calibration.version),
                     source_alert_ids=meta.wazuh_alert_ids,
+                    top_deviations=top_scaled_deviations(X_scaled[i]),
                 )
             )
             

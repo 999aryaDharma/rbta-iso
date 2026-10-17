@@ -108,6 +108,17 @@ class DurableStateManager:
                 )
                 """
             )
+            # Alert dari agen yang dikecualikan (RBTA_EXCLUDED_AGENTS): tidak pernah masuk seen,
+            # evidence, maupun RBTA. Dicatat per ID agar poll ulang tidak menggandakan counter.
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS excluded_alerts (
+                    wazuh_alert_id TEXT PRIMARY KEY,
+                    agent TEXT NOT NULL,
+                    excluded_at TEXT NOT NULL DEFAULT (datetime('now'))
+                )
+                """
+            )
             conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS notification_log (
@@ -346,6 +357,26 @@ class DurableStateManager:
         with sqlite3.connect(self.history_db_path) as conn:
             row = conn.execute("SELECT COUNT(*) FROM quarantined_alerts").fetchone()
         return int(row[0]) if row else 0
+
+    def excluded_add_many(self, alerts: List[CanonicalRawAlert]) -> None:
+        """Catat alert agen yang dikecualikan (idempoten per wazuh_alert_id)."""
+        if not alerts:
+            return
+        with sqlite3.connect(self.history_db_path) as conn:
+            conn.executemany(
+                "INSERT OR IGNORE INTO excluded_alerts (wazuh_alert_id, agent) VALUES (?, ?)",
+                (
+                    (a.wazuh_alert_id, str(a.agent_name if a.agent_name and a.agent_name != "unknown" else a.agent_id).lower())
+                    for a in alerts
+                ),
+            )
+            conn.commit()
+
+    def excluded_counts(self) -> Dict[str, int]:
+        """Counter kumulatif alert unik yang dikecualikan, per agen."""
+        with sqlite3.connect(self.history_db_path) as conn:
+            rows = conn.execute("SELECT agent, COUNT(*) FROM excluded_alerts GROUP BY agent ORDER BY agent").fetchall()
+        return {str(agent): int(count) for agent, count in rows}
 
     def suppression_add(self, meta_id: int, reason: str) -> None:
         """Tahan notifikasi untuk satu meta ID final (idempoten, alasan pertama yang dipakai).

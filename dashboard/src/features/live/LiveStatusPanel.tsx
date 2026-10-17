@@ -45,6 +45,8 @@ export function LiveStatusPanel({ isLoading, isError, data, errorMessage, onRetr
     );
   }
 
+  const excludedTotal = data.excluded_alerts_total ?? {};
+  const excludedSum = Object.values(excludedTotal).reduce((sum, n) => sum + n, 0);
   const stale = data.last_cycle_at
     ? Date.now() - new Date(data.last_cycle_at).getTime() > LIVE_STALE_AFTER_MS
     : data.worker_alive;
@@ -116,6 +118,22 @@ export function LiveStatusPanel({ isLoading, isError, data, errorMessage, onRetr
           </dd>
         </div>
       </dl>
+
+      {(data.excluded_agents?.length ?? 0) > 0 && (
+        <div className="text-xs text-kumo-subtle space-y-1">
+          <p>
+            Agen uji dikecualikan dari ingestion ({data.excluded_agents?.join(', ')}):{' '}
+            <span className="font-mono font-semibold text-kumo-strong">{excludedSum}</span> alert unik tidak diproses.
+          </p>
+          {excludedSum > 0 && (
+            <p className="font-mono">
+              {Object.entries(excludedTotal)
+                .map(([agent, count]) => `${agent}: ${count}`)
+                .join(' · ')}
+            </p>
+          )}
+        </div>
+      )}
 
       {data.last_error && (
         <p role="alert" className="text-xs text-red-600 font-mono break-words">

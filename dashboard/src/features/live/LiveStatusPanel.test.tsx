@@ -66,4 +66,21 @@ describe('LiveStatusPanel', () => {
     render(<LiveStatusPanel isLoading={false} isError={false} data={stopped} onRetry={() => {}} />);
     expect(screen.getAllByText(/worker berhenti/i)).toHaveLength(2);
   });
+  it('menampilkan counter agen uji yang dikecualikan', () => {
+    render(
+      <LiveStatusPanel
+        isLoading={false}
+        isError={false}
+        data={{ ...baseStatus, excluded_agents: ['agent-test'], excluded_alerts_total: { 'agent-test': 7, '010': 2 } }}
+        onRetry={() => {}}
+      />,
+    );
+    expect(screen.getByText(/agen uji dikecualikan/i)).toHaveTextContent('9');
+    expect(screen.getByText(/agent-test: 7/)).toBeInTheDocument();
+  });
+
+  it('tidak menampilkan blok pengecualian bila tidak dikonfigurasi', () => {
+    render(<LiveStatusPanel isLoading={false} isError={false} data={baseStatus} onRetry={() => {}} />);
+    expect(screen.queryByText(/agen uji dikecualikan/i)).not.toBeInTheDocument();
+  });
 });

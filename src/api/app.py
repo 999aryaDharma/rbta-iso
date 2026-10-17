@@ -353,6 +353,19 @@ def create_app(
             except Exception:
                 ingested_total = None
 
+        excluded_agents: List[str] = []
+        excluded_alerts_total: Dict[str, int] = {}
+        coordinator = getattr(worker, "coordinator", None) if worker is not None else None
+        if coordinator is not None:
+            excluded_agents = sorted(getattr(coordinator, "excluded_agents", ()) or ())
+        if service is not None:
+            try:
+                count_fn = getattr(service.state_manager, "excluded_counts", None)
+                if callable(count_fn):
+                    excluded_alerts_total = dict(count_fn())
+            except Exception:
+                excluded_alerts_total = {}
+
         return {
             "worker_alive": alive,
             "cycles_completed": int(worker_snapshot.get("cycles_completed", 0) or 0),
@@ -374,6 +387,8 @@ def create_app(
             "tls_verify": source_state.get("tls_verify"),
             "model": getattr(app.state, "model_identity", None),
             "base_delta_t_sec": service.base_delta_t.total_seconds() if service is not None else None,
+            "excluded_agents": excluded_agents,
+            "excluded_alerts_total": excluded_alerts_total,
         }
 
     @app.post("/ingest/wazuh", tags=["Ingress"])

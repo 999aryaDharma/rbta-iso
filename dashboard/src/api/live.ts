@@ -20,6 +20,9 @@ export const LiveStatusSchema = z.object({
   newest_ingested_event_time: z.string().nullable(),
   event_lag_sec: z.number().nullable(),
   tls_verify: z.boolean().nullable(),
+  // Opsional: backend lama tidak mengirim field ini.
+  excluded_agents: z.array(z.string()).optional(),
+  excluded_alerts_total: z.record(z.string(), z.number().int().nonnegative()).optional(),
 });
 
 export type LiveStatus = z.infer<typeof LiveStatusSchema>;

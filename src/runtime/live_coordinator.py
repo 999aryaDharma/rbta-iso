@@ -53,6 +53,7 @@ class LiveCycleResult:
     new_scored_meta_alerts: int
     quarantined: int = 0
     skipped_quarantined: int = 0
+    excluded: int = 0
 
     @property
     def reconciliation_candidates(self) -> int:
@@ -120,6 +121,7 @@ class LiveIngestionCoordinator:
         breaker_ack: Optional[str] = None,
         live_archive_enabled: Optional[bool] = None,
         live_archive_dir: Optional[Union[str, Path]] = None,
+        excluded_agents: Optional[str] = None,
     ) -> None:
         self.service: LiveRBTAService = service
         self.poller: WazuhIndexerLivePoller = poller or WazuhIndexerLivePoller()
@@ -154,6 +156,14 @@ class LiveIngestionCoordinator:
             env_dir = os.environ.get("RBTA_LIVE_ARCHIVE_DIR", "").strip()
             live_archive_dir = env_dir if env_dir else "data/archive"
         self.live_archive_dir: Path = Path(live_archive_dir)
+
+        # Agen uji yang dikecualikan dari ingestion live (RBTA_EXCLUDED_AGENTS, dipisah koma,
+        # cocok dengan agent_name ATAU agent_id, case-insensitive). Replay/offline tidak memakai ini.
+        if excluded_agents is None:
+            excluded_agents = os.environ.get("RBTA_EXCLUDED_AGENTS", "")
+        self.excluded_agents: frozenset = frozenset(
+            token.strip().lower() for token in str(excluded_agents).split(",") if token.strip()
+        )
 
         # Pulihkan state cursor transport dari service.
         source_state = self.service.get_live_source_state()
@@ -354,6 +364,21 @@ class LiveIngestionCoordinator:
 
         # Sort stabil berdasarkan timestamp ASC, wazuh_alert_id ASC.
         all_candidates.sort(key=lambda a: (a.timestamp, a.wazuh_alert_id))
+
+        # Agen yang dikecualikan disaring SEBELUM quarantine, order buffer, dan ingest: tidak masuk
+        # seen/evidence/arsip/RBTA, hanya dicatat (idempoten per ID) untuk counter kumulatif.
+        excluded_count = 0
+        if self.excluded_agents:
+            excluded_alerts = [
+                a for a in all_candidates
+                if str(a.agent_name).lower() in self.excluded_agents
+                or str(a.agent_id).lower() in self.excluded_agents
+            ]
+            if excluded_alerts:
+                self.service.state_manager.excluded_add_many(excluded_alerts)
+                excluded_ids = {a.wazuh_alert_id for a in excluded_alerts}
+                all_candidates = [a for a in all_candidates if a.wazuh_alert_id not in excluded_ids]
+                excluded_count = len(excluded_alerts)
 
         # Snapshot ID yang sudah dikarantina sekali per siklus (satu query, hanya kolom ID) lalu
         # saring SEBELUM order buffer, sehingga buffer tidak pernah menahan alert yang terus rusak.
@@ -597,4 +622,5 @@ class LiveIngestionCoordinator:
             new_scored_meta_alerts=len(total_scored),
             quarantined=quarantined,
             skipped_quarantined=skipped_quarantined,
+            excluded=excluded_count,
         )

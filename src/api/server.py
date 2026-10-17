@@ -212,6 +212,7 @@ def create_production_app(
                 poller=poller,
                 order_buffer_enabled=buffer_enabled,
                 breaker_ack=(env_map.get("RBTA_QUARANTINE_BREAKER_ACK") or None),
+                excluded_agents=env_map.get("RBTA_EXCLUDED_AGENTS", ""),
             ),
             poll_interval=poll_interval_from_env(env_map),
             drain_on_stop=drain_on_stop_from_env(env_map),

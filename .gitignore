@@ -130,6 +130,8 @@ docs/*
 !docs/design/
 !docs/thesis/
 !docs/thesis/**
+docs/thesis/DRAFT_Skripsi_*.docx
+docs/thesis/hasil-run-*/
 !docs/demo/
 !docs/demo/**
 !docs/KNOWN-LIMITATIONS.md

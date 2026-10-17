@@ -121,6 +121,7 @@ class DurableStateManager:
                 )
                 """
             )
+            self._ensure_column(conn, "excluded_alerts", "event_time", "TEXT")
             conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS notification_log (
@@ -374,9 +375,13 @@ class DurableStateManager:
             return
         with sqlite3.connect(self.history_db_path) as conn:
             conn.executemany(
-                "INSERT OR IGNORE INTO excluded_alerts (wazuh_alert_id, agent) VALUES (?, ?)",
+                "INSERT OR IGNORE INTO excluded_alerts (wazuh_alert_id, agent, event_time) VALUES (?, ?, ?)",
                 (
-                    (a.wazuh_alert_id, str(a.agent_name if a.agent_name and a.agent_name != "unknown" else a.agent_id).lower())
+                    (
+                        a.wazuh_alert_id,
+                        str(a.agent_name if a.agent_name and a.agent_name != "unknown" else a.agent_id).lower(),
+                        a.timestamp.isoformat(),
+                    )
                     for a in alerts
                 ),
             )

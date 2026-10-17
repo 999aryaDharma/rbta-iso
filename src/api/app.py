@@ -64,6 +64,8 @@ def create_app(
     app.state.auth_key = auth_key
     # Diisi oleh bootstrap produksi: {version, sha256, threshold, q3} model aktif.
     app.state.model_identity = None
+    # Direktori CSV bukti harian (T6); None = endpoint evidence selalu 404.
+    app.state.evidence_dir = None
 
     rate_limit = max(1, int(os.getenv("RBTA_CONTROL_RATE_LIMIT", "120")))
     max_request_bytes = max(128, int(os.getenv("RBTA_MAX_REQUEST_BYTES", str(1024 * 1024))))
@@ -412,6 +414,20 @@ def create_app(
             "agent_criticality_file": _criticality_file_info(),
             "latency_24h": latency_24h,
         }
+
+    @app.get("/api/v1/evidence/{file_name}", tags=["Evidence"])
+    def download_evidence(file_name: str, authorization: Optional[str] = Header(None)) -> FileResponse:
+        """Unduh CSV bukti harian live (allowlist nama file, tanpa path traversal)."""
+        from src.runtime.evidence_export import EVIDENCE_FILES
+
+        verify_auth(authorization)
+        evidence_dir = getattr(app.state, "evidence_dir", None)
+        if file_name not in EVIDENCE_FILES or evidence_dir is None:
+            raise HTTPException(status_code=404, detail="Evidence file not found")
+        path = Path(evidence_dir) / file_name
+        if not path.is_file():
+            raise HTTPException(status_code=404, detail="Evidence file not generated yet")
+        return FileResponse(path, media_type="text/csv", filename=file_name)
 
     @app.post("/ingest/wazuh", tags=["Ingress"])
     def ingest_wazuh(

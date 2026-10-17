@@ -43,6 +43,8 @@ COPY pyproject.toml README.md constraints.txt /app/
 RUN pip install --no-cache-dir -c constraints.txt .
 
 COPY src/ /app/src/
+# Ekspor bukti harian manual: docker compose exec rbta-service python scripts/export_live_evidence.py
+COPY scripts/export_live_evidence.py /app/scripts/export_live_evidence.py
 COPY --from=dashboard-build /build/dist /app/dashboard/dist
 
 RUN mkdir -p /app/data/runtime /app/artifacts/models && \

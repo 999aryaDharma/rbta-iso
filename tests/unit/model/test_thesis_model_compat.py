@@ -53,3 +53,20 @@ def test_thesis_scores_reproduce_published_rows():
             mitre_tactic_count=int(row.mitre_tactic_count),
         )
         assert (decision, action) == (row.decision, row.action), row.meta_id
+
+
+def test_reference_quantiles_artifact_matches_frozen_scaler():
+    import json
+    from pathlib import Path
+
+    bundle = require_thesis_model()
+    path = Path(__file__).resolve().parents[3] / "artifacts" / "reference_feature_quantiles.json"
+    data = json.loads(path.read_text(encoding="utf-8"))
+    assert data["source"]["model_version"] == THESIS_MODEL_VERSION
+    assert data["source"]["n_meta"] == bundle.metadata["training_row_count"]
+    for i, feature in enumerate(FEATURE_COLUMNS):
+        q = data["quantiles"][feature]
+        assert q["median"] == pytest.approx(bundle.scaler.center_[i], abs=1e-12)
+        iqr = q["q3"] - q["q1"]
+        # RobustScaler memakai scale 1 untuk IQR nol (fitur itu diskalakan dalam satuan mentah).
+        assert bundle.scaler.scale_[i] == pytest.approx(iqr if iqr > 0 else 1.0, abs=1e-12)

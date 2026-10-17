@@ -279,6 +279,9 @@ class LiveWorker:
             "live_model_version": version,
             "live_worker_started_at": now,
         }
+        # Log start terbatas untuk worker_restarts di ekspor bukti harian (T6).
+        start_log = [s for s in (source_state.get("live_worker_start_log") or []) if isinstance(s, str)]
+        payload["live_worker_start_log"] = (start_log + [now])[-400:]
         # Penanda waktu mulai pertama, ditulis tepat satu kali per file state.
         # Berbeda dengan live_worker_started_at (diperbarui setiap start), key ini hanya diisi
         # bila belum ada sehingga restart tidak pernah menimpa nilai aslinya.

@@ -1,0 +1,64 @@
+{
+  "description": "Kuantil 7 fitur partisi reference run skripsi (data latih rbta-if-thesis-v1).",
+  "source": {
+    "corpus_sha256": "079c47e3772fed5a4cce3cf2d1e9c6b98ff4e5a15433c5acb049a81c4a95b5dd",
+    "model_version": "rbta-if-thesis-v1",
+    "model_sha256": "0447550cd531cb88dc5d5ef60ed50fd525e201b154ba999d5fa84f2c3a6432f4",
+    "git_commit": "16ab5741233ff76e5d980f142971fea68e783c12",
+    "partition": "reference (60% pertama, kronologis)",
+    "partition_period": [
+      "2025-05-10T02:06:46.854000+00:00",
+      "2025-11-26T06:53:15.454000+00:00"
+    ],
+    "delta_t_minutes": 10,
+    "adaptive": true,
+    "n_raw": 858465,
+    "n_meta": 29719,
+    "verified_against_frozen_robust_scaler": true,
+    "builder": "scripts/build_reference_feature_quantiles.py"
+  },
+  "quantiles": {
+    "max_severity": {
+      "q1": 3.0,
+      "median": 3.0,
+      "q3": 5.0,
+      "p95": 10.0
+    },
+    "mitre_tactic_count": {
+      "q1": 0.0,
+      "median": 0.0,
+      "q3": 0.0,
+      "p95": 4.0
+    },
+    "critical_mitre_tactic_present": {
+      "q1": 0.0,
+      "median": 0.0,
+      "q3": 0.0,
+      "p95": 1.0
+    },
+    "alert_count_log": {
+      "q1": 0.6931471805599453,
+      "median": 0.6931471805599453,
+      "q3": 2.0794415416798357,
+      "p95": 4.189654742026425
+    },
+    "rule_diversity_shannon": {
+      "q1": 0.0,
+      "median": 0.0,
+      "q3": 0.0,
+      "p95": 0.8256265261578954
+    },
+    "severity_dispersion": {
+      "q1": 0.0,
+      "median": 0.0,
+      "q3": 0.0,
+      "p95": 0.7999999999999999
+    },
+    "agent_criticality": {
+      "q1": 2.0,
+      "median": 3.0,
+      "q3": 3.0,
+      "p95": 3.0
+    }
+  }
+}

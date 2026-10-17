@@ -260,6 +260,17 @@ def create_production_app(
                 "set creds or RBTA_TELEGRAM_DRY_RUN=true"
             )
 
+    # Ekspor bukti harian (T6): <state dir>/evidence, default 00:05 WITA, hanya untuk live.
+    from src.runtime.evidence_export import make_evidence_export_job, parse_hhmm
+
+    evidence_dir = Path(env_map.get("RBTA_EVIDENCE_DIR") or (state_dir / "evidence")).resolve()
+    evidence_job = None
+    export_enabled = str(env_map.get("RBTA_EVIDENCE_EXPORT_ENABLED", "true")).strip().lower() != "false"
+    if live_worker is not None and export_enabled:
+        evidence_job = make_evidence_export_job(
+            service, evidence_dir, model_identity, parse_hhmm(env_map.get("RBTA_EVIDENCE_EXPORT_AT") or "00:05")
+        )
+
     @asynccontextmanager
     async def lifespan(app_instance: FastAPI) -> AsyncGenerator[None, None]:
         logger.info("Starting RBTA production service...")
@@ -274,7 +285,12 @@ def create_production_app(
                 "Telegram dispatcher thread started (enabled=%s).",
                 telegram_dispatcher.enabled,
             )
+        if evidence_job is not None:
+            evidence_job.start()
+            logger.info("Evidence export job started (dir=%s).", evidence_dir)
         yield
+        if evidence_job is not None:
+            evidence_job.stop()
         if live_worker is not None and live_worker.drain_on_stop:
             logger.info(
                 "Shutting down RBTA production service "
@@ -300,6 +316,8 @@ def create_production_app(
     )
     app.router.lifespan_context = lifespan
     app.state.model_identity = model_identity
+    app.state.evidence_dir = evidence_dir
+    app.state.evidence_job = evidence_job
     app.state.live_worker = live_worker
     app.state.telegram_dispatcher = telegram_dispatcher
 

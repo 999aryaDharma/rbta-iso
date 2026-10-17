@@ -2,6 +2,7 @@
 
 from dataclasses import asdict
 from datetime import datetime, timedelta, timezone
+from itertools import islice
 import logging
 from functools import wraps
 from threading import RLock
@@ -25,6 +26,33 @@ def _serialized(method):
         with self._lock:
             return method(self, *args, **kwargs)
     return wrapped
+
+
+class _RecentIdSet(set):
+    """``set`` yang mengingat urutan sisip, sehingga pemangkasan membuang ID TERTUA.
+
+    Hanya hot cache in-memory; dedup acuan tetap tabel durable seen_alert_ids
+    (ingest_alert mengecek has_seen_alert_id sebelum engine). Engine hanya memakai add/in/len.
+    """
+
+    def __init__(self, items=()):
+        items = list(items)
+        super().__init__(items)
+        self._order = dict.fromkeys(items)
+
+    def add(self, item) -> None:
+        super().add(item)
+        self._order.setdefault(item, None)
+
+    def discard(self, item) -> None:
+        super().discard(item)
+        self._order.pop(item, None)
+
+    def keep_newest(self, limit: int) -> None:
+        excess = len(self._order) - limit
+        if excess > 0:
+            for item in list(islice(self._order, excess)):
+                self.discard(item)
 
 
 def _serialize_meta_alert(meta: MetaAlert) -> Dict[str, Any]:
@@ -156,6 +184,7 @@ class LiveRBTAService:
 
         # Pulihkan dari state durable saat startup.
         self._restore_from_disk()
+        self.engine._seen_alert_ids = _RecentIdSet(self.engine._seen_alert_ids)
 
     def _parse_scored_alert(self, item: Any) -> Optional[ScoredMetaAlert]:
         if isinstance(item, ScoredMetaAlert):
@@ -248,8 +277,10 @@ class LiveRBTAService:
             self._finalized_at.pop(item.meta_id, None)
         # SQLite adalah index duplikat acuan. Di memori cukup disimpan hot set terbatas
         # untuk request berulang yang cepat di proses ini.
-        if len(self.engine._seen_alert_ids) > 10_000:
-            self.engine._seen_alert_ids = set(list(self.engine._seen_alert_ids)[-10_000:])
+        # Dulu set(list(set)[-10_000:]) = subset acak; kini buang yang tertua (sudah durable di atas).
+        if not isinstance(self.engine._seen_alert_ids, _RecentIdSet):
+            self.engine._seen_alert_ids = _RecentIdSet(self.engine._seen_alert_ids)
+        self.engine._seen_alert_ids.keep_newest(10_000)
         if len(self.finalized_history) > self.RECENT_HISTORY_LIMIT:
             self.finalized_history = self.finalized_history[-self.RECENT_HISTORY_LIMIT:]
         self._last_persisted_history_idx = len(self.finalized_history)

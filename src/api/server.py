@@ -196,6 +196,9 @@ def create_production_app(
         worker_enabled_from_env,
     )
 
+    from src.runtime.retention import archive_dir_for, make_retention_job, retention_days_from_env
+
+    retention_days = retention_days_from_env(env_map)
     live_worker: Optional[LiveWorker] = None
     if service is not None and worker_enabled_from_env(env_map):
         # Lock state sudah diambil di atas untuk setiap bootstrap; tidak perlu acquire lagi.
@@ -222,6 +225,7 @@ def create_production_app(
                 order_buffer_enabled=buffer_enabled,
                 breaker_ack=(env_map.get("RBTA_QUARANTINE_BREAKER_ACK") or None),
                 excluded_agents=env_map.get("RBTA_EXCLUDED_AGENTS", ""),
+                retention_days=retention_days,
             ),
             poll_interval=poll_interval_from_env(env_map),
             drain_on_stop=drain_on_stop_from_env(env_map),
@@ -271,6 +275,13 @@ def create_production_app(
             service, evidence_dir, model_identity, parse_hhmm(env_map.get("RBTA_EVIDENCE_EXPORT_AT") or "00:05")
         )
 
+    # Retensi harian (T12), default 03:30 WITA; VACUUM hari Minggu. Hanya untuk live.
+    retention_job = None
+    if live_worker is not None and retention_days > 0:
+        retention_job = make_retention_job(
+            service, archive_dir_for(env_map), retention_days, at=env_map.get("RBTA_RETENTION_AT") or "03:30"
+        )
+
     # Daily digest NOISE_HIGH (T9), default 07:30 WITA; lewat dispatcher yang sama (dry-run/hold/throttle).
     digest_job = None
     digest_enabled = str(env_map.get("RBTA_DIGEST_ENABLED", "true")).strip().lower() != "false"
@@ -304,7 +315,12 @@ def create_production_app(
         if digest_job is not None:
             digest_job.start()
             logger.info("Daily digest job started.")
+        if retention_job is not None:
+            retention_job.start()
+            logger.info("Retention job started (%d days).", retention_days)
         yield
+        if retention_job is not None:
+            retention_job.stop()
         if digest_job is not None:
             digest_job.stop()
         if evidence_job is not None:
@@ -337,6 +353,9 @@ def create_production_app(
     app.state.evidence_dir = evidence_dir
     app.state.evidence_job = evidence_job
     app.state.digest_job = digest_job
+    app.state.retention_job = retention_job
+    app.state.retention_days = retention_days
+    app.state.disk_paths = {"state": state_dir, "archive": archive_dir_for(env_map)}
     app.state.live_worker = live_worker
     app.state.telegram_dispatcher = telegram_dispatcher
 

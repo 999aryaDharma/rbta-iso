@@ -527,6 +527,23 @@ class RawAlertEvidenceStore:
             rows = conn.execute(sql, params).fetchall()
             return [self._row_to_dict(r, redact=redact) for r in rows]
 
+    def prune_older_than(self, cutoff_iso: str) -> int:
+        """Hapus evidence dengan event timestamp < cutoff_iso (retensi T12); kembalikan jumlah baris."""
+        self.flush()
+        with self._lock:
+            conn = self._get_conn()
+            cur = conn.execute("DELETE FROM raw_alert_evidence WHERE timestamp < ?", (cutoff_iso,))
+            conn.commit()
+            row = conn.execute("SELECT COUNT(*) AS total FROM raw_alert_evidence").fetchone()
+            self._cached_count = int(row["total"]) if row else 0
+            return int(cur.rowcount or 0)
+
+    def vacuum(self) -> None:
+        """VACUUM lewat koneksi milik store (di bawah lock-nya) agar tidak bentrok dengan penulisan."""
+        self.flush()
+        with self._lock:
+            self._get_conn().execute("VACUUM")
+
     def count(self) -> int:
         """Kembalikan jumlah record raw alert evidence yang tersimpan, langsung dari cache memori."""
         if hasattr(self, "_cached_count"):

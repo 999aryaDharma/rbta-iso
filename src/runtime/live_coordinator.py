@@ -54,6 +54,7 @@ class LiveCycleResult:
     quarantined: int = 0
     skipped_quarantined: int = 0
     excluded: int = 0
+    retention_expired: int = 0
 
     @property
     def reconciliation_candidates(self) -> int:
@@ -122,6 +123,7 @@ class LiveIngestionCoordinator:
         live_archive_enabled: Optional[bool] = None,
         live_archive_dir: Optional[Union[str, Path]] = None,
         excluded_agents: Optional[str] = None,
+        retention_days: int = 0,
     ) -> None:
         self.service: LiveRBTAService = service
         self.poller: WazuhIndexerLivePoller = poller or WazuhIndexerLivePoller()
@@ -161,6 +163,9 @@ class LiveIngestionCoordinator:
         # cocok dengan agent_name ATAU agent_id, case-insensitive). Replay/offline tidak memakai ini.
         if excluded_agents is None:
             excluded_agents = os.environ.get("RBTA_EXCLUDED_AGENTS", "")
+        # Retensi (T12): seen_alert_ids lebih tua dari cutoff dipangkas, jadi kandidat dengan event time
+        # < cutoff dilewati (dihitung) agar tidak di-ingest ulang menjadi MetaAlert ganda. 0 = nonaktif.
+        self.retention_days: int = max(0, int(retention_days or 0))
         self.excluded_agents: frozenset = frozenset(
             token.strip().lower() for token in str(excluded_agents).split(",") if token.strip()
         )
@@ -364,6 +369,15 @@ class LiveIngestionCoordinator:
 
         # Sort stabil berdasarkan timestamp ASC, wazuh_alert_id ASC.
         all_candidates.sort(key=lambda a: (a.timestamp, a.wazuh_alert_id))
+
+        retention_expired = 0
+        if self.retention_days > 0:
+            cutoff = now - timedelta(days=self.retention_days)
+            kept_recent = [a for a in all_candidates if a.timestamp >= cutoff]
+            retention_expired = len(all_candidates) - len(kept_recent)
+            if retention_expired:
+                logger.debug("Skipping %d candidate(s) older than retention cutoff %s", retention_expired, cutoff)
+            all_candidates = kept_recent
 
         # Agen yang dikecualikan disaring SEBELUM quarantine, order buffer, dan ingest: tidak masuk
         # seen/evidence/arsip/RBTA, hanya dicatat (idempoten per ID) untuk counter kumulatif.
@@ -590,6 +604,7 @@ class LiveIngestionCoordinator:
         # None eksplisit bila tidak ada yang memenuhi (tidak pernah basi).
         newest_event = max(ingested_event_times, default=None)
         self.service.update_live_source_state({
+            "retention_expired_last_cycle": retention_expired,
             "recent_poll_cursor": self.recent_poll_cursor.isoformat() if self.recent_poll_cursor else None,
             "newest_ingested_event_time": newest_event.isoformat() if newest_event else None,
             "last_fast_poll_at": self.last_fast_poll_at.isoformat() if self.last_fast_poll_at else None,
@@ -623,4 +638,5 @@ class LiveIngestionCoordinator:
             quarantined=quarantined,
             skipped_quarantined=skipped_quarantined,
             excluded=excluded_count,
+            retention_expired=retention_expired,
         )

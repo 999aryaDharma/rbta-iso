@@ -83,4 +83,16 @@ describe('LiveStatusPanel', () => {
     render(<LiveStatusPanel isLoading={false} isError={false} data={baseStatus} onRetry={() => {}} />);
     expect(screen.queryByText(/agen uji dikecualikan/i)).not.toBeInTheDocument();
   });
+  it('memperingatkan bila disk volume > 80%', () => {
+    render(
+      <LiveStatusPanel
+        isLoading={false}
+        isError={false}
+        data={{ ...baseStatus, disk: { state: { used_pct: 91.2, warning: true }, archive: { used_pct: 40, warning: false } } }}
+        onRetry={() => {}}
+      />,
+    );
+    expect(screen.getByText(/disk volume state terpakai 91.2%/i)).toBeInTheDocument();
+    expect(screen.queryByText(/disk volume archive/i)).not.toBeInTheDocument();
+  });
 });

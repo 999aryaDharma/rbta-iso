@@ -23,6 +23,9 @@ export const LiveStatusSchema = z.object({
   // Opsional: backend lama tidak mengirim field ini.
   excluded_agents: z.array(z.string()).optional(),
   excluded_alerts_total: z.record(z.string(), z.number().int().nonnegative()).optional(),
+  disk: z
+    .record(z.string(), z.object({ used_pct: z.number(), warning: z.boolean() }).passthrough().nullable())
+    .optional(),
 });
 
 export type LiveStatus = z.infer<typeof LiveStatusSchema>;

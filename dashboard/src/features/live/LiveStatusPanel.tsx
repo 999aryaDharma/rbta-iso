@@ -119,6 +119,14 @@ export function LiveStatusPanel({ isLoading, isError, data, errorMessage, onRetr
         </div>
       </dl>
 
+      {Object.entries(data.disk ?? {})
+        .filter(([, usage]) => usage?.warning)
+        .map(([volume, usage]) => (
+          <p key={volume} role="alert" className="text-xs text-amber-600">
+            Disk volume {volume} terpakai {usage?.used_pct.toFixed(1)}% (&gt; 80%). Periksa retensi/backup.
+          </p>
+        ))}
+
       {(data.excluded_agents?.length ?? 0) > 0 && (
         <div className="text-xs text-kumo-subtle space-y-1">
           <p>

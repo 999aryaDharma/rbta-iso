@@ -29,6 +29,13 @@ def _criticality_file_info() -> Optional[Dict[str, Any]]:
     return {"sha256": AGENT_CRITICALITY_OVERRIDE["sha256"], "entries": AGENT_CRITICALITY_OVERRIDE["entries"]}
 
 
+def _disk_status(paths: Dict[str, Any]) -> Dict[str, Any]:
+    """Pemakaian disk per volume (state live, arsip); warning bila > 80%."""
+    from src.runtime.retention import disk_usage
+
+    return {name: disk_usage(Path(path)) for name, path in paths.items() if path is not None}
+
+
 def create_app(
     service: Optional[LiveRBTAService] = None,
     model_registry: Optional[ModelRegistry] = None,
@@ -66,6 +73,8 @@ def create_app(
     app.state.model_identity = None
     # Direktori CSV bukti harian (T6); None = endpoint evidence selalu 404.
     app.state.evidence_dir = None
+    # Diisi bootstrap produksi (T12): {"state": Path, "archive": Path|None}.
+    app.state.disk_paths = {}
 
     rate_limit = max(1, int(os.getenv("RBTA_CONTROL_RATE_LIMIT", "120")))
     max_request_bytes = max(128, int(os.getenv("RBTA_MAX_REQUEST_BYTES", str(1024 * 1024))))
@@ -413,6 +422,9 @@ def create_app(
             "excluded_alerts_total": excluded_alerts_total,
             "agent_criticality_file": _criticality_file_info(),
             "latency_24h": latency_24h,
+            "retention_days": getattr(app.state, "retention_days", None),
+            "retention_expired_last_cycle": source_state.get("retention_expired_last_cycle"),
+            "disk": _disk_status(getattr(app.state, "disk_paths", {}) or {}),
         }
 
     @app.get("/api/v1/evidence/{file_name}", tags=["Evidence"])

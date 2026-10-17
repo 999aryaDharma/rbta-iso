@@ -104,10 +104,10 @@ alpine tar czf /b/live-backup.tgz -C /s .` (sama untuk `rbta-ct-archive`).
 
 ## Batas yang diketahui
 
-- Image pertama kali di-build 2026-10-04 di CT (`rbta-service:ct`):
-  base `python:3.13-slim` (3.11 tak punya wheel numpy 2.5.x),
-  `scikit-learn==1.9.0` di `pyproject.toml` + `constraints.txt`
-  (model `rbta-if-v1` dilatih 1.7.2 — ada `InconsistentVersionWarning`
-  saat load, sudah terbukti stabil di semua test lokal + shadow run).
+- Sejak branch `fix/prod-hardening`: base `python:3.11-slim`,
+  `scikit-learn==1.7.2`, `numpy==2.3.5`, `scipy==1.17.1` — sama dengan
+  lingkungan pelatihan model skripsi, sehingga bundle dimuat tanpa
+  `InconsistentVersionWarning`. (Image 2026-10-04 masih 3.13 + sklearn 1.9.0;
+  rebuild wajib.)
 - Pin TLS = leaf interim; ganti ke CA permanen bila server menerbitkan ulang.
 - Retensi arsip `rbta-ct-archive` belum otomatis — jadwalkan hapus manual.

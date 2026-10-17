@@ -9,7 +9,8 @@ COPY dashboard/ /build/
 RUN npm run build
 
 # Tahap 2: runtime Python
-FROM python:3.13-slim AS runtime
+# Python 3.11 = versi run skripsi (metadata model: 3.11.15).
+FROM python:3.11-slim AS runtime
 
 ARG GIT_SHA="unknown"
 ARG BUILD_DATE="unknown"

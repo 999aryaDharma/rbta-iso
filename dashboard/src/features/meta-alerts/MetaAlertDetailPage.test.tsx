@@ -84,8 +84,8 @@ describe('MetaAlertDetailPage contract states', () => {
   it('menampilkan ringkasan agregasi + skor saat sukses', async () => {
     mockFetchMetaAlert.mockResolvedValue(detail);
     renderAt('/meta-alerts/5');
-    expect(await screen.findByText('MetaAlert #5')).toBeInTheDocument();
-    expect(screen.getByText(/Temporal Aggregation Profile/)).toBeInTheDocument();
+    expect(await screen.findByText('Meta-alert #5')).toBeInTheDocument();
+    expect(screen.getByText(/Profil pengelompokan/)).toBeInTheDocument();
     expect(screen.queryByText(/Provenance Trace/)).not.toBeInTheDocument();
   });
   it('menampilkan penyebab deviasi robust bila tersedia', async () => {
@@ -99,6 +99,6 @@ describe('MetaAlertDetailPage contract states', () => {
       top_deviations: [['mitre_tactic_count', 4], ['rule_diversity_shannon', 2.1]],
     });
     renderAt('/meta-alerts/5');
-    expect(await screen.findByText('mitre_tactic_count +4.0, rule_diversity_shannon +2.1')).toBeInTheDocument();
+    expect(await screen.findByText('Jumlah taktik MITRE (mitre_tactic_count) +4.0, Keragaman aturan (rule_diversity_shannon) +2.1')).toBeInTheDocument();
   });
 });

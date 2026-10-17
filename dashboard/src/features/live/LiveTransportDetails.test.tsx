@@ -46,18 +46,18 @@ describe('LiveTransportDetails', () => {
 
   it('merender blok sekunder collapsible di bawah timeline', () => {
     renderDetails();
-    expect(screen.getByText(/detail transport/i)).toBeInTheDocument();
+    expect(screen.getByText(/detail teknis koneksi/i)).toBeInTheDocument();
     expect(document.querySelector('details')).toBeInTheDocument();
   });
 
   it('memuat metrik transport worker di dalam blok sekunder', async () => {
     renderDetails();
-    expect(await screen.findByText(/worker hidup/i)).toBeInTheDocument();
+    expect(await screen.findByText(/pemrosesan berjalan/i)).toBeInTheDocument();
   });
 
   it('tidak menampilkan hitungan siklus internal', async () => {
     renderDetails();
-    await screen.findByText(/worker hidup/i);
+    await screen.findByText(/pemrosesan berjalan/i);
     expect(screen.queryByText('Siklus selesai')).not.toBeInTheDocument();
   });
 });

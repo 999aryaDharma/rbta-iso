@@ -80,8 +80,8 @@ beforeEach(() => {
 describe('BucketDetailPage', () => {
   it('menampilkan identitas bucket + anggota raw alert', async () => {
     renderPage();
-    expect(await screen.findByText(/Bucket 005 · rootcheck/)).toBeInTheDocument();
-    expect(screen.getByText(/mengagregasi/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Kelompok 005 · rootcheck/)).toBeInTheDocument();
+    expect(await screen.findByText(/^masih bertambah$/i)).toBeInTheDocument();
     expect(await screen.findByText('a1')).toBeInTheDocument();
     expect(screen.getByText('Rootcheck event')).toBeInTheDocument();
   });
@@ -92,16 +92,16 @@ describe('BucketDetailPage', () => {
       new ApiError(404, JSON.stringify({ detail: 'tutup', finalized_meta_id: 119 })),
     );
     renderPage();
-    expect(await screen.findByText(/sudah final sebagai MetaAlert #119/i)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /buka metaalert #119/i })).toBeInTheDocument();
+    expect(await screen.findByText(/sudah ditutup menjadi meta-alert #119/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /buka meta-alert #119/i })).toBeInTheDocument();
   });
 
   it('menampilkan banner tanpa tautan bila bucket tak dikenal', async () => {
     const { ApiError } = await import('@/api/client');
     mockFetchBucketRawAlerts.mockRejectedValue(new ApiError(404, 'tidak ada'));
     renderPage();
-    expect(await screen.findByText(/bucket tidak aktif/i)).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /buka metaalert/i })).not.toBeInTheDocument();
+    expect(await screen.findByText(/kelompok tidak lagi terbuka/i)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /buka meta-alert/i })).not.toBeInTheDocument();
   });
 
   it('baris anggota menuju rute detail raw alert bucket', async () => {

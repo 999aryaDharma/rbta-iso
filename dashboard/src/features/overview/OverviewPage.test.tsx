@@ -55,16 +55,16 @@ describe('OverviewPage kosakata Replay-vs-Live', () => {
   it('mode Live: judul dan deskripsi memakai kosakata arus langsung', async () => {
     renderAt('/');
     expect(await screen.findByRole('heading', { name: /ringkasan live/i })).toBeInTheDocument();
-    expect(screen.getAllByText(/arus alert langsung/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/data langsung/i).length).toBeGreaterThan(0);
     expect(screen.queryByText(/ringkasan replay/i)).not.toBeInTheDocument();
   });
 
   it('mode Live: definisi metrik konsisten (ARR = reduksi triase, ESCALATE terbuka bukan vonis)', async () => {
     renderAt('/');
     await screen.findByRole('heading', { name: /ringkasan live/i });
-    expect(screen.getAllByText(/reduksi unit triase, bukan akurasi/i).length).toBeGreaterThan(0);
-    expect(screen.getByText(/prioritas investigasi.*bukan insiden terbukti/i)).toBeInTheDocument();
-    expect(screen.getByText(/prioritas.*bukan label benign/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/pengurangan jumlah yang perlu dicek analyst, bukan akurasi/i).length).toBeGreaterThan(0);
+    expect(screen.getByText(/prioritas, bukan insiden terbukti/i)).toBeInTheDocument();
+    expect(screen.getByText(/prioritas rendah, bukan label aman/i)).toBeInTheDocument();
   });
 
   it('mode Live: batas klaim tesis eksplisit (skor = prioritas, bukan vonis serangan)', async () => {
@@ -77,14 +77,14 @@ describe('OverviewPage kosakata Replay-vs-Live', () => {
     renderAt('/?run_id=run-abc-123');
     expect(await screen.findByRole('heading', { name: /ringkasan replay/i })).toBeInTheDocument();
     expect(screen.getAllByText(/run-abc-123/).length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/dataset historis/i).length).toBeGreaterThan(0);
-    expect(screen.getByText(/jendela temporal run replay ini/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/data historis/i).length).toBeGreaterThan(0);
+    expect(screen.getByText(/pada sesi replay ini/i)).toBeInTheDocument();
   });
 
   it('mode Replay: batas klaim dan definisi ARR tetap eksplisit', async () => {
     renderAt('/?run_id=run-abc-123');
     await screen.findByRole('heading', { name: /ringkasan replay/i });
-    expect(screen.getAllByText(/reduksi unit triase, bukan akurasi/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/pengurangan jumlah yang perlu dicek analyst, bukan akurasi/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/skor.*prioritas.*bukan vonis serangan/i).length).toBeGreaterThan(0);
   });
 });

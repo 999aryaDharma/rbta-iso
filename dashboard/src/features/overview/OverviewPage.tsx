@@ -7,6 +7,7 @@ import { MetricCard } from '@/components/shared/MetricCard';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { DecisionBadge } from '@/components/shared/DecisionBadge';
 import { formatNumber, formatDateTime, formatScore } from '@/lib/formatters';
+import { ACTION_LABELS, TERM_HINTS, TERMS } from '@/lib/labels';
 import { Button } from '@cloudflare/kumo/components/button';
 import { Badge } from '@cloudflare/kumo/components/badge';
 import { Table } from '@cloudflare/kumo/components/table';
@@ -37,20 +38,20 @@ export function OverviewPage() {
   return (
     <>
       <PageHeader
-        breadcrumbs={isReplay ? ['Riset', 'Ringkasan Replay'] : ['Operasi', 'Ringkasan Live']}
-        title={isReplay ? 'Ringkasan Replay' : 'Ringkasan Live'}
+        breadcrumbs={isReplay ? ['Riset', 'Ringkasan replay'] : ['Operasi', 'Ringkasan live']}
+        title={isReplay ? 'Ringkasan replay' : 'Ringkasan live'}
         description={
           isReplay
-            ? `Angka ringkasan dari dataset historis run replay ${runId}. Definisi metrik identik dengan konteks Live; skor Isolation Forest = urutan prioritas, bukan vonis serangan.`
-            : 'Angka ringkasan dari arus alert langsung (tanpa run_id). RBTA mengurangi unit triase; skor Isolation Forest = urutan prioritas, bukan vonis serangan.'
+            ? `Kondisi alert dan beban analyst dari data historis sesi replay ${runId}. Definisi angka sama dengan live; skor keanehan = urutan prioritas, bukan vonis serangan.`
+            : 'Kondisi alert dan beban analyst saat ini (data langsung). RBTA mengurangi jumlah yang perlu dicek analyst; skor keanehan = urutan prioritas, bukan vonis serangan.'
         }
       />
 
       <div className="px-6 py-8 lg:px-10 space-y-8">
         <p className="text-xs text-kumo-subtle leading-relaxed border border-kumo-hairline bg-kumo-canvas rounded-xl px-4 py-3">
           {isReplay
-            ? `Konteks Replay: dataset historis (run ${runId}). ARR = reduksi unit triase, bukan akurasi; skor = prioritas, bukan vonis serangan.`
-            : 'Konteks Live: arus alert langsung dari Indexer/API. ARR = reduksi unit triase, bukan akurasi; skor = prioritas, bukan vonis serangan.'}
+            ? `Konteks replay: data historis (sesi ${runId}). ARR = pengurangan jumlah yang perlu dicek analyst, bukan akurasi; skor = prioritas, bukan vonis serangan.`
+            : 'Konteks live: data langsung dari Indexer/API. ARR = pengurangan jumlah yang perlu dicek analyst, bukan akurasi; skor = prioritas, bukan vonis serangan.'}
         </p>
         {needsInvestigation.length > 0 && (
           <div className="p-6 rounded-xl bg-rose-500/5 shadow-xs space-y-5">
@@ -58,7 +59,7 @@ export function OverviewPage() {
               <div className="flex items-center gap-3">
                 <WarningCircle size={22} className="text-rose-600 dark:text-rose-400 shrink-0" weight="fill" />
                 <h2 className="text-xs font-semibold uppercase tracking-wider text-kumo-strong">
-                  Perlu Ditinjau ({needsInvestigation.length} MetaAlert ESCALATE)
+                  Perlu dicek segera ({needsInvestigation.length} meta-alert, kode ESCALATE)
                 </h2>
               </div>
               <Button
@@ -67,7 +68,7 @@ export function OverviewPage() {
                 className="text-xs text-rose-600 dark:text-rose-400 hover:text-rose-700"
                 onClick={() => navigate(withRunId('/meta-alerts?action=ESCALATE'))}
               >
-                Lihat seluruh prioritas <ArrowRight size={14} className="ml-1" />
+                Lihat semua yang perlu dicek <ArrowRight size={14} className="ml-1" />
               </Button>
             </div>
 
@@ -84,19 +85,19 @@ export function OverviewPage() {
                   </div>
                   <div className="space-y-2 text-xs text-kumo-subtle">
                     <div className="flex justify-between items-center">
-                      <span>Agent:</span>
+                      <span>Agen:</span>
                       <span className="text-kumo-default font-medium truncate max-w-[160px]">{m.agent_name} ({m.agent_id})</span>
                     </div>
                     <div className="flex justify-between items-center">
-                      <span>Rule Group:</span>
+                      <span>Kategori aturan:</span>
                       <Badge variant="secondary">{m.rule_group_primary}</Badge>
                     </div>
                     <div className="flex justify-between items-center">
-                      <span>Score / Thresh:</span>
+                      <span>Skor / batas skor:</span>
                       <span className="font-mono text-kumo-strong font-semibold">{m.anomaly_score.toFixed(3)} / {m.threshold_used.toFixed(3)}</span>
                     </div>
                     <div className="flex justify-between items-center">
-                      <span>Aggregated Alerts:</span>
+                      <span>Alert digabung:</span>
                       <span className="font-mono font-bold text-kumo-strong">{m.alert_count}</span>
                     </div>
                   </div>
@@ -109,7 +110,7 @@ export function OverviewPage() {
                       navigate(withRunId(`/meta-alerts/${m.meta_id}`));
                     }}
                   >
-                    Selidiki {m.alert_count} Alert Mentah <ArrowRight size={13} className="ml-1" />
+                    Periksa {m.alert_count} alert asli <ArrowRight size={13} className="ml-1" />
                   </Button>
                 </div>
               ))}
@@ -119,58 +120,63 @@ export function OverviewPage() {
 
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-5">
           <MetricCard
-            label="Alert Mentah Masuk"
+            label="Alert masuk"
             value={summary ? formatNumber(summary.raw_alert_count) : '-'}
-            sub={isReplay ? 'Alert valid dari dataset historis' : 'Alert Wazuh dari arus langsung'}
+            sub={isReplay ? 'Alert valid dari data historis' : 'Alert Wazuh dari data langsung'}
           />
           <MetricCard
-            label="MetaAlert Final"
+            label="Meta-alert selesai"
             value={summary ? formatNumber(summary.meta_alert_count) : '-'}
-            sub="Episode temporal hasil agregasi RBTA"
+            sub="Kelompok alert hasil pengelompokan RBTA"
+            hint={TERM_HINTS.RBTA}
           />
           <MetricCard
-            label="Alert Reduction Rate (ARR)"
+            label="Pengurangan alert (ARR)"
             value={
               summary && summary.alert_reduction_rate_percent !== null && summary.alert_reduction_rate_percent !== undefined
                 ? `${summary.alert_reduction_rate_percent}%`
                 : '-'
             }
-            sub="Reduksi unit triase, bukan akurasi deteksi"
+            sub="Pengurangan yang perlu dicek, bukan akurasi"
+            hint={TERM_HINTS.ARR}
           />
           <div
             onClick={() => navigate(withRunId('/meta-alerts?action=ESCALATE'))}
             className="cursor-pointer transition-opacity hover:opacity-95"
           >
             <MetricCard
-              label="MetaAlert ESCALATE"
+              label="Perlu dicek segera"
               value={summary ? formatNumber(summary.escalate_count) : '-'}
-              sub="Prioritas investigasi terbuka, bukan insiden terbukti"
+              sub="Kode ESCALATE. Prioritas, bukan insiden terbukti"
+              hint={ACTION_LABELS.ESCALATE.hint}
             />
           </div>
           <MetricCard
-            label="Di Atas Ambang Tukey"
+            label="Melewati batas skor"
             value={summary ? formatNumber(summary.anomalies_detected) : '-'}
-            sub="Skor di atas ambang; prioritas, bukan vonis serangan"
+            sub="Skor di atas batas; prioritas, bukan vonis serangan"
           />
           <div
             onClick={() => navigate(withRunId('/rbta'))}
             className="cursor-pointer transition-opacity hover:opacity-95"
           >
             <MetricCard
-              label="Bucket RBTA Terbuka"
+              label="Kelompok alert terbuka"
               value={summary ? formatNumber(summary.active_buckets_count) : '-'}
-              sub={isReplay ? 'Jendela temporal run replay ini (per agen)' : 'Jendela temporal arus langsung (per agen)'}
+              sub={isReplay ? 'Kelompok per agen pada sesi replay ini' : 'Kelompok per agen pada data langsung'}
             />
           </div>
           <MetricCard
-            label="Antrean Digest"
+            label="Ringkasan harian"
             value={summary ? formatNumber(summary.digest_count) : '-'}
-            sub="Batch rutin frekuensi rendah (DAILY_DIGEST)"
+            sub="Kode DAILY_DIGEST. Ditinjau berkala"
+            hint={ACTION_LABELS.DAILY_DIGEST.hint}
           />
           <MetricCard
-            label="MetaAlert SUPPRESS"
+            label="Tidak ditampilkan di antrean"
             value={summary ? formatNumber(summary.suppress_count) : '-'}
-            sub="Prioritas lebih rendah, bukan label benign"
+            sub="Kode SUPPRESS. Prioritas rendah, bukan label aman"
+            hint={ACTION_LABELS.SUPPRESS.hint}
           />
         </div>
 
@@ -179,12 +185,12 @@ export function OverviewPage() {
             <div className="flex items-center justify-between pb-3 border-b border-kumo-hairline">
               <div>
                 <h2 className="text-sm font-semibold text-kumo-strong">
-                  Kecepatan Ingesti & Agregasi
+                  {TERMS.processingRate}
                 </h2>
                 <p className="text-xs text-kumo-subtle mt-0.5">
                   {isReplay
-                    ? 'Alert historis vs MetaAlert final per waktu (run replay ini)'
-                    : 'Alert mentah arus langsung vs MetaAlert final per waktu'}
+                    ? 'Alert historis vs meta-alert selesai per waktu (sesi replay ini)'
+                    : 'Alert masuk vs meta-alert selesai per waktu'}
                 </p>
               </div>
             </div>
@@ -195,8 +201,8 @@ export function OverviewPage() {
                 <YAxis tick={{ fontSize: 11 }} />
                 <Tooltip />
                 <Legend wrapperStyle={{ fontSize: '12px' }} />
-                <Area type="monotone" dataKey="raw_alerts" stroke="#64748b" fill="#64748b20" name="Alert Mentah" />
-                <Area type="monotone" dataKey="meta_alerts" stroke="#0f172a" fill="#0f172a20" name="MetaAlert" />
+                <Area type="monotone" dataKey="raw_alerts" stroke="#64748b" fill="#64748b20" name="Alert masuk" />
+                <Area type="monotone" dataKey="meta_alerts" stroke="#0f172a" fill="#0f172a20" name="Meta-alert" />
               </AreaChart>
             </ResponsiveContainer>
           </div>
@@ -207,10 +213,10 @@ export function OverviewPage() {
             <div className="px-6 py-4 border-b border-kumo-hairline flex items-center justify-between">
               <div>
                 <h2 className="text-sm font-semibold text-kumo-strong">
-                  Episode MetaAlert Terbaru
+                  Meta-alert terbaru
                 </h2>
                 <p className="text-xs text-kumo-subtle mt-0.5">
-                  Kelompok alert teragregasi yang dinilai Isolation Forest; skor = prioritas, bukan vonis serangan
+                  Kelompok alert yang dinilai Isolation Forest; skor = prioritas, bukan vonis serangan
                 </p>
               </div>
               <Button
@@ -218,19 +224,19 @@ export function OverviewPage() {
                 size="sm"
                 onClick={() => navigate(withRunId('/meta-alerts'))}
               >
-                Lihat semua MetaAlert <ArrowRight size={13} className="ml-1" />
+                Lihat semua meta-alert <ArrowRight size={13} className="ml-1" />
               </Button>
             </div>
             <Table>
               <Table.Header>
                 <Table.Row className="bg-kumo-recessed/50 text-[11px] uppercase tracking-wider">
-                  <Table.Head>Meta ID</Table.Head>
-                  <Table.Head>Waktu Akhir</Table.Head>
-                  <Table.Head>Agent / Host</Table.Head>
-                  <Table.Head>Rule Group</Table.Head>
-                  <Table.Head className="text-right">Jumlah Alert</Table.Head>
-                  <Table.Head className="text-right">Skor Anomali</Table.Head>
-                  <Table.Head>Level / Aksi</Table.Head>
+                  <Table.Head>Nomor</Table.Head>
+                  <Table.Head>Waktu selesai</Table.Head>
+                  <Table.Head>Agen</Table.Head>
+                  <Table.Head>Kategori aturan (Rule Group)</Table.Head>
+                  <Table.Head className="text-right">Jumlah alert</Table.Head>
+                  <Table.Head className="text-right">Skor keanehan</Table.Head>
+                  <Table.Head>Level & aksi</Table.Head>
                 </Table.Row>
               </Table.Header>
               <Table.Body>

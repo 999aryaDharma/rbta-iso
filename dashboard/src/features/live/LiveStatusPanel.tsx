@@ -1,6 +1,7 @@
 import { usePollingQuery } from '@/hooks/usePolling';
 import { fetchLiveStatus, type LiveStatus } from '@/api/live';
 import { Pulse } from '@phosphor-icons/react';
+import { TERMS } from '@/lib/labels';
 
 /** Siklus dianggap basi bila tidak ada siklus sukses selama ambang ini. */
 export const LIVE_STALE_AFTER_MS = 120_000;
@@ -17,6 +18,11 @@ function formatLag(sec: number | null): string {
   if (sec === null || Number.isNaN(sec)) return '-';
   if (sec < 60) return `${sec.toFixed(1)} dtk`;
   return `${(sec / 60).toFixed(1)} mnt`;
+}
+
+function formatAgo(sec: number | null): string {
+  if (sec === null || Number.isNaN(sec)) return '-';
+  return `${formatLag(sec)} lalu`;
 }
 
 export function LiveStatusPanel({ isLoading, isError, data, errorMessage, onRetry }: LiveStatusPanelProps) {
@@ -58,23 +64,23 @@ export function LiveStatusPanel({ isLoading, isError, data, errorMessage, onRetr
           <Pulse size={18} />
         </div>
         <h3 className="font-semibold text-xs uppercase tracking-wider text-kumo-strong">
-          Status Live Stream
+          Status pemrosesan live
         </h3>
         <span
           className={`ml-auto font-mono text-xs font-bold ${data.worker_alive ? 'text-emerald-500' : 'text-kumo-subtle'}`}
         >
-          {data.worker_alive ? 'Worker hidup' : 'Worker berhenti'}
+          {data.worker_alive ? TERMS.workerUp : TERMS.workerDown}
         </span>
       </div>
 
       {stale && data.worker_alive && (
         <p role="status" className="text-xs text-amber-600">
-          Data basi, siklus terakhir lebih dari 2 menit lalu. Periksa koneksi Indexer/API dan log backend.
+          Data belum diperbarui lebih dari 2 menit. Periksa koneksi ke sumber data (Indexer/API) dan log server.
         </p>
       )}
       {!data.worker_alive && (
         <p className="text-xs text-kumo-subtle">
-          Worker berhenti. Backend berjalan dalam mode replay/demo. Aktifkan via RBTA_LIVE_WORKER_ENABLED=true.
+          Pemrosesan berhenti. Aplikasi berjalan dalam mode replay/demo. Aktifkan lewat pengaturan RBTA_LIVE_WORKER_ENABLED=true.
         </p>
       )}
 
@@ -86,25 +92,25 @@ export function LiveStatusPanel({ isLoading, isError, data, errorMessage, onRetr
           </dd>
         </div>
         <div>
-          <dt className="text-kumo-subtle font-medium">Gagal beruntun</dt>
+          <dt className="text-kumo-subtle font-medium">{TERMS.consecutiveFail}</dt>
           <dd className={`font-mono font-semibold text-base ${data.consecutive_failures > 0 ? 'text-red-600' : 'text-kumo-strong'}`}>
             {data.consecutive_failures}
           </dd>
         </div>
         <div>
-          <dt className="text-kumo-subtle font-medium">Model terpin</dt>
+          <dt className="text-kumo-subtle font-medium">{TERMS.modelVersion}</dt>
           <dd className="font-mono font-semibold text-kumo-strong">{data.live_model_version ?? '-'}</dd>
         </div>
         <div>
-          <dt className="text-kumo-subtle font-medium">Karantina</dt>
+          <dt className="text-kumo-subtle font-medium">{TERMS.quarantine}</dt>
           <dd className="font-mono font-semibold text-kumo-strong">{data.quarantine_total ?? '-'}</dd>
         </div>
         <div>
-          <dt className="text-kumo-subtle font-medium">Lag siklus</dt>
-          <dd className="font-mono text-kumo-default">{formatLag(data.lag_sec)}</dd>
+          <dt className="text-kumo-subtle font-medium">{TERMS.cycleLag}</dt>
+          <dd className="font-mono text-kumo-default">{formatAgo(data.lag_sec)}</dd>
         </div>
         <div>
-          <dt className="text-kumo-subtle font-medium">Lag event</dt>
+          <dt className="text-kumo-subtle font-medium">{TERMS.eventLag}</dt>
           <dd className="font-mono text-kumo-default">{formatLag(data.event_lag_sec)}</dd>
         </div>
         <div>
@@ -112,9 +118,9 @@ export function LiveStatusPanel({ isLoading, isError, data, errorMessage, onRetr
           <dd className="font-mono text-kumo-default">{data.outbox_pending}</dd>
         </div>
         <div>
-          <dt className="text-kumo-subtle font-medium">Buffer</dt>
+          <dt className="text-kumo-subtle font-medium">{TERMS.buffer}</dt>
           <dd className="font-mono text-kumo-default">
-            {data.buffer_size === null ? 'nonaktif' : data.buffer_size}
+            {data.buffer_size === null ? 'tidak aktif' : data.buffer_size}
           </dd>
         </div>
       </dl>
@@ -130,7 +136,7 @@ export function LiveStatusPanel({ isLoading, isError, data, errorMessage, onRetr
       {(data.excluded_agents?.length ?? 0) > 0 && (
         <div className="text-xs text-kumo-subtle space-y-1">
           <p>
-            Agen uji dikecualikan dari ingestion ({data.excluded_agents?.join(', ')}):{' '}
+            Agen uji dikecualikan dari pemrosesan ({data.excluded_agents?.join(', ')}):{' '}
             <span className="font-mono font-semibold text-kumo-strong">{excludedSum}</span> alert unik tidak diproses.
           </p>
           {excludedSum > 0 && (
@@ -145,12 +151,12 @@ export function LiveStatusPanel({ isLoading, isError, data, errorMessage, onRetr
 
       {data.last_error && (
         <p role="alert" className="text-xs text-red-600 font-mono break-words">
-          Error terakhir: {data.last_error}
+          Kesalahan terakhir: {data.last_error}
         </p>
       )}
       {data.tls_verify === false && (
         <p className="text-xs text-amber-600">
-          Verifikasi TLS Indexer/API nonaktif. Rentan MITM; aktifkan untuk produksi.
+          Pemeriksaan sertifikat TLS ke sumber data dimatikan. Rentan disadap; aktifkan untuk produksi.
         </p>
       )}
     </div>

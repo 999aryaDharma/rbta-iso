@@ -5,6 +5,7 @@ import { DecisionBadge } from '@/components/shared/DecisionBadge';
 import { LiveReplaySwitcher } from '@/features/live/LiveReplaySwitcher';
 import { resolveLiveContext } from '@/features/live/liveContext';
 import { formatDateTime, formatScore } from '@/lib/formatters';
+import { ACTION_LABELS, DECISION_LABELS, TERMS } from '@/lib/labels';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useCallback, useEffect, useState } from 'react';
 import { InputGroup } from '@cloudflare/kumo/components/input-group';
@@ -110,16 +111,16 @@ export function MetaAlertsPage() {
   return (
     <>
       <PageHeader
-        breadcrumbs={['Security Analytics', 'MetaAlerts']}
-        title="MetaAlerts Investigation Explorer"
-        description="Aggregated security alert clusters scored by Isolation Forest with deterministic Tukey IQR thresholding"
+        breadcrumbs={['Analisis', 'Daftar meta-alert']}
+        title="Daftar meta-alert"
+        description="Kelompok alert yang sudah diberi skor keanehan, dengan batas skor tetap (Tukey IQR)"
       />
 
       <div className="px-6 py-8 lg:px-10 space-y-6">
         <LiveReplaySwitcher
           mode={resolveLiveContext(runId)}
           status={isError ? 'error' : isLoading ? 'loading' : data && data.total === 0 ? 'empty' : 'idle'}
-          errorMessage={isError ? (error instanceof Error ? error.message : 'Gagal memuat MetaAlert') : undefined}
+          errorMessage={isError ? (error instanceof Error ? error.message : 'Gagal memuat meta-alert') : undefined}
           onChange={(next) => {
             if (next === 'live') {
               const params = new URLSearchParams(searchParams);
@@ -137,7 +138,7 @@ export function MetaAlertsPage() {
               <InputGroup>
                 <InputGroup.Addon align="start"><MagnifyingGlass size={14} className="text-kumo-subtle" /></InputGroup.Addon>
                 <InputGroup.Input
-                  placeholder="Filter Meta ID, Agent, Rule Group..."
+                  placeholder="Filter nomor meta-alert, agen, kategori aturan…"
                   value={localSearch}
                   onChange={(e) => setLocalSearch(e.target.value)}
                 />
@@ -148,31 +149,31 @@ export function MetaAlertsPage() {
               size="sm"
               value={action || ''}
               onValueChange={(val) => setFilterParam('action', val as string)}
-              placeholder="All Actions"
+              placeholder="Semua aksi"
             >
-              <Select.Option value="">All Actions</Select.Option>
-              <Select.Option value="ESCALATE">ESCALATE</Select.Option>
-              <Select.Option value="DAILY_DIGEST">DAILY_DIGEST</Select.Option>
-              <Select.Option value="SUPPRESS">SUPPRESS</Select.Option>
+              <Select.Option value="">Semua aksi</Select.Option>
+              <Select.Option value="ESCALATE">{ACTION_LABELS.ESCALATE.label} (ESCALATE)</Select.Option>
+              <Select.Option value="DAILY_DIGEST">{ACTION_LABELS.DAILY_DIGEST.label} (DAILY_DIGEST)</Select.Option>
+              <Select.Option value="SUPPRESS">{ACTION_LABELS.SUPPRESS.label} (SUPPRESS)</Select.Option>
             </Select>
 
             <Select
               size="sm"
               value={decision || ''}
               onValueChange={(val) => setFilterParam('decision', val as string)}
-              placeholder="All Levels"
+              placeholder="Semua level"
             >
-              <Select.Option value="">All Levels</Select.Option>
-              <Select.Option value="CRITICAL">CRITICAL</Select.Option>
-              <Select.Option value="SUSPICIOUS">SUSPICIOUS</Select.Option>
-              <Select.Option value="CONTEXTUAL_ANOMALY">CONTEXTUAL_ANOMALY</Select.Option>
-              <Select.Option value="NOISE_HIGH">NOISE_HIGH</Select.Option>
-              <Select.Option value="NOISE">NOISE</Select.Option>
+              <Select.Option value="">Semua level</Select.Option>
+              <Select.Option value="CRITICAL">{DECISION_LABELS.CRITICAL.label} (CRITICAL)</Select.Option>
+              <Select.Option value="SUSPICIOUS">{DECISION_LABELS.SUSPICIOUS.label} (SUSPICIOUS)</Select.Option>
+              <Select.Option value="CONTEXTUAL_ANOMALY">{DECISION_LABELS.CONTEXTUAL_ANOMALY.label} (CONTEXTUAL_ANOMALY)</Select.Option>
+              <Select.Option value="NOISE_HIGH">{DECISION_LABELS.NOISE_HIGH.label} (NOISE_HIGH)</Select.Option>
+              <Select.Option value="NOISE">{DECISION_LABELS.NOISE.label} (NOISE)</Select.Option>
             </Select>
           </div>
 
           <div className="flex items-center gap-2 text-xs text-kumo-subtle">
-            {isFetching && <span className="animate-pulse">Refreshing...</span>}
+            {isFetching && <span className="animate-pulse">Memperbarui…</span>}
             <span className="font-mono bg-kumo-recessed px-2.5 py-1 rounded border border-kumo-hairline text-kumo-strong font-medium">
               Total: {data?.total ?? 0}
             </span>
@@ -183,24 +184,24 @@ export function MetaAlertsPage() {
           <Table>
             <Table.Header>
               <Table.Row className="bg-kumo-recessed/50 text-[11px] uppercase tracking-wider">
-                <Table.Head>Meta ID</Table.Head>
-                <Table.Head>End Time</Table.Head>
-                <Table.Head>Agent / Host</Table.Head>
-                <Table.Head>Rule Name</Table.Head>
-                <Table.Head className="text-right">Alert Count</Table.Head>
-                <Table.Head className="text-right">Max Sev</Table.Head>
+                <Table.Head>Nomor</Table.Head>
+                <Table.Head>Waktu selesai</Table.Head>
+                <Table.Head>Agen</Table.Head>
+                <Table.Head>Kategori aturan (Rule Group)</Table.Head>
+                <Table.Head className="text-right">Jumlah alert</Table.Head>
+                <Table.Head className="text-right">Keparahan maks.</Table.Head>
                 <Table.Head className="text-right">
                   <button
                     type="button"
                     onClick={toggleAlertScoreSort}
                     className="inline-flex items-center gap-1 rounded text-right hover:text-kumo-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kumo-brand"
-                    aria-label={`Urutkan Alert Score ${sortBy === 'anomaly_score' && sortOrder === 'desc' ? 'terendah ke tertinggi' : 'tertinggi ke terendah'}`}
+                    aria-label={`Urutkan skor keanehan ${sortBy === 'anomaly_score' && sortOrder === 'desc' ? 'terendah ke tertinggi' : 'tertinggi ke terendah'}`}
                   >
-                    Alert Score
+                    {TERMS.anomalyScore}
                     {sortBy !== 'anomaly_score' ? <CaretUpDown size={13} /> : sortOrder === 'desc' ? <CaretDown size={13} /> : <CaretUp size={13} />}
                   </button>
                 </Table.Head>
-                <Table.Head>SOC Level</Table.Head>
+                <Table.Head>Level & aksi</Table.Head>
               </Table.Row>
             </Table.Header>
             <Table.Body>
@@ -223,7 +224,7 @@ export function MetaAlertsPage() {
               {data && data.items.length === 0 && (
                 <Table.Row>
                   <Table.Cell colSpan={8} className="py-12 text-center text-xs text-kumo-subtle font-mono">
-                    No MetaAlerts match the specified filter criteria.
+                    Tidak ada meta-alert yang cocok dengan filter.
                   </Table.Cell>
                 </Table.Row>
               )}

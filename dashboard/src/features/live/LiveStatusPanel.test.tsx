@@ -41,7 +41,7 @@ describe('LiveStatusPanel', () => {
 
   it('menampilkan worker hidup dan model terpin', () => {
     render(<LiveStatusPanel isLoading={false} isError={false} data={baseStatus} onRetry={() => {}} />);
-    expect(screen.getByText(/worker hidup/i)).toBeInTheDocument();
+    expect(screen.getByText(/pemrosesan berjalan/i)).toBeInTheDocument();
     expect(screen.getByText('rbta-if-v1')).toBeInTheDocument();
   });
 
@@ -53,7 +53,7 @@ describe('LiveStatusPanel', () => {
   it('menandai basi bila siklus terakhir sudah tua', () => {
     const stale = { ...baseStatus, last_cycle_at: new Date(Date.now() - 10 * 60_000).toISOString() };
     render(<LiveStatusPanel isLoading={false} isError={false} data={stale} onRetry={() => {}} />);
-    expect(screen.getByText(/basi/i)).toBeInTheDocument();
+    expect(screen.getByText(/belum diperbarui lebih dari 2 menit/i)).toBeInTheDocument();
   });
 
   it('menampilkan total alert unik yang diproses', () => {
@@ -64,7 +64,7 @@ describe('LiveStatusPanel', () => {
   it('menampilkan worker berhenti saat mode replay', () => {
     const stopped = { ...baseStatus, worker_alive: false, cycles_completed: 0 };
     render(<LiveStatusPanel isLoading={false} isError={false} data={stopped} onRetry={() => {}} />);
-    expect(screen.getAllByText(/worker berhenti/i)).toHaveLength(2);
+    expect(screen.getAllByText(/pemrosesan berhenti/i)).toHaveLength(2);
   });
   it('menampilkan counter agen uji yang dikecualikan', () => {
     render(

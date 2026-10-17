@@ -82,16 +82,16 @@ export function RawAlertsPage() {
   return (
     <>
       <PageHeader
-        breadcrumbs={['Security Analytics', 'MetaAlerts', `#${id}`, 'Raw Alerts']}
-        title={`Member Raw Alerts for MetaAlert #${id}`}
-        description="Individual security log events aggregated into this temporal cluster"
+        breadcrumbs={['Analisis', 'Daftar meta-alert', `#${id}`, 'Alert asli']}
+        title={`Alert asli dalam meta-alert #${id}`}
+        description="Kejadian log keamanan yang digabung ke dalam meta-alert ini"
         actions={
           <Button
             variant="ghost"
             size="sm"
             onClick={() => navigate(withRunId(`/meta-alerts/${id}`))}
           >
-            <ArrowLeft size={14} className="mr-1" /> Back to MetaAlert
+            <ArrowLeft size={14} className="mr-1" /> Kembali ke meta-alert
           </Button>
         }
       />
@@ -101,8 +101,8 @@ export function RawAlertsPage() {
           <Banner
             variant="alert"
             size="sm"
-            title={`Partial Local Evidence: ${data.resolved_total} of ${data.source_total} source alerts resolved.`}
-            description={`${data.unresolved_alert_ids.length} source alert(s) remain referenced by the MetaAlert trace but local audit evidence is unavailable: ${data.unresolved_alert_ids.join(', ')}`}
+            title={`${data.resolved_total} dari ${data.source_total} alert asli tersedia.`}
+            description={`${data.unresolved_alert_ids.length} alert tercatat di meta-alert #${id}, tapi datanya tidak tersimpan lokal: ${data.unresolved_alert_ids.join(', ')}`}
           />
         )}
 
@@ -111,7 +111,7 @@ export function RawAlertsPage() {
             <InputGroup>
               <InputGroup.Addon align="start"><MagnifyingGlass size={14} className="text-kumo-subtle" /></InputGroup.Addon>
               <InputGroup.Input
-                placeholder="Cari Alert ID, Rule ID, signature, IP…"
+                placeholder="Cari ID alert, ID rule, deskripsi, IP…"
                 value={localSearch}
                 onChange={(e) => setLocalSearch(e.target.value)}
               />
@@ -119,9 +119,9 @@ export function RawAlertsPage() {
           </div>
 
           <div className="flex items-center gap-2 text-xs text-kumo-subtle">
-            {isFetching && <span className="animate-pulse">Refreshing...</span>}
+            {isFetching && <span className="animate-pulse">Memperbarui…</span>}
             <span className="font-mono bg-kumo-recessed px-2.5 py-1 rounded border border-kumo-hairline text-kumo-strong font-medium">
-              {data ? `Showing ${data.filtered_total} / ${data.source_total} total` : 'Loading...'}
+              {data ? `Menampilkan ${data.filtered_total} dari ${data.source_total}` : 'Memuat…'}
             </span>
           </div>
         </div>
@@ -130,13 +130,13 @@ export function RawAlertsPage() {
           <Table>
             <Table.Header>
               <Table.Row className="bg-kumo-recessed/50 text-[11px] uppercase tracking-wider">
-                <Table.Head>Timestamp</Table.Head>
-                <Table.Head>Wazuh Alert ID</Table.Head>
-                <Table.Head>Detection Signature</Table.Head>
+                <Table.Head>Waktu</Table.Head>
+                <Table.Head>ID alert Wazuh</Table.Head>
+                <Table.Head>Deskripsi deteksi</Table.Head>
                 <Table.Head className="text-right">Level</Table.Head>
-                <Table.Head>Rule Group</Table.Head>
-                <Table.Head>Source IP</Table.Head>
-                <Table.Head>MITRE Tactics</Table.Head>
+                <Table.Head>Kategori aturan (Rule Group)</Table.Head>
+                <Table.Head>IP sumber</Table.Head>
+                <Table.Head>Taktik MITRE</Table.Head>
               </Table.Row>
             </Table.Header>
             <Table.Body>
@@ -160,7 +160,7 @@ export function RawAlertsPage() {
                     {a.mitre_tactics && a.mitre_tactics.length > 0 ? (
                       <Badge variant="secondary">{a.mitre_tactics.join(', ')}</Badge>
                     ) : (
-                      <span className="text-kumo-subtle text-[11px]">None</span>
+                      <span className="text-kumo-subtle text-[11px]">Tidak ada</span>
                     )}
                   </Table.Cell>
                 </Table.Row>
@@ -168,7 +168,7 @@ export function RawAlertsPage() {
               {data && data.items.length === 0 && (
                 <Table.Row>
                   <Table.Cell colSpan={7} className="py-12 text-center text-xs text-kumo-subtle font-mono">
-                    No matching raw alerts found.
+                    Tidak ada alert asli yang cocok.
                   </Table.Cell>
                 </Table.Row>
               )}

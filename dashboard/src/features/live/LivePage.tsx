@@ -7,9 +7,9 @@ export function LivePage() {
   return (
     <>
       <PageHeader
-        breadcrumbs={['Operasi', 'Live Stream']}
-        title="Live Stream Wazuh"
-        description="Beban triase analis dulu: reduksi, antrean ESCALATE, distribusi decision, dan kesegaran data. Detail transport di bawah timeline"
+        breadcrumbs={['Operasi', 'Pemantauan live']}
+        title="Pemantauan live Wazuh"
+        description="Beban analyst lebih dulu: pengurangan alert, antrean yang perlu dicek, sebaran level, dan kesegaran data. Detail teknis koneksi ada di bawah"
       />
       <div className="px-6 py-8 lg:px-10 space-y-8">
         <LiveTriageSummaryCard />

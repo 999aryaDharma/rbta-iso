@@ -62,13 +62,13 @@ describe('LiveTriageSummaryPanel', () => {
 
   it('menegaskan batas klaim: ARR reduksi triase bukan akurasi, skor prioritas bukan vonis', () => {
     render(<LiveTriageSummaryPanel isLoading={false} isError={false} data={baseDatum} onRetry={() => {}} />);
-    expect(screen.getByText(/reduksi unit triase, bukan akurasi/i)).toBeInTheDocument();
+    expect(screen.getByText(/pengurangan jumlah yang perlu dicek analyst, bukan akurasi/i)).toBeInTheDocument();
     expect(screen.getByText(/prioritas.*bukan vonis serangan/i)).toBeInTheDocument();
   });
 
   it('menampilkan ESCALATE terbuka + outbox tanpa paragraf bocoran dapur', () => {
     render(<LiveTriageSummaryPanel isLoading={false} isError={false} data={baseDatum} onRetry={() => {}} />);
-    expect(screen.getByText('ESCALATE terbuka')).toBeInTheDocument();
+    expect(screen.getByText(/perlu dicek segera/i)).toBeInTheDocument();
     expect(screen.getByText('Antrean Telegram')).toBeInTheDocument();
     expect(screen.queryByText(/umur tertua tidak tersedia/i)).not.toBeInTheDocument();
   });
@@ -76,14 +76,14 @@ describe('LiveTriageSummaryPanel', () => {
   it('menampilkan funnel reduksi sebagai satu strip', () => {
     render(<LiveTriageSummaryPanel isLoading={false} isError={false} data={baseDatum} onRetry={() => {}} />);
     expect(
-      screen.getByRole('img', { name: /reduksi: 1899 alert menjadi 42 metaalert/i }),
+      screen.getByRole('img', { name: /reduksi: 1899 alert menjadi 42 meta-alert/i }),
     ).toBeInTheDocument();
   });
 
   it('menampilkan distribusi level sebagai stacked bar satu warna per level', () => {
     render(<LiveTriageSummaryPanel isLoading={false} isError={false} data={baseDatum} onRetry={() => {}} />);
     expect(
-      screen.getByRole('img', { name: /CRITICAL 2.*SUSPICIOUS 3.*NOISE_HIGH 7.*NOISE 30/i }),
+      screen.getByRole('img', { name: /Kritis 2.*Mencurigakan 3.*Keparahan tinggi, pola biasa 7.*Biasa 30/i }),
     ).toBeInTheDocument();
   });
 
@@ -104,7 +104,7 @@ describe('LiveTriageSummaryPanel', () => {
         onRetry={() => {}}
       />,
     );
-    expect(screen.getByText(/basi/i)).toBeInTheDocument();
+    expect(screen.getByText(/belum diperbarui lebih dari 2 menit/i)).toBeInTheDocument();
   });
 
   it('tidak menampilkan hitungan siklus internal', () => {

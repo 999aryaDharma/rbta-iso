@@ -72,11 +72,11 @@ export function RawAlertDetailPage() {
       <PageHeader
         breadcrumbs={
           metaId
-            ? ['Security Analytics', 'MetaAlerts', `#${metaId}`, 'Raw Alerts', String(alertId)]
-            : ['Security Analytics', 'Raw Alerts', String(alertId)]
+            ? ['Analisis', 'Daftar meta-alert', `#${metaId}`, 'Alert asli', String(alertId)]
+            : ['Analisis', 'Alert asli', String(alertId)]
         }
-        title="Raw Alert Forensic Evidence"
-        description={`Wazuh Alert ID: ${alertId}`}
+        title="Detail alert asli"
+        description={`ID alert Wazuh: ${alertId}`}
         actions={
           <div className="flex items-center gap-2">
             {metaId && sourceIds.length > 0 && (
@@ -86,9 +86,9 @@ export function RawAlertDetailPage() {
                   size="sm"
                   disabled={!prevId}
                   onClick={() => prevId && navigate(withRunId(`/meta-alerts/${metaId}/raw-alerts/${encodeURIComponent(prevId)}`))}
-                  title="Previous Alert ([)"
+                  title="Alert sebelumnya ([)"
                 >
-                  <CaretLeft size={14} className="mr-0.5" /> Prev
+                  <CaretLeft size={14} className="mr-0.5" /> Sebelumnya
                 </Button>
 
                 <span className="text-xs font-mono px-2 text-kumo-subtle">
@@ -100,9 +100,9 @@ export function RawAlertDetailPage() {
                   size="sm"
                   disabled={!nextId}
                   onClick={() => nextId && navigate(withRunId(`/meta-alerts/${metaId}/raw-alerts/${encodeURIComponent(nextId)}`))}
-                  title="Next Alert (])"
+                  title="Alert berikutnya (])"
                 >
-                  Next <CaretRight size={14} className="ml-0.5" />
+                  Berikutnya <CaretRight size={14} className="ml-0.5" />
                 </Button>
               </div>
             )}
@@ -114,7 +114,7 @@ export function RawAlertDetailPage() {
                 onClick={handleCopy}
               >
                 {copied ? <Check size={14} className="text-emerald-500 mr-1" /> : <Copy size={14} className="mr-1" />}
-                {copied ? 'Copied' : 'Copy JSON'}
+                {copied ? 'Tersalin' : 'Salin JSON'}
               </Button>
             )}
 
@@ -124,7 +124,7 @@ export function RawAlertDetailPage() {
                 size="sm"
                 onClick={() => navigate(withRunId(`/meta-alerts/${metaId}/raw-alerts`))}
               >
-                <ArrowLeft size={14} className="mr-1" /> Back
+                <ArrowLeft size={14} className="mr-1" /> Kembali
               </Button>
             )}
           </div>
@@ -136,8 +136,8 @@ export function RawAlertDetailPage() {
           <Banner
             variant="alert"
             size="sm"
-            title="Local Evidence Unavailable"
-            description={`Alert ID ${alertId} remains referenced by MetaAlert #${metaId} trace provenance, but its canonical audit record is not present in the local database.`}
+            title="Data alert asli tidak tersedia"
+            description={`Alert ini tercatat di meta-alert #${metaId}, tapi datanya tidak tersimpan lokal.`}
           />
         )}
 
@@ -145,40 +145,40 @@ export function RawAlertDetailPage() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div className="space-y-6">
               <div className="p-6 rounded-xl border border-kumo-hairline bg-kumo-canvas shadow-xs">
-                <h3 className="font-semibold text-xs uppercase tracking-wider text-kumo-strong mb-4 pb-3 border-b border-kumo-hairline">Identity & Source Origin</h3>
+                <h3 className="font-semibold text-xs uppercase tracking-wider text-kumo-strong mb-4 pb-3 border-b border-kumo-hairline">Identitas & asal data</h3>
                 <dl className="space-y-3 text-xs">
-                  <div className="flex justify-between items-center py-1.5 border-b border-kumo-hairline/40"><dt className="text-kumo-subtle font-medium">Wazuh Alert ID:</dt> <dd className="font-mono font-semibold text-kumo-strong">{data.wazuh_alert_id}</dd></div>
-                  <div className="flex justify-between items-center py-1.5 border-b border-kumo-hairline/40"><dt className="text-kumo-subtle font-medium">Timestamp (WITA):</dt> <dd className="font-mono text-kumo-default">{formatDateTime(data.timestamp)}</dd></div>
-                  <div className="flex justify-between items-center py-1.5 border-b border-kumo-hairline/40"><dt className="text-kumo-subtle font-medium">Source Mode:</dt> <dd className="font-mono text-kumo-default">{data.source_mode || 'LIVE'}</dd></div>
-                  <div className="flex justify-between items-center py-1.5 border-b border-kumo-hairline/40"><dt className="text-kumo-subtle font-medium">Agent:</dt> <dd className="text-kumo-default font-medium">{data.agent_name} ({data.agent_id}) · Crit: {data.agent_criticality}</dd></div>
+                  <div className="flex justify-between items-center py-1.5 border-b border-kumo-hairline/40"><dt className="text-kumo-subtle font-medium">ID alert Wazuh:</dt> <dd className="font-mono font-semibold text-kumo-strong">{data.wazuh_alert_id}</dd></div>
+                  <div className="flex justify-between items-center py-1.5 border-b border-kumo-hairline/40"><dt className="text-kumo-subtle font-medium">Waktu (WITA):</dt> <dd className="font-mono text-kumo-default">{formatDateTime(data.timestamp)}</dd></div>
+                  <div className="flex justify-between items-center py-1.5 border-b border-kumo-hairline/40"><dt className="text-kumo-subtle font-medium">Sumber data:</dt> <dd className="font-mono text-kumo-default">{data.source_mode || 'LIVE'}</dd></div>
+                  <div className="flex justify-between items-center py-1.5 border-b border-kumo-hairline/40"><dt className="text-kumo-subtle font-medium">Agen:</dt> <dd className="text-kumo-default font-medium">{data.agent_name} ({data.agent_id}) · Kepentingan aset: {data.agent_criticality}</dd></div>
                   {data.source_index && (
-                    <div className="flex justify-between items-center py-1.5 border-b border-kumo-hairline/40"><dt className="text-kumo-subtle font-medium">Source Index:</dt> <dd className="font-mono text-kumo-default">{data.source_index}</dd></div>
+                    <div className="flex justify-between items-center py-1.5 border-b border-kumo-hairline/40"><dt className="text-kumo-subtle font-medium">Indeks sumber:</dt> <dd className="font-mono text-kumo-default">{data.source_index}</dd></div>
                   )}
                   {data.source_document_id && (
-                    <div className="flex justify-between items-center py-1"><dt className="text-kumo-subtle font-medium">Document ID:</dt> <dd className="font-mono text-kumo-default truncate max-w-xs">{data.source_document_id}</dd></div>
+                    <div className="flex justify-between items-center py-1"><dt className="text-kumo-subtle font-medium">ID dokumen:</dt> <dd className="font-mono text-kumo-default truncate max-w-xs">{data.source_document_id}</dd></div>
                   )}
                 </dl>
               </div>
 
               <div className="p-6 rounded-xl border border-kumo-hairline bg-kumo-canvas shadow-xs">
-                <h3 className="font-semibold text-xs uppercase tracking-wider text-kumo-strong mb-4 pb-3 border-b border-kumo-hairline">Rule & Signature Detection</h3>
+                <h3 className="font-semibold text-xs uppercase tracking-wider text-kumo-strong mb-4 pb-3 border-b border-kumo-hairline">Aturan & deskripsi deteksi</h3>
                 <dl className="space-y-3 text-xs">
-                  <div className="flex justify-between items-center py-1.5 border-b border-kumo-hairline/40"><dt className="text-kumo-subtle font-medium">Rule Name:</dt> <dd className="font-mono font-semibold text-kumo-default">{data.rule_id}</dd></div>
-                  <div className="flex justify-between items-center py-1.5 border-b border-kumo-hairline/40"><dt className="text-kumo-subtle font-medium">Severity Level:</dt> <dd className="font-mono font-bold text-kumo-strong">{data.rule_level} / 15</dd></div>
-                  <div className="flex justify-between items-center py-1.5 border-b border-kumo-hairline/40"><dt className="text-kumo-subtle font-medium">Primary Group:</dt> <dd className="font-mono text-kumo-default">{data.rule_group_primary}</dd></div>
-                  <div className="flex justify-between items-center py-1.5 border-b border-kumo-hairline/40"><dt className="text-kumo-subtle font-medium">Rule Groups:</dt> <dd className="font-mono text-kumo-default">{data.rule_groups_all.join(', ') || data.rule_group_primary}</dd></div>
-                  <div className="pt-1"><dt className="text-kumo-subtle font-medium">Description:</dt> <dd className="mt-2 p-3.5 rounded-lg border border-kumo-hairline bg-kumo-recessed/30 text-xs text-kumo-default leading-relaxed">{data.rule_description}</dd></div>
+                  <div className="flex justify-between items-center py-1.5 border-b border-kumo-hairline/40"><dt className="text-kumo-subtle font-medium">ID rule:</dt> <dd className="font-mono font-semibold text-kumo-default">{data.rule_id}</dd></div>
+                  <div className="flex justify-between items-center py-1.5 border-b border-kumo-hairline/40"><dt className="text-kumo-subtle font-medium">Tingkat keparahan:</dt> <dd className="font-mono font-bold text-kumo-strong">{data.rule_level} / 15</dd></div>
+                  <div className="flex justify-between items-center py-1.5 border-b border-kumo-hairline/40"><dt className="text-kumo-subtle font-medium">Kategori aturan utama:</dt> <dd className="font-mono text-kumo-default">{data.rule_group_primary}</dd></div>
+                  <div className="flex justify-between items-center py-1.5 border-b border-kumo-hairline/40"><dt className="text-kumo-subtle font-medium">Semua kategori aturan:</dt> <dd className="font-mono text-kumo-default">{data.rule_groups_all.join(', ') || data.rule_group_primary}</dd></div>
+                  <div className="pt-1"><dt className="text-kumo-subtle font-medium">Deskripsi:</dt> <dd className="mt-2 p-3.5 rounded-lg border border-kumo-hairline bg-kumo-recessed/30 text-xs text-kumo-default leading-relaxed">{data.rule_description}</dd></div>
                 </dl>
               </div>
 
               <div className="p-6 rounded-xl border border-kumo-hairline bg-kumo-canvas shadow-xs">
-                <h3 className="font-semibold text-xs uppercase tracking-wider text-kumo-strong mb-4 pb-3 border-b border-kumo-hairline">Network & MITRE ATT&CK Context</h3>
+                <h3 className="font-semibold text-xs uppercase tracking-wider text-kumo-strong mb-4 pb-3 border-b border-kumo-hairline">Jaringan & konteks MITRE ATT&CK</h3>
                 <dl className="space-y-3 text-xs">
-                  <div className="flex justify-between items-center py-1.5 border-b border-kumo-hairline/40"><dt className="text-kumo-subtle font-medium">Source IP:</dt> <dd className="font-mono text-kumo-default font-semibold">{data.srcip || '-'}</dd></div>
-                  <div className="flex justify-between items-center py-1.5 border-b border-kumo-hairline/40"><dt className="text-kumo-subtle font-medium">Location:</dt> <dd className="font-mono text-kumo-default">{data.location || '-'}</dd></div>
-                  <div className="flex justify-between items-center py-1.5 border-b border-kumo-hairline/40"><dt className="text-kumo-subtle font-medium">Decoder:</dt> <dd className="font-mono text-kumo-default">{data.decoder || '-'}</dd></div>
-                  <div className="flex justify-between items-center py-1.5 border-b border-kumo-hairline/40"><dt className="text-kumo-subtle font-medium">MITRE Tactics:</dt> <dd className="font-mono text-kumo-default">{data.mitre_tactics.join(', ') || 'None'}</dd></div>
-                  <div className="flex justify-between items-center py-1"><dt className="text-kumo-subtle font-medium">MITRE Techniques:</dt> <dd className="font-mono text-kumo-default">{data.mitre_techniques.join(', ') || 'None'}</dd></div>
+                  <div className="flex justify-between items-center py-1.5 border-b border-kumo-hairline/40"><dt className="text-kumo-subtle font-medium">IP sumber:</dt> <dd className="font-mono text-kumo-default font-semibold">{data.srcip || '-'}</dd></div>
+                  <div className="flex justify-between items-center py-1.5 border-b border-kumo-hairline/40"><dt className="text-kumo-subtle font-medium">Lokasi log:</dt> <dd className="font-mono text-kumo-default">{data.location || '-'}</dd></div>
+                  <div className="flex justify-between items-center py-1.5 border-b border-kumo-hairline/40"><dt className="text-kumo-subtle font-medium">Decoder Wazuh:</dt> <dd className="font-mono text-kumo-default">{data.decoder || '-'}</dd></div>
+                  <div className="flex justify-between items-center py-1.5 border-b border-kumo-hairline/40"><dt className="text-kumo-subtle font-medium">Taktik MITRE:</dt> <dd className="font-mono text-kumo-default">{data.mitre_tactics.join(', ') || 'Tidak ada'}</dd></div>
+                  <div className="flex justify-between items-center py-1"><dt className="text-kumo-subtle font-medium">Teknik MITRE:</dt> <dd className="font-mono text-kumo-default">{data.mitre_techniques.join(', ') || 'Tidak ada'}</dd></div>
                 </dl>
               </div>
             </div>
@@ -186,7 +186,7 @@ export function RawAlertDetailPage() {
             <div className="space-y-6">
               {data.full_log && (
                 <div className="p-6 rounded-xl border border-kumo-hairline bg-kumo-canvas shadow-xs">
-                  <h3 className="font-semibold text-xs uppercase tracking-wider text-kumo-strong mb-3 pb-2 border-b border-kumo-hairline">Full Event Log Message</h3>
+                  <h3 className="font-semibold text-xs uppercase tracking-wider text-kumo-strong mb-3 pb-2 border-b border-kumo-hairline">Isi log lengkap</h3>
                   <pre className="text-xs font-mono p-3.5 rounded-lg border border-kumo-hairline bg-kumo-recessed/30 text-kumo-default overflow-auto max-h-48 whitespace-pre-wrap leading-relaxed">
                     {data.full_log}
                   </pre>
@@ -195,8 +195,8 @@ export function RawAlertDetailPage() {
 
               <div className="p-6 rounded-xl border border-kumo-hairline bg-kumo-canvas shadow-xs">
                 <div className="flex items-center justify-between mb-3 pb-2 border-b border-kumo-hairline">
-                  <h3 className="font-semibold text-xs uppercase tracking-wider text-kumo-strong">Canonical & Evidence JSON</h3>
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded border border-kumo-hairline bg-kumo-recessed text-kumo-subtle">IMMUTABLE EVIDENCE</span>
+                  <h3 className="font-semibold text-xs uppercase tracking-wider text-kumo-strong">Data lengkap (JSON)</h3>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded border border-kumo-hairline bg-kumo-recessed text-kumo-subtle">Bukti asli (tidak diubah)</span>
                 </div>
                 <pre className="text-xs font-mono p-4 rounded-lg border border-kumo-hairline bg-kumo-recessed/30 text-kumo-default overflow-auto max-h-[500px] leading-relaxed">
                   {JSON.stringify(data, null, 2)}

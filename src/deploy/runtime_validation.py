@@ -8,6 +8,7 @@ Memvalidasi environment runtime yang benar-benar ter-mount, dijalankan sebagai u
 4. Uji perilaku RW direktori state: write, flush, fsync, atomic rename, read, delete
 """
 
+import hashlib
 import json
 import gzip
 import os
@@ -23,6 +24,30 @@ from src.model.registry import ModelRegistry, ModelRegistryError
 class RuntimeValidationError(Exception):
     """Dilempar bila environment runtime, mount, permission, atau artefak gagal validasi."""
     pass
+
+
+EXPECTED_MODEL_SHA256_ENV = "RBTA_EXPECTED_MODEL_SHA256"
+
+
+def model_sha256(model_dir: Path) -> str:
+    """sha256 dari ``isolation_forest.joblib`` sebuah direktori bundle (identitas model)."""
+    return hashlib.sha256((Path(model_dir) / "isolation_forest.joblib").read_bytes()).hexdigest()
+
+
+def check_expected_model_sha256(actual: Optional[str], expected: Optional[str]) -> None:
+    """Gagal tertutup bila hash model yang diharapkan diset tetapi tidak cocok (atau model tidak ada)."""
+    wanted = (expected or "").strip().lower()
+    if not wanted:
+        return
+    if actual is None:
+        raise RuntimeValidationError(
+            f"{EXPECTED_MODEL_SHA256_ENV} is set but no active model bundle was loaded; refusing to start."
+        )
+    if actual.lower() != wanted:
+        raise RuntimeValidationError(
+            f"Model identity mismatch: isolation_forest.joblib sha256={actual} "
+            f"!= {EXPECTED_MODEL_SHA256_ENV}={wanted}; refusing to start."
+        )
 
 
 def validate_user_identity(expected_uid: int = 10001, strict: bool = True) -> bool:
@@ -41,6 +66,7 @@ def validate_user_identity(expected_uid: int = 10001, strict: bool = True) -> bo
 def validate_model_artifacts(
     models_dir: Path,
     model_version: str,
+    expected_sha256: Optional[str] = None,
 ) -> Dict[str, str]:
     """Validasi keberadaan bundle model, checksum, metadata, dan skema 7 fitur."""
     if not model_version or not model_version.strip():
@@ -75,8 +101,12 @@ def validate_model_artifacts(
             f"Invalid feature schema: expected 7 canonical features, got {len(features)}: {features}"
         )
 
+    actual_sha256 = model_sha256(version_dir)
+    check_expected_model_sha256(actual_sha256, expected_sha256)
+
     return {
         "model_version": model_version,
+        "model_sha256": actual_sha256,
         "features_count": str(len(features)),
         "tukey_threshold": str(getattr(bundle.threshold, "threshold", "UNKNOWN")),
     }
@@ -238,7 +268,11 @@ def run_runtime_validation(
 
     validate_user_identity(expected_uid=10001, strict=strict_uid)
 
-    model_info = validate_model_artifacts(models_dir=models_dir, model_version=model_version)
+    model_info = validate_model_artifacts(
+        models_dir=models_dir,
+        model_version=model_version,
+        expected_sha256=os.environ.get(EXPECTED_MODEL_SHA256_ENV),
+    )
 
     replay_info = validate_replay_datasets(replay_dir=replay_dir, verify_read_only=verify_ro)
 

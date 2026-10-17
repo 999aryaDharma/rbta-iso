@@ -10,6 +10,11 @@ from fastapi import FastAPI
 import uvicorn
 
 from src.api.app import create_app
+from src.deploy.runtime_validation import (
+    EXPECTED_MODEL_SHA256_ENV,
+    check_expected_model_sha256,
+    model_sha256,
+)
 from src.model.registry import ModelRegistry, ModelRegistryError
 from src.model.scoring_pipeline import ScoringPipeline
 from src.runtime.durable_state import DurableStateManager
@@ -78,17 +83,30 @@ def create_production_app(
 
     active_version = registry.get_active_version()
     scoring_pipe: Optional[ScoringPipeline] = None
+    model_identity: Optional[Dict[str, Any]] = None
 
     if active_version:
         logger.info("Loading active model artifact version: '%s'", active_version)
         bundle = registry.load_bundle(active_version)
         scoring_pipe = ScoringPipeline(bundle)
+        model_identity = {
+            "version": active_version,
+            "sha256": model_sha256(registry.base_dir / active_version),
+            "threshold": bundle.threshold.threshold,
+            "q3": bundle.threshold.q3,
+        }
+        logger.info("Active model sha256(isolation_forest.joblib)=%s", model_identity["sha256"])
     else:
         logger.warning(
             "No active model bundle found in '%s' for version '%s'. /ready will return 503.",
             registry_dir,
             model_version,
         )
+    # Guard identitas: model yang dimuat harus persis model yang diharapkan operator.
+    check_expected_model_sha256(
+        model_identity["sha256"] if model_identity else None,
+        env_map.get(EXPECTED_MODEL_SHA256_ENV),
+    )
 
     from src.runtime.raw_evidence import RawAlertEvidenceStore
     from src.runtime.replay_controller import ReplayController
@@ -255,6 +273,7 @@ def create_production_app(
         replay_controller=replay_controller,
     )
     app.router.lifespan_context = lifespan
+    app.state.model_identity = model_identity
     app.state.live_worker = live_worker
     app.state.telegram_dispatcher = telegram_dispatcher
 

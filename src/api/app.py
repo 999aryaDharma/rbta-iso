@@ -53,6 +53,8 @@ def create_app(
     app.state.raw_evidence_store = raw_evidence_store or runtime_resolver.live_evidence_store
     app.state.replay_controller = replay_controller or runtime_resolver.replay_controller
     app.state.auth_key = auth_key
+    # Diisi oleh bootstrap produksi: {version, sha256, threshold, q3} model aktif.
+    app.state.model_identity = None
 
     rate_limit = max(1, int(os.getenv("RBTA_CONTROL_RATE_LIMIT", "120")))
     max_request_bytes = max(128, int(os.getenv("RBTA_MAX_REQUEST_BYTES", str(1024 * 1024))))
@@ -160,22 +162,18 @@ def create_app(
                 content={"ready": False, "reason": "No active model version published in registry"},
             )
 
+        # Endpoint tanpa auth: hanya status + versi. θ, q3, dan hash model ada di /api/v1/live/status.
         try:
-            bundle = model_registry.load_bundle(active_version)
-            return JSONResponse(
-                status_code=status.HTTP_200_OK,
-                content={
-                    "ready": True,
-                    "active_model_version": active_version,
-                    "threshold_q3": bundle.threshold.q3 if hasattr(bundle, "threshold") else 0.0,
-                    "threshold": bundle.threshold.threshold if hasattr(bundle, "threshold") else 0.0,
-                },
-            )
-        except Exception as exc:
+            model_registry.load_bundle(active_version)
+        except Exception:
             return JSONResponse(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                content={"ready": False, "reason": f"Failed loading active bundle: {exc}"},
+                content={"ready": False, "reason": "Failed loading active bundle"},
             )
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content={"ready": True, "active_model_version": active_version},
+        )
 
     @app.get("/runtime/stats", tags=["Monitoring"])
     def runtime_stats(authorization: Optional[str] = Header(None)) -> Dict[str, Any]:
@@ -211,6 +209,8 @@ def create_app(
           null berarti "tidak tersedia", bukan nol.
         * ``event_lag_sec`` = now - ``end_time`` terbaru yang sudah diskor di history/outbox
           (hanya API publik); null bila belum ada event yang diskor.
+        * ``model`` = identitas model aktif {version, sha256 isolation_forest.joblib, threshold, q3};
+          null bila bootstrap tidak memuat model. /ready sengaja tidak memuat nilai ini.
         """
         import re as _re
 
@@ -372,6 +372,7 @@ def create_app(
             "newest_ingested_event_time": newest_ingested_event_time,
             "event_lag_sec": event_lag_sec,
             "tls_verify": source_state.get("tls_verify"),
+            "model": getattr(app.state, "model_identity", None),
         }
 
     @app.post("/ingest/wazuh", tags=["Ingress"])

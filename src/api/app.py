@@ -373,6 +373,7 @@ def create_app(
             "event_lag_sec": event_lag_sec,
             "tls_verify": source_state.get("tls_verify"),
             "model": getattr(app.state, "model_identity", None),
+            "base_delta_t_sec": service.base_delta_t.total_seconds() if service is not None else None,
         }
 
     @app.post("/ingest/wazuh", tags=["Ingress"])

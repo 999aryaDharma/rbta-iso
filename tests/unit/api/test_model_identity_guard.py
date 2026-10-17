@@ -69,3 +69,19 @@ def test_runtime_validation_checks_expected_hash(tmp_path: Path):
     assert info["model_sha256"] == _sha(tmp_path)
     with pytest.raises(RuntimeValidationError, match="Model identity mismatch"):
         validate_model_artifacts(tmp_path / "models", "ident-v1", expected_sha256="f" * 64)
+
+
+@pytest.mark.parametrize("raw, expected_sec", [(None, 900.0), ("", 900.0), ("10", 600.0)])
+def test_base_delta_t_env_is_opt_in(tmp_path: Path, raw, expected_sec):
+    publish_test_model(tmp_path / "models", "ident-v1")
+    extra = {} if raw is None else {"RBTA_BASE_DELTA_T_MIN": raw}
+    client = TestClient(create_production_app(env=_env(tmp_path, **extra)))
+    status = client.get("/api/v1/live/status", headers={"Authorization": f"Bearer {API_KEY}"}).json()
+    assert status["base_delta_t_sec"] == expected_sec
+
+
+@pytest.mark.parametrize("raw", ["abc", "0", "-5"])
+def test_base_delta_t_env_rejects_invalid(tmp_path: Path, raw):
+    publish_test_model(tmp_path / "models", "ident-v1")
+    with pytest.raises(ValueError, match="RBTA_BASE_DELTA_T_MIN"):
+        create_production_app(env=_env(tmp_path, RBTA_BASE_DELTA_T_MIN=raw))

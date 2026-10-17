@@ -1,6 +1,7 @@
 """Bootstrap server FastAPI produksi: validasi konfigurasi dan pengelolaan lifecycle."""
 
 from contextlib import asynccontextmanager
+from datetime import timedelta
 import logging
 import os
 from pathlib import Path
@@ -129,12 +130,26 @@ def create_production_app(
     if source_mode not in ("DEFERRED", "LIVE"):
         raise ValueError(f"RBTA_SOURCE_MODE must be either 'DEFERRED' or 'LIVE', got '{source_mode}'")
 
+    # Δt dasar live. Kosong = DEFAULT_BASE_DELTA_T (15 menit, perilaku lama). Run skripsi
+    # (rbta-if-thesis-v1) memakai 10 menit; set RBTA_BASE_DELTA_T_MIN=10 untuk paritas.
+    service_kwargs: Dict[str, Any] = {}
+    raw_delta_t = str(env_map.get("RBTA_BASE_DELTA_T_MIN") or "").strip()
+    if raw_delta_t:
+        try:
+            delta_t_min = float(raw_delta_t)
+        except ValueError as exc:
+            raise ValueError(f"RBTA_BASE_DELTA_T_MIN must be a number of minutes, got '{raw_delta_t}'") from exc
+        if delta_t_min <= 0:
+            raise ValueError(f"RBTA_BASE_DELTA_T_MIN must be > 0, got '{raw_delta_t}'")
+        service_kwargs["base_delta_t"] = timedelta(minutes=delta_t_min)
+
     service: Optional[LiveRBTAService] = None
     if scoring_pipe is not None:
         service = LiveRBTAService(
             scoring_pipeline=scoring_pipe,
             state_manager=state_mgr,
             adaptive=True,
+            **service_kwargs,
             raw_evidence_store=raw_evidence_store,
             source_mode=source_mode,
         )
@@ -151,6 +166,7 @@ def create_production_app(
         )
     if service is not None:
         service.update_live_source_state({"tls_verify": tls_verify})
+        logger.info("Live RBTA base delta_t = %.0f s", service.base_delta_t.total_seconds())
 
     # Replay controller untuk demo.
     replay_controller: Optional[ReplayController] = None

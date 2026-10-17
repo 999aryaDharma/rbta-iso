@@ -147,3 +147,5 @@ scripts/run-backend.ps1
 scripts/run-frontend.ps1
 role-patched*.json
 guardins-ca.pem
+# Pemetaan kekritisan agen di CT (lokal; yang di-commit hanya *.example.json)
+deploy/ct/config/agent_criticality.json

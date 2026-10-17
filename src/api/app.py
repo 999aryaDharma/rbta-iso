@@ -20,6 +20,15 @@ from src.runtime.replay_controller import ReplayController
 from src.runtime.service import LiveRBTAService, _serialize_scored_alert
 
 
+def _criticality_file_info() -> Optional[Dict[str, Any]]:
+    """sha256 + jumlah entri file RBTA_AGENT_CRITICALITY_FILE yang aktif (path tidak diekspos)."""
+    from src.config.domain import AGENT_CRITICALITY_OVERRIDE
+
+    if AGENT_CRITICALITY_OVERRIDE is None:
+        return None
+    return {"sha256": AGENT_CRITICALITY_OVERRIDE["sha256"], "entries": AGENT_CRITICALITY_OVERRIDE["entries"]}
+
+
 def create_app(
     service: Optional[LiveRBTAService] = None,
     model_registry: Optional[ModelRegistry] = None,
@@ -389,6 +398,7 @@ def create_app(
             "base_delta_t_sec": service.base_delta_t.total_seconds() if service is not None else None,
             "excluded_agents": excluded_agents,
             "excluded_alerts_total": excluded_alerts_total,
+            "agent_criticality_file": _criticality_file_info(),
         }
 
     @app.post("/ingest/wazuh", tags=["Ingress"])

@@ -42,6 +42,7 @@ def test_matching_hash_starts_and_status_exposes_identity(tmp_path: Path):
     assert status["model"]["sha256"] == sha
     assert isinstance(status["model"]["threshold"], float)
     assert isinstance(status["model"]["q3"], float)
+    assert status["agent_criticality_file"] is None
 
 
 def test_mismatching_hash_refuses_to_start(tmp_path: Path):

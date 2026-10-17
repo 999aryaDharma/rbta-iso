@@ -109,6 +109,15 @@ def create_production_app(
         env_map.get(EXPECTED_MODEL_SHA256_ENV),
     )
 
+    from src.config.domain import AGENT_CRITICALITY_OVERRIDE
+
+    if AGENT_CRITICALITY_OVERRIDE is not None:
+        logger.info(
+            "Agent criticality override file loaded: %d entries, sha256=%s",
+            AGENT_CRITICALITY_OVERRIDE["entries"],
+            AGENT_CRITICALITY_OVERRIDE["sha256"],
+        )
+
     from src.runtime.raw_evidence import RawAlertEvidenceStore
     from src.runtime.replay_controller import ReplayController
 

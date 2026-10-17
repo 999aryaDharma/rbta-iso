@@ -31,6 +31,7 @@ services:
       RBTA_EXPECTED_MODEL_SHA256: ${RBTA_EXPECTED_MODEL_SHA256:-}
       RBTA_BASE_DELTA_T_MIN: ${RBTA_BASE_DELTA_T_MIN:-}
       RBTA_EXCLUDED_AGENTS: ${RBTA_EXCLUDED_AGENTS:-}
+      RBTA_AGENT_CRITICALITY_FILE: ${RBTA_AGENT_CRITICALITY_FILE:-}
       RBTA_SOURCE_MODE: "LIVE"
       RBTA_LIVE_WORKER_ENABLED: "true"
       RBTA_LIVE_SOURCE: ${RBTA_LIVE_SOURCE:-indexer}
@@ -68,6 +69,10 @@ services:
       - type: bind
         source: ./certs
         target: /app/certs
+        read_only: true
+      - type: bind
+        source: ./config
+        target: /app/config
         read_only: true
       - type: bind
         source: ./replay

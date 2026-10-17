@@ -6,7 +6,11 @@ Satu-satunya sumber untuk:
 - CRITICAL_MITRE_TACTICS
 """
 
-from typing import Sequence
+import hashlib
+import json
+import os
+from pathlib import Path
+from typing import Any, Optional, Sequence
 
 # Kritikalitas agent (skala 1-4: Low=1, Medium=2, High=3, Critical=4).
 # Pemetaan kritikalitas aset domain untuk infrastruktur UPT TIK INSTIKI.
@@ -23,6 +27,46 @@ AGENT_CRITICALITY: dict[str, int] = {
 }
 
 DEFAULT_AGENT_CRITICALITY: int = 1
+
+AGENT_CRITICALITY_FILE_ENV = "RBTA_AGENT_CRITICALITY_FILE"
+
+
+def load_agent_criticality_file(path: str | Path) -> tuple[dict[str, int], str]:
+    """Baca file JSON {nama_atau_id_agent: 1-4}; kembalikan (pemetaan ternormalisasi, sha256 file).
+
+    Gagal tertutup: file yang tidak bisa dibaca atau berisi nilai di luar 1-4 melempar ValueError,
+    sehingga service tidak pernah diam-diam memakai pemetaan sebagian.
+    """
+    raw = Path(path).read_bytes()
+    try:
+        data = json.loads(raw.decode("utf-8"))
+    except ValueError as exc:
+        raise ValueError(f"{AGENT_CRITICALITY_FILE_ENV} '{path}' is not valid JSON: {exc}") from exc
+    if not isinstance(data, dict):
+        raise ValueError(f"{AGENT_CRITICALITY_FILE_ENV} '{path}' must be a JSON object {{agent: 1-4}}")
+    mapping: dict[str, int] = {}
+    for key, value in data.items():
+        name = str(key).strip().lower()
+        if not name or isinstance(value, bool) or not isinstance(value, int) or not 1 <= value <= 4:
+            raise ValueError(
+                f"{AGENT_CRITICALITY_FILE_ENV} '{path}': entry {key!r}={value!r} must map a non-empty agent to an integer 1-4"
+            )
+        mapping[name] = value
+    return mapping, hashlib.sha256(raw).hexdigest()
+
+
+def _apply_criticality_file_from_env() -> Optional[dict[str, Any]]:
+    """Tambahkan override file di atas AGENT_CRITICALITY bawaan bila env diset (sekali, saat import)."""
+    path = os.environ.get(AGENT_CRITICALITY_FILE_ENV, "").strip()
+    if not path:
+        return None
+    mapping, sha256 = load_agent_criticality_file(path)
+    AGENT_CRITICALITY.update(mapping)
+    return {"path": path, "sha256": sha256, "entries": len(mapping)}
+
+
+# None bila env tidak diset: AGENT_CRITICALITY persis tabel bawaan di atas (perilaku penelitian).
+AGENT_CRITICALITY_OVERRIDE: Optional[dict[str, Any]] = _apply_criticality_file_from_env()
 
 CRITICALITY_LABEL_TO_SCORE: dict[str, int] = {
     "critical": 4,

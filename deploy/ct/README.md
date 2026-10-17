@@ -77,14 +77,25 @@ docker compose down && docker compose up -d --build   # update (habis git pull)
 docker volume ls | grep rbta-ct       # state (live) + arsip (archive) persisten
 ```
 
-## 6. Auto-deploy (CD pull-based)
+## 6. Auto-deploy (CD pull-based, bergerbang tag rilis)
 
 CT yang menarik, bukan GitHub yang mendorong (IP kampus privat tak
 terjangkau runner publik). Cron tiap 5 menit menjalankan
-`deploy/ct/auto-update.sh`: bila HEAD berubah → pull, rebuild, up,
-cek `/ready`. Push ke branch = deploy dalam ±5 menit.
-Tulis `[skip cd]` di pesan commit untuk melewati satu rilis
-(mis. commit docs tanpa rebuild).
+`deploy/ct/auto-update.sh`: fetch branch + tag, lalu deploy **hanya bila
+commit ujung `origin/<branch>` memiliki tag `release-*`**
+(`git tag --points-at`). Commit biasa diabaikan (dicatat `SKIP ... tanpa tag`
+sekali per SHA di `cd.log`). Bila bertag: `merge --ff-only` ke SHA itu,
+rebuild, up, cek `/ready`. `[skip cd]` di pesan commit bertag tetap melewatinya.
+
+Membuat rilis (di laptop, setelah semua gate hijau dan commit sudah di-push):
+
+```bash
+git tag -a release-2026.10.17 -m "rilis: <ringkasan>"   # tag di commit ujung branch
+git push origin release-2026.10.17
+```
+
+Tag harus menunjuk commit ujung branch; push commit baru tanpa tag setelahnya
+menahan deploy sampai commit baru itu diberi tag juga.
 
 Pasang sekali di CT:
 
@@ -98,6 +109,24 @@ CI (`/.github/workflows/ci.yml`, Ubuntu publik) berjalan tiap push:
 backend `pytest`, frontend `lint + typecheck + vitest`. CD di CT
 sengaja tidak menunggu CI hijau — branch ini rilis manual peneliti;
 jangan push kode yang belum lolos test lokal.
+
+## 7. Opsi: reverse proxy TLS (Caddy) — tidak aktif secara default
+
+Default port 8010 di-bind ke `0.0.0.0` (perilaku lama, HTTP polos di LAN).
+Untuk HTTPS, jalankan Caddy di CT dan batasi backend ke loopback:
+
+1. `deploy/ct/.env`: `RBTA_BIND_ADDR=127.0.0.1`, lalu `docker compose up -d`.
+2. Install Caddy di CT (`apt-get install -y caddy`) dan isi `/etc/caddy/Caddyfile`:
+   ```caddy
+   rbta.<domain-kampus> {
+       # sertifikat internal bila tidak ada DNS publik/ACME: tls internal
+       reverse_proxy 127.0.0.1:8010
+   }
+   ```
+3. `systemctl reload caddy`. Healthcheck `auto-update.sh` tetap memakai
+   `http://127.0.0.1:8010/ready` sehingga tidak berubah.
+
+Header keamanan (HSTS, CSP) sudah dikirim backend; HSTS baru berarti setelah TLS aktif.
 
 Backup berkala: `docker run --rm -v rbta-ct-live:/s -v $PWD:/b
 alpine tar czf /b/live-backup.tgz -C /s .` (sama untuk `rbta-ct-archive`).

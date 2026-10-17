@@ -21,7 +21,8 @@ services:
     tmpfs:
       - /tmp:rw,noexec,nosuid,size=128m,uid=10001,gid=10001
     ports:
-      - "${RBTA_HOST_PORT:-8010}:8000"
+      # RBTA_BIND_ADDR=127.0.0.1 bila dashboard hanya diakses lewat reverse proxy (lihat README).
+      - "${RBTA_BIND_ADDR:-0.0.0.0}:${RBTA_HOST_PORT:-8010}:8000"
     extra_hosts:
       # Indexer TANPA IP-SAN: wajib diakses via nama DNS ini (bukan IP).
       - "wazuh.indexer:${WAZUH_INDEXER_HOST_IP:?WAZUH_INDEXER_HOST_IP is required}"

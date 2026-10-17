@@ -271,6 +271,19 @@ def create_production_app(
             service, evidence_dir, model_identity, parse_hhmm(env_map.get("RBTA_EVIDENCE_EXPORT_AT") or "00:05")
         )
 
+    # Daily digest NOISE_HIGH (T9), default 07:30 WITA; lewat dispatcher yang sama (dry-run/hold/throttle).
+    digest_job = None
+    digest_enabled = str(env_map.get("RBTA_DIGEST_ENABLED", "true")).strip().lower() != "false"
+    if telegram_dispatcher is not None and digest_enabled:
+        from src.runtime.digest_job import make_digest_job
+
+        digest_job = make_digest_job(
+            service,
+            telegram_dispatcher,
+            at=env_map.get("RBTA_DIGEST_AT") or "07:30",
+            dashboard_url=(env_map.get("RBTA_DASHBOARD_URL") or "").strip() or None,
+        )
+
     @asynccontextmanager
     async def lifespan(app_instance: FastAPI) -> AsyncGenerator[None, None]:
         logger.info("Starting RBTA production service...")
@@ -288,7 +301,12 @@ def create_production_app(
         if evidence_job is not None:
             evidence_job.start()
             logger.info("Evidence export job started (dir=%s).", evidence_dir)
+        if digest_job is not None:
+            digest_job.start()
+            logger.info("Daily digest job started.")
         yield
+        if digest_job is not None:
+            digest_job.stop()
         if evidence_job is not None:
             evidence_job.stop()
         if live_worker is not None and live_worker.drain_on_stop:
@@ -318,6 +336,7 @@ def create_production_app(
     app.state.model_identity = model_identity
     app.state.evidence_dir = evidence_dir
     app.state.evidence_job = evidence_job
+    app.state.digest_job = digest_job
     app.state.live_worker = live_worker
     app.state.telegram_dispatcher = telegram_dispatcher
 

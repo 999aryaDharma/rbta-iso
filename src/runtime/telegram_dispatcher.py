@@ -309,6 +309,8 @@ class TelegramDispatcher:
         self._sent_keys: Set[str] = set()
         self._sent_order: Deque[str] = deque()
         self._lock = threading.Lock()
+        # Menyerialkan throttle + kirim antara thread dispatcher dan job lain (digest, ringkasan cooldown).
+        self._send_lock = threading.Lock()
         self._thread: Optional[threading.Thread] = None
         self.dry_run_payloads: List[Dict[str, Any]] = []
         self._sent_total = 0
@@ -597,8 +599,10 @@ class TelegramDispatcher:
                 logger.info("Telegram dispatcher dry-run for %s (no send)", key)
                 continue
             payload = self._build_payload(scored)
-            self._throttle_before_send(result)
-            if self._send_with_retry(payload, result):
+            with self._send_lock:
+                self._throttle_before_send(result)
+                delivered = self._send_with_retry(payload, result)
+            if delivered:
                 if not self._record_notification(scored.meta_id, "SENT"):
                     with self._lock:
                         self._failed_total += 1
@@ -618,6 +622,40 @@ class TelegramDispatcher:
                     self._failed_total += 1
                 result.failed += 1
         return result
+
+    def send_text(self, message: str, kind: str = "text") -> str:
+        """Kirim pesan non-MetaAlert (digest, ringkasan) dengan mode, throttle, dan retry yang sama.
+
+        Hasil: ``sent`` | ``dry_run`` (payload disimpan, tidak dikirim) | ``held`` (tanpa kredensial)
+        | ``failed``. Tidak menyentuh outbox maupun notification_log.
+        """
+        mode = self.mode
+        if mode == "hold":
+            logger.warning("Telegram dispatcher holding %s: credentials missing and dry-run not set", kind)
+            return "held"
+        payload = {
+            "meta_id": None,
+            "idempotency_key": f"{self._run_id}:{kind}",
+            "run_id": self._run_id,
+            "chat_id": self._chat_id,
+            "message": message,
+            "parse_mode": "HTML",
+        }
+        if mode == "dry_run":
+            self.dry_run_payloads.append(payload)
+            del self.dry_run_payloads[:-MAX_DRY_RUN_PAYLOADS]
+            logger.info("Telegram dispatcher dry-run for %s (no send)", kind)
+            return "dry_run"
+        result = DispatchResult()
+        with self._send_lock:
+            self._throttle_before_send(result)
+            delivered = self._send_with_retry(payload, result)
+            if delivered:
+                try:
+                    self._last_send_monotonic = self._monotonic_fn()
+                except Exception:
+                    self._last_send_monotonic = None
+        return "sent" if delivered else "failed"
 
     def start(self) -> None:
         """Jalankan thread polling latar belakang (idempoten)."""

@@ -14,6 +14,7 @@ FROM python:3.11-slim AS runtime
 
 ARG GIT_SHA="unknown"
 ARG BUILD_DATE="unknown"
+ARG RELEASE_TAG="unknown"
 
 LABEL org.opencontainers.image.revision="${GIT_SHA}" \
       org.opencontainers.image.created="${BUILD_DATE}" \
@@ -22,7 +23,9 @@ LABEL org.opencontainers.image.revision="${GIT_SHA}" \
       org.opencontainers.image.description="Rule-Based Temporal Aggregation and Isolation Forest for Wazuh SIEM Security Logs" \
       org.opencontainers.image.authors="Arya Dharma"
 
-ENV PYTHONDONTWRITEBYTECODE=1 \
+ENV RBTA_BUILD_SHA=${GIT_SHA} \
+    RBTA_RELEASE_TAG=${RELEASE_TAG} \
+    PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \

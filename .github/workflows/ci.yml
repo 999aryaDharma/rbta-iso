@@ -35,3 +35,19 @@ jobs:
       - run: npm run lint
       - run: npm run typecheck
       - run: npm test -- --run
+
+  # CD pull-based di CT hanya men-deploy commit ujung branch yang bertag release-*.
+  # Job ini memberi tag itu setelah backend + frontend hijau pada push (bukan PR).
+  release:
+    needs: [backend, frontend]
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Tag release
+        run: |
+          TAG="release-$(date -u +%Y.%m.%d-%H%M)-${GITHUB_SHA::7}"
+          git tag -a "$TAG" -m "rilis otomatis: CI hijau pada $GITHUB_SHA"
+          git push origin "$TAG"

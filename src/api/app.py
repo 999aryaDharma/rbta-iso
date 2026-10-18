@@ -146,6 +146,13 @@ def create_app(
         """Liveness probe."""
         return {"status": "ok", "service": "rbta-security-analytics"}
 
+    def _build_info() -> Dict[str, str]:
+        # Diisi saat docker build oleh CD; cek versi terpasang tanpa SSH.
+        return {
+            "build_sha": os.environ.get("RBTA_BUILD_SHA", "unknown"),
+            "release_tag": os.environ.get("RBTA_RELEASE_TAG", "unknown"),
+        }
+
     @app.get("/ready", tags=["Monitoring"])
     def ready() -> JSONResponse:
         """Readiness probe: memeriksa artefak model dan state runtime."""
@@ -172,7 +179,7 @@ def create_app(
 
             return JSONResponse(
                 status_code=status.HTTP_200_OK,
-                content={"ready": True, "active_model_version": version},
+                content={"ready": True, "active_model_version": version, **_build_info()},
             )
 
         active_version = model_registry.get_active_version()
@@ -192,7 +199,7 @@ def create_app(
             )
         return JSONResponse(
             status_code=status.HTTP_200_OK,
-            content={"ready": True, "active_model_version": active_version},
+            content={"ready": True, "active_model_version": active_version, **_build_info()},
         )
 
     @app.get("/runtime/stats", tags=["Monitoring"])

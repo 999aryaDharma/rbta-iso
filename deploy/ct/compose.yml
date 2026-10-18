@@ -13,6 +13,7 @@ services:
       args:
         GIT_SHA: ${RBTA_CODE_SHA:-ct-production}
         BUILD_DATE: ${RBTA_BUILD_DATE:-unknown}
+        RELEASE_TAG: ${RBTA_RELEASE_TAG:-unknown}
     image: rbta-service:${RBTA_IMAGE_TAG:-ct}
     restart: unless-stopped
     init: true

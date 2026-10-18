@@ -55,6 +55,8 @@ log "DEPLOY $LOCAL -> $REMOTE ($TAG)"
 # Merge ke SHA yang sudah dicek, bukan pull ujung branch (yang bisa saja commit baru tanpa tag).
 git merge -q --ff-only "$REMOTE" || fail "git merge --ff-only gagal (riwayat menyimpang?)"
 cd "$STACK_DIR"
+# Dibaca compose sebagai build args; muncul di /ready (build_sha, release_tag).
+export RBTA_CODE_SHA="$REMOTE" RBTA_RELEASE_TAG="$TAG" RBTA_BUILD_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 docker compose build >>"$LOG" 2>&1 || fail "docker compose build gagal"
 # Volume dibuat milik root; container jalan sebagai UID 10001 (idempoten).
 docker run --rm -v rbta-ct-live:/s -v rbta-ct-archive:/a alpine chown -R 10001:10001 /s /a >>"$LOG" 2>&1 || fail "chown volume gagal"

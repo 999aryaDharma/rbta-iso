@@ -4,10 +4,30 @@ import logging
 import os
 import time
 from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
+import ssl
 import requests
+from requests.adapters import HTTPAdapter
 from requests.auth import HTTPBasicAuth
 
 logger = logging.getLogger(__name__)
+
+
+class _PinnedLeafAdapter(HTTPAdapter):
+    """Percayai sertifikat leaf yang di-pin tanpa rantai penerbit.
+
+    Python 3.11 menolak leaf bukan-self-signed sebagai trust anchor ("unable to get local issuer
+    certificate"); 3.13 tidak. VERIFY_X509_PARTIAL_CHAIN menyamakan perilakunya. Hostname tetap diverifikasi.
+    """
+
+    def __init__(self, cafile: str, **kwargs: Any) -> None:
+        self._cafile = cafile
+        super().__init__(**kwargs)
+
+    def init_poolmanager(self, *args: Any, **kwargs: Any) -> None:
+        ctx = ssl.create_default_context(cafile=self._cafile)
+        ctx.verify_flags |= ssl.VERIFY_X509_PARTIAL_CHAIN
+        kwargs["ssl_context"] = ctx
+        super().init_poolmanager(*args, **kwargs)
 
 
 class WazuhClientError(RuntimeError):
@@ -79,6 +99,7 @@ class WazuhIndexerClient:
         self._random_fn = random_fn or (lambda: __import__('random').random())
 
         self._session = requests.Session()
+        self._leaf_pinned = False
         if self.username and self.password:
             self._session.auth = HTTPBasicAuth(self.username, self.password)
 
@@ -90,6 +111,10 @@ class WazuhIndexerClient:
         params: Optional[Dict[str, Any]] = None,
     ) -> requests.Response:
         """Jalankan request terautentikasi dengan retry untuk error sementara; 401/403 langsung gagal."""
+        # Lazy: file CA baru dibaca saat request pertama.
+        if isinstance(self.verify_tls, str) and not self._leaf_pinned:
+            self._session.mount("https://", _PinnedLeafAdapter(self.verify_tls))
+            self._leaf_pinned = True
         url = f"{self.base_url}/{endpoint.lstrip('/')}"
         headers = {"Content-Type": "application/json"}
 

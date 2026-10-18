@@ -135,6 +135,7 @@ def test_ready_endpoint_passes_200_when_active_model_published(tmp_path: Path):
     data = resp.json()
     assert data["ready"] is True
     assert data["active_model_version"] == "ready-v1"
+    assert {"build_sha", "release_tag"} <= data.keys()
 
 
 def test_ingest_alert_endpoint_and_outbox_ack(tmp_path: Path):

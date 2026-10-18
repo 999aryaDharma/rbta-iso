@@ -35,7 +35,7 @@ def test_matching_hash_starts_and_status_exposes_identity(tmp_path: Path):
 
     ready = client.get("/ready")
     assert ready.status_code == 200
-    assert ready.json() == {"ready": True, "active_model_version": "ident-v1"}
+    assert {k: v for k, v in ready.json().items() if k not in ("build_sha", "release_tag")} == {"ready": True, "active_model_version": "ident-v1"}
 
     status = client.get("/api/v1/live/status", headers={"Authorization": f"Bearer {API_KEY}"}).json()
     assert status["model"]["version"] == "ident-v1"
@@ -60,7 +60,7 @@ def test_expected_hash_without_model_refuses_to_start(tmp_path: Path):
 def test_ready_never_leaks_threshold_without_expected_hash(tmp_path: Path):
     publish_test_model(tmp_path / "models", "ident-v1")
     body = TestClient(create_production_app(env=_env(tmp_path))).get("/ready").json()
-    assert set(body) == {"ready", "active_model_version"}
+    assert set(body) == {"ready", "active_model_version", "build_sha", "release_tag"}
     assert "threshold" not in str(body)
 
 

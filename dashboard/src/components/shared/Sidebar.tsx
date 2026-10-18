@@ -137,10 +137,10 @@ export function AppSidebar() {
               <SidebarMenuButton
                 icon={House}
                 active={isPathActive("/overview")}
-                tooltip="Ringkasan: kondisi alert dan beban analyst"
+                tooltip="Overview: kondisi alert dan beban analyst"
                 onClick={() => navigate(withRunId("/overview"))}
               >
-                Ringkasan
+                Overview
               </SidebarMenuButton>
             </SidebarMenuItem>
 
@@ -194,10 +194,10 @@ export function AppSidebar() {
               <SidebarMenuButton
                 icon={Play}
                 active={isPathActive("/demo")}
-                tooltip="Replay sidang: putar ulang data penelitian dan hasil evaluasi"
+                tooltip="Replay: putar ulang data penelitian dan hasil evaluasi"
                 onClick={() => navigate(withRunId("/demo"))}
               >
-                Replay sidang
+                Replay
               </SidebarMenuButton>
             </SidebarMenuItem>
           </SidebarMenu>

@@ -7,10 +7,10 @@ export function ShortcutsModal({ open, onClose }: { open: boolean; onClose: () =
     {
       category: 'NAVIGASI',
       items: [
-        { key: 'g o', desc: 'Buka Ringkasan' },
+        { key: 'g o', desc: 'Buka Overview' },
         { key: 'g m', desc: 'Buka Daftar meta-alert' },
         { key: 'g r', desc: 'Buka Status pengelompokan' },
-        { key: 'g d', desc: 'Buka Replay sidang' },
+        { key: 'g d', desc: 'Buka Replay' },
         { key: 'g l', desc: 'Buka Pemantauan live' },
         { key: 'g s', desc: 'Buka Sistem' },
       ],

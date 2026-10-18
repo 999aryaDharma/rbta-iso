@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
@@ -76,12 +77,21 @@ def dashboard_bucket_raw_alerts(
 @router.get("/timeseries")
 def dashboard_timeseries(
     window_hours: int = Query(24, ge=1, le=168, description="Time series lookback window in hours"),
+    start: Optional[datetime] = Query(None, description="Custom range start (overrides window_hours)"),
+    end: Optional[datetime] = Query(None, description="Custom range end (inclusive)"),
     run_id: Optional[str] = Query(None, description="Optional replay run context ID"),
     resolver: DashboardRuntimeResolver = Depends(_get_resolver),
     api_key: str = Depends(get_api_key),
 ) -> List[Dict[str, Any]]:
+    if (start is None) != (end is None):
+        raise HTTPException(status_code=422, detail="start and end must be given together")
+    if start is not None and end is not None:
+        a = start if start.tzinfo else start.replace(tzinfo=timezone.utc)
+        b = end if end.tzinfo else end.replace(tzinfo=timezone.utc)
+        if b < a or (b - a).days > 31:
+            raise HTTPException(status_code=422, detail="range must be 0-31 days with end >= start")
     service, evidence_store, _ = resolver.resolve(run_id)
-    return get_dashboard_timeseries(service, evidence_store, window_hours=window_hours)
+    return get_dashboard_timeseries(service, evidence_store, window_hours=window_hours, start=start, end=end)
 
 
 @router.get("/system")

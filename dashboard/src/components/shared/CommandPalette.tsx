@@ -17,11 +17,11 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
     runId ? `${path}${path.includes('?') ? '&' : '?'}run_id=${encodeURIComponent(runId)}` : path;
 
   const navItems = [
-    { label: 'Ringkasan', category: 'Halaman', desc: 'Kondisi alert dan beban analyst saat ini', path: withRunId('/overview'), icon: ChartBar },
+    { label: 'Overview', category: 'Halaman', desc: 'Kondisi alert dan beban analyst saat ini', path: withRunId('/overview'), icon: ChartBar },
     { label: 'Daftar meta-alert', category: 'Halaman', desc: 'Telusuri kelompok alert dan skornya', path: withRunId('/meta-alerts'), icon: PaintBucket },
     { label: 'Status pengelompokan', category: 'Halaman', desc: 'Kelompok terbuka dan jendela waktu per agen', path: withRunId('/rbta'), icon: Cpu },
     { label: 'Pemantauan live', category: 'Halaman', desc: 'Status pemrosesan dan kesegaran data', path: withRunId('/live'), icon: Pulse },
-    { label: 'Replay sidang', category: 'Halaman', desc: 'Putar ulang data penelitian dan hasil evaluasi', path: withRunId('/demo'), icon: Play },
+    { label: 'Replay', category: 'Halaman', desc: 'Putar ulang data penelitian dan hasil evaluasi', path: withRunId('/demo'), icon: Play },
     { label: 'Integrasi', category: 'Operasi', desc: 'Status Telegram dan Shuffle', path: withRunId('/integrations'), icon: Plugs },
     { label: 'Sistem', category: 'Operasi', desc: 'Versi model dan konfigurasi', path: withRunId('/system'), icon: GearSix },
   ];

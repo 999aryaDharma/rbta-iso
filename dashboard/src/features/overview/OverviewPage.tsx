@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { usePollingQuery } from '@/hooks/usePolling';
 import { fetchSummary, fetchTimeseries } from '@/api/dashboard';
@@ -11,7 +12,8 @@ import { ACTION_LABELS, TERM_HINTS, TERMS } from '@/lib/labels';
 import { Button } from '@cloudflare/kumo/components/button';
 import { Badge } from '@cloudflare/kumo/components/badge';
 import { Table } from '@cloudflare/kumo/components/table';
-import { WarningCircle, ArrowRight } from '@phosphor-icons/react';
+import { DatePicker, type DateRange } from '@cloudflare/kumo/components/date-picker';
+import { WarningCircle, ArrowRight, CalendarBlank } from '@phosphor-icons/react';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts';
@@ -24,7 +26,20 @@ export function OverviewPage() {
   const withRunId = (path: string) => (runId ? `${path}${path.includes('?') ? '&' : '?'}run_id=${encodeURIComponent(runId)}` : path);
 
   const { data: summary } = usePollingQuery(['summary', runId || 'live'], () => fetchSummary(runId || undefined), 3000);
-  const { data: timeseries } = usePollingQuery(['timeseries', runId || 'live'], () => fetchTimeseries(24, runId || undefined), 5000);
+  const [range, setRange] = useState<DateRange | undefined>();
+  const [pickerOpen, setPickerOpen] = useState(false);
+  // Rentang kustom dikirim sebagai awal hari s/d akhir hari (UTC, sesuai bin per jam di backend).
+  const rangeParam = range?.from
+    ? {
+        start: `${range.from.toLocaleDateString('sv')}T00:00:00Z`,
+        end: `${(range.to ?? range.from).toLocaleDateString('sv')}T23:59:59Z`,
+      }
+    : undefined;
+  const { data: timeseries } = usePollingQuery(
+    ['timeseries', runId || 'live', rangeParam?.start ?? '', rangeParam?.end ?? ''],
+    () => fetchTimeseries(24, runId || undefined, rangeParam),
+    5000,
+  );
   const { data: recentMetas } = usePollingQuery(
     ['meta-alerts-recent', runId || 'live'],
     () => fetchMetaAlerts({ page: 1, page_size: 10, sort_by: 'end_time', sort_order: 'desc', run_id: runId || undefined }),
@@ -193,7 +208,25 @@ export function OverviewPage() {
                     : 'Alert masuk vs meta-alert selesai per waktu'}
                 </p>
               </div>
+              <div className="flex items-center gap-2">
+                <Button variant="secondary" size="sm" onClick={() => setPickerOpen((o) => !o)}>
+                  <CalendarBlank size={14} className="mr-1" />
+                  {rangeParam
+                    ? `${range!.from!.toLocaleDateString('sv')} – ${(range!.to ?? range!.from!).toLocaleDateString('sv')}`
+                    : '24 jam terakhir'}
+                </Button>
+                {range && (
+                  <Button variant="ghost" size="sm" onClick={() => { setRange(undefined); setPickerOpen(false); }}>
+                    Reset
+                  </Button>
+                )}
+              </div>
             </div>
+            {pickerOpen && (
+              <div className="flex justify-end">
+                <DatePicker mode="range" selected={range} onChange={setRange} numberOfMonths={2} />
+              </div>
+            )}
             <ResponsiveContainer width="100%" height={260}>
               <AreaChart data={timeseries}>
                 <CartesianGrid strokeDasharray="3 3" opacity={0.15} />

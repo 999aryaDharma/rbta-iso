@@ -156,14 +156,23 @@ def get_dashboard_timeseries(
     service: LiveRBTAService,
     evidence_store: RawAlertEvidenceStore,
     window_hours: int = 24,
+    start: Optional[datetime] = None,
+    end: Optional[datetime] = None,
 ) -> List[Dict[str, Any]]:
     """Susun deret waktu raw alert yang masuk vs MetaAlert yang sudah final.
 
     Jumlah raw alert diambil murni dari persistensi raw evidence (termasuk bucket aktif).
     Jumlah MetaAlert diambil dari end_time MetaAlert final.
     """
-    now = datetime.now(timezone.utc)
-    start_time = now - timedelta(hours=window_hours)
+    if start is not None and end is not None:
+        # Rentang kustom (inklusif); bin per jam UTC, dibatasi 31 hari oleh endpoint.
+        start_time = start.astimezone(timezone.utc) if start.tzinfo else start.replace(tzinfo=timezone.utc)
+        now = end.astimezone(timezone.utc) if end.tzinfo else end.replace(tzinfo=timezone.utc)
+        start_time = start_time.replace(minute=0, second=0, microsecond=0)
+        window_hours = max(1, int((now - start_time).total_seconds() // 3600) + 1)
+    else:
+        now = datetime.now(timezone.utc)
+        start_time = now - timedelta(hours=window_hours)
 
     # Siapkan bin per jam.
     bins: Dict[str, Dict[str, Any]] = {}
@@ -184,7 +193,7 @@ def get_dashboard_timeseries(
 
     # Isi MetaAlert final.
     for m in service.finalized_history:
-        if m.end_time and m.end_time >= start_time:
+        if m.end_time and start_time <= m.end_time <= now:
             bin_key = m.end_time.strftime("%Y-%m-%d %H:00")
             if bin_key in bins:
                 bins[bin_key]["meta_alerts"] += 1

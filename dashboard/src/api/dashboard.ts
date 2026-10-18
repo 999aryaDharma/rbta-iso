@@ -58,9 +58,17 @@ export async function fetchBucketRawAlerts(
   return RawAlertListSchema.parse(data);
 }
 
-export async function fetchTimeseries(windowHours: number = 24, runId?: string): Promise<TimeseriesData> {
+export async function fetchTimeseries(
+  windowHours: number = 24,
+  runId?: string,
+  range?: { start: string; end: string },
+): Promise<TimeseriesData> {
   const queryParams = new URLSearchParams();
   queryParams.set('window_hours', String(windowHours));
+  if (range) {
+    queryParams.set('start', range.start);
+    queryParams.set('end', range.end);
+  }
   if (runId) queryParams.set('run_id', runId);
   const data = await apiFetch<unknown>(`/dashboard/timeseries?${queryParams.toString()}`);
   return TimeseriesSchema.parse(data);

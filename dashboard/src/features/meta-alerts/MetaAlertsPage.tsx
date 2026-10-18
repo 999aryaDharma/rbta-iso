@@ -15,13 +15,15 @@ import { Pagination } from '@cloudflare/kumo/components/pagination';
 import { MagnifyingGlass, CaretDown, CaretUp, CaretUpDown } from '@phosphor-icons/react';
 import { nextAlertScoreSort, type MetaAlertSortOrder } from './metaAlertSort';
 
-const META_ALERT_PAGE_SIZE = 10;
+const PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
 
 export function MetaAlertsPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const page = Number(searchParams.get('page') || 1);
+  const requestedSize = Number(searchParams.get('page_size'));
+  const META_ALERT_PAGE_SIZE = PAGE_SIZE_OPTIONS.includes(requestedSize) ? requestedSize : 10;
   const decision = searchParams.get('decision') || '';
   const action = searchParams.get('action') || '';
   const urlSearch = searchParams.get('search') || '';
@@ -53,7 +55,7 @@ export function MetaAlertsPage() {
   }, [localSearch, urlSearch, searchParams, setSearchParams]);
 
   const { data, isFetching, isPlaceholderData, isLoading, isError, error } = useQuery({
-    queryKey: ['meta-alerts', page, decision, action, urlSearch, sortBy, sortOrder, runId || 'live'],
+    queryKey: ['meta-alerts', page, META_ALERT_PAGE_SIZE, decision, action, urlSearch, sortBy, sortOrder, runId || 'live'],
     queryFn: () =>
       fetchMetaAlerts({
         page,
@@ -74,7 +76,7 @@ export function MetaAlertsPage() {
     const totalPages = data ? Math.ceil(data.total / META_ALERT_PAGE_SIZE) || 1 : 1;
     if (data && page < totalPages) {
       queryClient.prefetchQuery({
-        queryKey: ['meta-alerts', page + 1, decision, action, urlSearch, sortBy, sortOrder, runId || 'live'],
+        queryKey: ['meta-alerts', page + 1, META_ALERT_PAGE_SIZE, decision, action, urlSearch, sortBy, sortOrder, runId || 'live'],
         queryFn: () =>
           fetchMetaAlerts({
             page: page + 1,
@@ -89,7 +91,7 @@ export function MetaAlertsPage() {
         staleTime: 5000,
       });
     }
-  }, [data, page, decision, action, urlSearch, sortBy, sortOrder, runId, queryClient]);
+  }, [data, page, META_ALERT_PAGE_SIZE, decision, action, urlSearch, sortBy, sortOrder, runId, queryClient]);
 
   const setFilterParam = useCallback((key: string, val: string) => {
     const params = new URLSearchParams(searchParams);
@@ -231,7 +233,24 @@ export function MetaAlertsPage() {
             </Table.Body>
           </Table>
 
-          <div className="px-6 py-4 border-t border-kumo-hairline bg-kumo-recessed/20">
+          <div className="px-6 py-4 border-t border-kumo-hairline bg-kumo-recessed/20 flex flex-wrap items-center justify-between gap-3">
+            <label className="flex items-center gap-2 text-xs text-kumo-subtle">
+              Item per halaman
+              <Select
+                size="sm"
+                value={String(META_ALERT_PAGE_SIZE)}
+                onValueChange={(val) => {
+                  const params = new URLSearchParams(searchParams);
+                  params.set('page_size', val as string);
+                  params.set('page', '1');
+                  setSearchParams(params);
+                }}
+              >
+                {PAGE_SIZE_OPTIONS.map((n) => (
+                  <Select.Option key={n} value={String(n)}>{n}</Select.Option>
+                ))}
+              </Select>
+            </label>
             <Pagination
               page={page}
               setPage={(p) => {
@@ -239,7 +258,7 @@ export function MetaAlertsPage() {
                 params.set('page', String(p));
                 setSearchParams(params);
               }}
-              perPage={10}
+              perPage={META_ALERT_PAGE_SIZE}
               totalCount={data?.total ?? 0}
             >
               <Pagination.Info />

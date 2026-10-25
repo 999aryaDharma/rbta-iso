@@ -72,7 +72,13 @@ export function RawAlertDetailPage() {
       <PageHeader
         breadcrumbs={
           metaId
-            ? ['Analisis', 'Daftar meta-alert', `#${metaId}`, 'Alert asli', String(alertId)]
+            ? [
+                'Analisis',
+                { label: 'Daftar meta-alert', href: '/meta-alerts' },
+                { label: `#${metaId}`, href: `/meta-alerts/${metaId}` },
+                { label: 'Alert asli', href: `/meta-alerts/${metaId}/raw-alerts` },
+                String(alertId),
+              ]
             : ['Analisis', 'Alert asli', String(alertId)]
         }
         title="Detail alert asli"
@@ -189,6 +195,18 @@ export function RawAlertDetailPage() {
                   <h3 className="font-semibold text-xs uppercase tracking-wider text-kumo-strong mb-3 pb-2 border-b border-kumo-hairline">Isi log lengkap</h3>
                   <pre className="text-xs font-mono p-3.5 rounded-lg border border-kumo-hairline bg-kumo-recessed/30 text-kumo-default overflow-auto max-h-48 whitespace-pre-wrap leading-relaxed">
                     {data.full_log}
+                  </pre>
+                </div>
+              )}
+
+              {data.original_source_payload && (
+                <div className="p-6 rounded-xl border border-kumo-hairline bg-kumo-canvas shadow-xs">
+                  <div className="flex items-center justify-between mb-3 pb-2 border-b border-kumo-hairline">
+                    <h3 className="font-semibold text-xs uppercase tracking-wider text-kumo-strong">Raw alert (Wazuh)</h3>
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded border border-kumo-hairline bg-kumo-recessed text-kumo-subtle">Payload asli sebelum kanonisasi</span>
+                  </div>
+                  <pre className="text-xs font-mono p-4 rounded-lg border border-kumo-hairline bg-kumo-recessed/30 text-kumo-default overflow-auto max-h-[500px] leading-relaxed">
+                    {JSON.stringify(data.original_source_payload, null, 2)}
                   </pre>
                 </div>
               )}

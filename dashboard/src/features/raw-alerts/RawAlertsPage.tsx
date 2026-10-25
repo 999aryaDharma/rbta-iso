@@ -82,7 +82,7 @@ export function RawAlertsPage() {
   return (
     <>
       <PageHeader
-        breadcrumbs={['Analisis', 'Daftar meta-alert', `#${id}`, 'Alert asli']}
+        breadcrumbs={['Analisis', { label: 'Daftar meta-alert', href: '/meta-alerts' }, { label: `#${id}`, href: `/meta-alerts/${id}` }, 'Alert asli']}
         title={`Alert asli dalam meta-alert #${id}`}
         description="Kejadian log keamanan yang digabung ke dalam meta-alert ini"
         actions={

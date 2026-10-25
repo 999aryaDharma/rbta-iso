@@ -1,10 +1,15 @@
-import { type ReactNode } from 'react';
+import { type ReactNode, useMemo, useState } from 'react';
 import { SidebarProvider } from '@cloudflare/kumo/components/sidebar';
 import { AppSidebar } from './Sidebar';
 import { Topbar } from './Topbar';
+import { BreadcrumbContext, type Crumb } from './BreadcrumbContext';
 
 export function AppShell({ children }: { children: ReactNode }) {
+  const [crumbs, setCrumbs] = useState<Crumb[]>([]);
+  const breadcrumbValue = useMemo(() => ({ crumbs, setCrumbs }), [crumbs]);
+
   return (
+    <BreadcrumbContext.Provider value={breadcrumbValue}>
     <SidebarProvider defaultOpen collapsible="icon" peekable>
       <div className="h-screen w-full flex bg-kumo-canvas text-kumo-default antialiased overflow-hidden">
         <AppSidebar />
@@ -17,5 +22,6 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
       </div>
     </SidebarProvider>
+    </BreadcrumbContext.Provider>
   );
 }

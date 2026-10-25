@@ -75,7 +75,7 @@ export function BucketDetailPage() {
   return (
     <>
       <PageHeader
-        breadcrumbs={['Operasi', 'Pemantauan live', bucketKey]}
+        breadcrumbs={['Operasi', { label: 'Pemantauan live', href: '/live' }, bucketKey]}
         title={`Kelompok ${bucketKey}`}
         description="Alert dalam kelompok yang masih terbuka. Isinya bertambah saat alert baru masuk, sampai kelompok ditutup menjadi meta-alert."
         actions={

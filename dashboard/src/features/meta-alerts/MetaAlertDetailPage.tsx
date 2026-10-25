@@ -5,7 +5,7 @@ import { PageHeader } from '@/components/shared/PageHeader';
 import { DecisionBadge } from '@/components/shared/DecisionBadge';
 import { formatDateTime, formatScore } from '@/lib/formatters';
 import { Hint } from '@/components/shared/Hint';
-import { TERM_HINTS, decisionLabel, featureLabel } from '@/lib/labels';
+import { TERM_HINTS, decisionLabel } from '@/lib/labels';
 import { Button } from '@cloudflare/kumo/components/button';
 import { ArrowRight } from '@phosphor-icons/react';
 import { AnalystVerdictPanel } from './AnalystVerdictPanel';
@@ -73,7 +73,7 @@ export function MetaAlertDetailPage() {
   return (
     <>
       <PageHeader
-        breadcrumbs={['Analisis', 'Daftar meta-alert', `#${id}`]}
+        breadcrumbs={['Analisis', { label: 'Daftar meta-alert', href: '/meta-alerts' }, `#${id}`]}
         title={`Meta-alert #${id}`}
         description={`Agen: ${data.agent_name} (${data.agent_id}) · Kategori aturan (Rule Group): ${data.rule_group_primary}`}
         actions={
@@ -144,21 +144,6 @@ export function MetaAlertDetailPage() {
                   <dt className="text-kumo-subtle font-medium">Tindakan:</dt>
                   <dd><DecisionBadge decision={data.decision} action={data.action} /></dd>
                 </div>
-                {data.top_deviations && data.top_deviations.length > 0 && (
-                  <div className="flex justify-between items-center py-1.5 border-b border-kumo-hairline/40">
-                    <dt
-                      className="text-kumo-subtle font-medium"
-                      title="(nilai - median reference) / IQR reference; skala 1 bila IQR reference = 0. Bukan atribusi skor Isolation Forest."
-                    >
-                      Penyebab skor tinggi (deviasi robust):
-                    </dt>
-                    <dd className="font-mono text-kumo-default text-right">
-                      {data.top_deviations
-                        .map(([name, value]) => `${featureLabel(name)?.label ?? name} (${name}) ${value >= 0 ? '+' : ''}${value.toFixed(1)}`)
-                        .join(', ')}
-                    </dd>
-                  </div>
-                )}
                 <div className="flex justify-between items-center py-1">
                   <dt className="text-kumo-subtle font-medium">Versi model:</dt>
                   <dd className="font-mono text-kumo-subtle">{data.model_version}</dd>

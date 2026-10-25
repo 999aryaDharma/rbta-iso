@@ -1,7 +1,9 @@
 import React from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link as RouterLink, useSearchParams } from 'react-router-dom';
 import { Button } from '@cloudflare/kumo/components/button';
 import { Badge } from '@cloudflare/kumo/components/badge';
+import { Breadcrumbs } from '@cloudflare/kumo/components/breadcrumbs';
+import { LinkProvider, type LinkComponentProps } from '@cloudflare/kumo';
 import {
   MagnifyingGlass, Question, Sun, Moon, Desktop, User,
 } from '@phosphor-icons/react';
@@ -10,12 +12,20 @@ import { fetchSummary } from '@/api/dashboard';
 import { useTheme } from '@/context/ThemeContext';
 import { ShortcutsModal } from './ShortcutsModal';
 import { CommandPalette } from './CommandPalette';
+import { BreadcrumbContext } from './BreadcrumbContext';
+
+// Breadcrumbs.Link Kumo mengoper `to`; arahkan ke router agar navigasi tanpa reload penuh.
+const RouterLinkAdapter = React.forwardRef<HTMLAnchorElement, LinkComponentProps>(
+  ({ href, to, ...rest }, ref) => <RouterLink ref={ref} to={to ?? href ?? ''} {...rest} />
+);
 
 export function Topbar() {
   const [searchParams] = useSearchParams();
   const runId = searchParams.get('run_id');
   const { data } = usePollingQuery(['summary-topbar', runId || 'live'], () => fetchSummary(runId || undefined), 3000);
   const { theme, setTheme } = useTheme();
+  const { crumbs } = React.useContext(BreadcrumbContext);
+  const withRunId = (path: string) => (runId ? `${path}?run_id=${encodeURIComponent(runId)}` : path);
 
   const [showShortcuts, setShowShortcuts] = React.useState(false);
   const [showPalette, setShowPalette] = React.useState(false);
@@ -48,10 +58,25 @@ export function Topbar() {
     <>
       <header className="w-full h-14 min-h-[3.5rem] flex items-center justify-between px-6 lg:px-8 border-b border-kumo-line bg-kumo-canvas shrink-0 z-20 sticky top-0">
         <div className="flex items-center gap-3 min-w-0">
-          <div className="flex items-center gap-2 text-sm font-medium text-kumo-subtle">
-            <span>Operasi keamanan</span>
-            <span>/</span>
-            <span className="text-kumo-strong font-semibold">SOC kampus</span>
+          <div className="min-w-0">
+            <LinkProvider component={RouterLinkAdapter}>
+              {/* Children harus datar (tanpa Fragment): Kumo memilih item mobile dari anak langsung. */}
+              <Breadcrumbs size="sm" className="mr-0">
+                {crumbs.flatMap((crumb, idx) => {
+                  const label = typeof crumb === 'string' ? crumb : crumb.label;
+                  const item =
+                    idx === crumbs.length - 1 ? (
+                      <Breadcrumbs.Current key={`c${idx}`}>{label}</Breadcrumbs.Current>
+                    ) : typeof crumb === 'string' ? (
+                      // Label grup tanpa halaman; disembunyikan di mobile agar tidak ditaruh Kumo setelah crumb aktif.
+                      <span key={`c${idx}`} className="hidden sm:inline shrink-0 text-kumo-subtle">{label}</span>
+                    ) : (
+                      <Breadcrumbs.Link key={`c${idx}`} href={withRunId(crumb.href)}>{label}</Breadcrumbs.Link>
+                    );
+                  return idx > 0 ? [<Breadcrumbs.Separator key={`s${idx}`} />, item] : [item];
+                })}
+              </Breadcrumbs>
+            </LinkProvider>
           </div>
 
           <span className="h-4 w-px bg-kumo-line hidden sm:inline-block shrink-0" />

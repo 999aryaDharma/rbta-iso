@@ -555,6 +555,44 @@ class RawAlertEvidenceStore:
             self._cached_count = int(row["total"]) if row else 0
             return self._cached_count
 
+    def count_scoped(
+        self,
+        agent_id: Optional[str] = None,
+        rule_group_primary: Optional[str] = None,
+        start_time: Optional[datetime] = None,
+        end_time: Optional[datetime] = None,
+    ) -> int:
+        """Jumlah raw alert dalam lingkup filter; tanpa filter memakai count() ber-cache."""
+        if not (agent_id or rule_group_primary or start_time or end_time):
+            return self.count()
+        self.flush()
+        clause, params = self._scope_sql(agent_id, rule_group_primary, start_time, end_time)
+        with self._lock:
+            row = self._get_conn().execute(
+                f"SELECT COUNT(*) AS total FROM raw_alert_evidence WHERE {clause}", params
+            ).fetchone()
+        return int(row["total"]) if row else 0
+
+    @staticmethod
+    def _scope_sql(agent_id, rule_group_primary, start_time, end_time):
+        def iso(dt: datetime) -> str:
+            return (dt.astimezone(timezone.utc) if dt.tzinfo else dt.replace(tzinfo=timezone.utc)).isoformat()
+
+        clauses, params = ["1=1"], []
+        if agent_id:
+            clauses.append("agent_id = ?")
+            params.append(agent_id)
+        if rule_group_primary:
+            clauses.append("rule_group_primary = ?")
+            params.append(rule_group_primary)
+        if start_time:
+            clauses.append("timestamp >= ?")
+            params.append(iso(start_time))
+        if end_time:
+            clauses.append("timestamp <= ?")
+            params.append(iso(end_time))
+        return " AND ".join(clauses), params
+
     def latest_agent_names(self) -> Dict[str, str]:
         """Kembalikan nama kanonis terbaru (bukan placeholder) untuk setiap agent.
 
@@ -610,6 +648,8 @@ class RawAlertEvidenceStore:
         self,
         start_time: datetime,
         end_time: datetime,
+        agent_id: Optional[str] = None,
+        rule_group_primary: Optional[str] = None,
     ) -> Dict[str, int]:
         """Agregasi jumlah raw alert ke bucket per jam UTC di dalam [start_time, end_time].
 
@@ -621,14 +661,12 @@ class RawAlertEvidenceStore:
         self.flush()
         st_utc = start_time.astimezone(timezone.utc) if start_time.tzinfo else start_time.replace(tzinfo=timezone.utc)
         et_utc = end_time.astimezone(timezone.utc) if end_time.tzinfo else end_time.replace(tzinfo=timezone.utc)
-        start_iso = st_utc.isoformat()
-        end_iso = et_utc.isoformat()
-
-        sql = "SELECT wazuh_alert_id, timestamp FROM raw_alert_evidence WHERE timestamp >= ? AND timestamp <= ?"
+        clause, params = self._scope_sql(agent_id, rule_group_primary, st_utc, et_utc)
+        sql = f"SELECT wazuh_alert_id, timestamp FROM raw_alert_evidence WHERE {clause}"
         hourly_counts: Dict[str, int] = {}
         with self._lock:
             conn = self._get_conn()
-            rows = conn.execute(sql, (start_iso, end_iso)).fetchall()
+            rows = conn.execute(sql, params).fetchall()
             for r in rows:
                 ts_raw = r["timestamp"]
                 try:

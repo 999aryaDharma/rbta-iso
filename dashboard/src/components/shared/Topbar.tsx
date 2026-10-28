@@ -81,19 +81,17 @@ export function Topbar() {
 
           <span className="h-4 w-px bg-kumo-line hidden sm:inline-block shrink-0" />
 
-          <div className="flex items-center gap-2 text-xs">
-            {runId ? (
-              <Badge variant="warning">REPLAY: {runId.slice(0, 8)}</Badge>
-            ) : (
-              <Badge variant="success">DATA LANGSUNG</Badge>
-            )}
-
-            <span className="hidden lg:inline-flex">
-              <Badge variant={data?.system_status === 'READY' ? 'secondary' : 'error'}>
-                {data?.system_status === 'READY' ? 'SISTEM SIAP' : 'TERGANGGU'}
-              </Badge>
-            </span>
-          </div>
+          {/* Mode live dan sistem siap adalah keadaan normal, jadi tidak ditampilkan; hanya penyimpangan yang muncul. */}
+          {(runId || (data && data.system_status !== 'READY')) && (
+            <div className="flex items-center gap-2 text-xs">
+              {runId && <Badge variant="warning">REPLAY: {runId.slice(0, 8)}</Badge>}
+              {data && data.system_status !== 'READY' && (
+                <span className="hidden lg:inline-flex">
+                  <Badge variant="error">TERGANGGU</Badge>
+                </span>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="flex items-center gap-2.5">

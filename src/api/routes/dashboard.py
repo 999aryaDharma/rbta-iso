@@ -9,6 +9,7 @@ from src.runtime.observability import (
     get_dashboard_agents,
     get_dashboard_bucket_raw_alerts,
     get_dashboard_buckets,
+    get_dashboard_filter_options,
     get_dashboard_integrations,
     get_dashboard_summary,
     get_dashboard_system,
@@ -25,11 +26,25 @@ def _get_resolver(request: Request) -> DashboardRuntimeResolver:
 @router.get("/summary")
 def dashboard_summary(
     run_id: Optional[str] = Query(None, description="Optional replay run context ID"),
+    agent_id: Optional[str] = Query(None, description="Filter lingkup: agent ID"),
+    rule_group_primary: Optional[str] = Query(None, description="Filter lingkup: rule group primer"),
+    start: Optional[datetime] = Query(None, description="Filter lingkup: awal rentang"),
+    end: Optional[datetime] = Query(None, description="Filter lingkup: akhir rentang"),
     resolver: DashboardRuntimeResolver = Depends(_get_resolver),
     api_key: str = Depends(get_api_key),
 ) -> Dict[str, Any]:
     service, evidence_store, _ = resolver.resolve(run_id)
-    return get_dashboard_summary(service, evidence_store)
+    return get_dashboard_summary(service, evidence_store, agent_id, rule_group_primary, start, end)
+
+
+@router.get("/filters")
+def dashboard_filters(
+    run_id: Optional[str] = Query(None, description="Optional replay run context ID"),
+    resolver: DashboardRuntimeResolver = Depends(_get_resolver),
+    api_key: str = Depends(get_api_key),
+) -> Dict[str, Any]:
+    service, _, _ = resolver.resolve(run_id)
+    return get_dashboard_filter_options(service)
 
 
 @router.get("/agents")
@@ -79,6 +94,8 @@ def dashboard_timeseries(
     window_hours: int = Query(24, ge=1, le=168, description="Time series lookback window in hours"),
     start: Optional[datetime] = Query(None, description="Custom range start (overrides window_hours)"),
     end: Optional[datetime] = Query(None, description="Custom range end (inclusive)"),
+    agent_id: Optional[str] = Query(None, description="Filter lingkup: agent ID"),
+    rule_group_primary: Optional[str] = Query(None, description="Filter lingkup: rule group primer"),
     run_id: Optional[str] = Query(None, description="Optional replay run context ID"),
     resolver: DashboardRuntimeResolver = Depends(_get_resolver),
     api_key: str = Depends(get_api_key),
@@ -91,7 +108,10 @@ def dashboard_timeseries(
         if b < a or (b - a).days > 31:
             raise HTTPException(status_code=422, detail="range must be 0-31 days with end >= start")
     service, evidence_store, _ = resolver.resolve(run_id)
-    return get_dashboard_timeseries(service, evidence_store, window_hours=window_hours, start=start, end=end)
+    return get_dashboard_timeseries(
+        service, evidence_store, window_hours=window_hours, start=start, end=end,
+        agent_id=agent_id, rule_group_primary=rule_group_primary,
+    )
 
 
 @router.get("/system")

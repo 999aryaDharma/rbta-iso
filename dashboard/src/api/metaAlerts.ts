@@ -8,6 +8,9 @@ export interface MetaAlertsQueryParams {
   decision?: string;
   action?: string;
   agent_id?: string;
+  rule_group_primary?: string;
+  start?: string;
+  end?: string;
   search?: string;
   sort_by?: string;
   sort_order?: 'asc' | 'desc';
@@ -21,6 +24,9 @@ export async function fetchMetaAlerts(params: MetaAlertsQueryParams = {}): Promi
   if (params.decision) queryParams.set('decision', params.decision);
   if (params.action) queryParams.set('action', params.action);
   if (params.agent_id) queryParams.set('agent_id', params.agent_id);
+  if (params.rule_group_primary) queryParams.set('rule_group_primary', params.rule_group_primary);
+  if (params.start) queryParams.set('start', params.start);
+  if (params.end) queryParams.set('end', params.end);
   if (params.search) queryParams.set('search', params.search);
   if (params.sort_by) queryParams.set('sort_by', params.sort_by);
   if (params.sort_order) queryParams.set('sort_order', params.sort_order);

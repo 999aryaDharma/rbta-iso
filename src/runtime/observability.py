@@ -42,25 +42,60 @@ def derive_system_status(service: Optional[LiveRBTAService]) -> Tuple[str, List[
     return "READY", []
 
 
+def _in_scope(m: Any, agent_id: Optional[str], rule_group_primary: Optional[str],
+              start: Optional[datetime], end: Optional[datetime]) -> bool:
+    """Filter lingkup untuk MetaAlert di memori (ekor yang belum masuk SQLite)."""
+    if agent_id and m.agent_id != agent_id:
+        return False
+    if rule_group_primary and m.rule_group_primary != rule_group_primary:
+        return False
+    if start and not (m.end_time and m.end_time >= start):
+        return False
+    return not (end and not (m.end_time and m.end_time <= end))
+
+
+def get_dashboard_filter_options(service: LiveRBTAService) -> Dict[str, Any]:
+    """Pilihan filter dashboard: agen dan rule group yang pernah menjadi MetaAlert final."""
+    opts = service.state_manager.finalized_filter_options()
+    agents = {a["agent_id"]: a for a in opts["agents"]}
+    groups = set(opts["rule_groups"])
+    for m in service.unpersisted_history():
+        agents.setdefault(m.agent_id, {"agent_id": m.agent_id, "agent_name": m.agent_name})
+        groups.add(m.rule_group_primary)
+    return {"agents": sorted(agents.values(), key=lambda a: a["agent_id"]), "rule_groups": sorted(groups)}
+
+
 def get_dashboard_summary(
     service: LiveRBTAService,
     evidence_store: RawAlertEvidenceStore,
+    agent_id: Optional[str] = None,
+    rule_group_primary: Optional[str] = None,
+    start: Optional[datetime] = None,
+    end: Optional[datetime] = None,
 ) -> Dict[str, Any]:
     """Susun KPI ringkasan dashboard (murni read-only) memakai metrik penelitian kanonis."""
-    raw_count = evidence_store.count()
-    history = list(service.finalized_history)
-    meta_count = len(history)
+    scope = dict(agent_id=agent_id, rule_group_primary=rule_group_primary, start=start, end=end)
+    raw_count = evidence_store.count_scoped(agent_id, rule_group_primary, start, end)
+    # SQLite = sumber kebenaran; finalized_history di memori hanya cache 1000 terakhir.
+    # Ekor yang belum di-checkpoint belum ada di SQLite, jadi ditambahkan dari memori.
+    totals = service.state_manager.summarize_finalized(**scope)
+    tail = [m for m in service.unpersisted_history() if _in_scope(m, **scope)]
+    meta_count = totals["meta_count"] + len(tail)
 
     arr_val = compute_arr(raw_count, meta_count) if raw_count > 0 and meta_count <= raw_count else None
     arr_percent = round(arr_val, 2) if arr_val is not None else None
 
-    escalate_count = sum(1 for m in history if m.action == "ESCALATE")
-    digest_count = sum(1 for m in history if m.action == "DAILY_DIGEST")
-    suppress_count = sum(1 for m in history if m.action == "SUPPRESS")
-    critical_count = sum(1 for m in history if m.decision == "CRITICAL")
-    anomalies_count = sum(1 for m in history if m.anomaly_score >= m.threshold_used)
+    escalate_count = totals["escalate"] + sum(1 for m in tail if m.action == "ESCALATE")
+    digest_count = totals["digest"] + sum(1 for m in tail if m.action == "DAILY_DIGEST")
+    suppress_count = totals["suppress"] + sum(1 for m in tail if m.action == "SUPPRESS")
+    critical_count = totals["critical"] + sum(1 for m in tail if m.decision == "CRITICAL")
+    anomalies_count = totals["anomalies"] + sum(1 for m in tail if m.anomaly_score >= m.threshold_used)
 
-    active_buckets = service.engine.snapshot_buckets()
+    active_buckets = [
+        b for b in service.engine.snapshot_buckets()
+        if (not agent_id or b.get("agent_id") == agent_id)
+        and (not rule_group_primary or b.get("rule_group_primary") == rule_group_primary)
+    ]
     status, _ = derive_system_status(service)
 
     return {
@@ -134,10 +169,13 @@ def get_dashboard_bucket_raw_alerts(
     """
     members = service.engine.active_bucket_members(agent_id, rule_group_primary)
     if members is None:
-        finalized_meta_id: Optional[int] = None
-        for meta in service.finalized_history:
-            if meta.agent_id == agent_id and meta.rule_group_primary == rule_group_primary:
-                finalized_meta_id = meta.meta_id
+        finalized_meta_id: Optional[int] = next(
+            (m.meta_id for m in reversed(service.unpersisted_history())
+             if m.agent_id == agent_id and m.rule_group_primary == rule_group_primary),
+            None,
+        )
+        if finalized_meta_id is None:
+            finalized_meta_id = service.state_manager.latest_finalized_meta_id(agent_id, rule_group_primary)
         raise BucketNotActiveError(agent_id, rule_group_primary, finalized_meta_id)
     reserved_meta_id, alert_ids = members
     resolved = evidence_store.get_meta_alert_raw_alerts(
@@ -158,6 +196,8 @@ def get_dashboard_timeseries(
     window_hours: int = 24,
     start: Optional[datetime] = None,
     end: Optional[datetime] = None,
+    agent_id: Optional[str] = None,
+    rule_group_primary: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
     """Susun deret waktu raw alert yang masuk vs MetaAlert yang sudah final.
 
@@ -186,17 +226,20 @@ def get_dashboard_timeseries(
         }
 
     # Isi raw alert langsung dari raw evidence store.
-    raw_hourly = evidence_store.count_by_hour(start_time, now)
+    raw_hourly = evidence_store.count_by_hour(start_time, now, agent_id, rule_group_primary)
     for k, v in raw_hourly.items():
         if k in bins:
             bins[k]["raw_alerts"] = v
 
-    # Isi MetaAlert final.
-    for m in service.finalized_history:
-        if m.end_time and start_time <= m.end_time <= now:
-            bin_key = m.end_time.strftime("%Y-%m-%d %H:00")
-            if bin_key in bins:
-                bins[bin_key]["meta_alerts"] += 1
+    # Isi MetaAlert final: SQLite + ekor yang belum di-checkpoint.
+    meta_hourly = service.state_manager.count_finalized_by_hour(agent_id=agent_id, rule_group_primary=rule_group_primary)
+    for m in service.unpersisted_history():
+        if m.end_time and start_time <= m.end_time <= now and _in_scope(m, agent_id, rule_group_primary, None, None):
+            k = m.end_time.strftime("%Y-%m-%d %H:00")
+            meta_hourly[k] = meta_hourly.get(k, 0) + 1
+    for k, v in meta_hourly.items():
+        if k in bins:
+            bins[k]["meta_alerts"] = v
 
     return list(bins.values())
 

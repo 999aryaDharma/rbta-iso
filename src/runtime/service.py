@@ -409,6 +409,14 @@ class LiveRBTAService:
     def get_history(self) -> List[ScoredMetaAlert]:
         return list(self.finalized_history)
 
+    def unpersisted_history(self) -> List[ScoredMetaAlert]:
+        """MetaAlert final yang belum masuk SQLite (ekor sejak checkpoint terakhir)."""
+        return self.finalized_history[self._last_persisted_history_idx:]
+
+    def finalized_total(self) -> int:
+        """Jumlah seluruh MetaAlert final; cache memori dipotong, SQLite tidak."""
+        return self.state_manager.count_finalized() + len(self.unpersisted_history())
+
     def query_history(self, **filters: Any) -> tuple[List[ScoredMetaAlert], int]:
         raw_items, total = self.state_manager.query_finalized(**filters)
         items = [parsed for raw in raw_items if (parsed := self._parse_scored_alert(raw)) is not None]

@@ -681,7 +681,7 @@ class ReplayController:
             if self.current_service:
                 active_buckets = len(self.current_service.engine._active_buckets) if hasattr(self.current_service.engine, "_active_buckets") else 0
                 active_agents = len(self.current_service.engine._temporal_states) if hasattr(self.current_service.engine, "_temporal_states") else 0
-                finalized_count = len(self.current_service.finalized_history)
+                finalized_count = self.current_service.finalized_total()
 
             evidence_count = self.current_evidence_store.count() if self.current_evidence_store else self.processed_count
             telegram_count = self.escalation_sink.get_total_count() if self.escalation_sink else 0

@@ -219,6 +219,96 @@ class DurableStateManager:
             rows = cursor.fetchall()
         return [json.loads(row[0]) for row in rows]
 
+    @staticmethod
+    def _scope_where(agent_id=None, rule_group_primary=None, start=None, end=None):
+        """Klausa WHERE untuk filter lingkup dashboard; end_time disimpan sebagai ISO UTC."""
+        def iso(dt: datetime) -> str:
+            return (dt.astimezone(timezone.utc) if dt.tzinfo else dt.replace(tzinfo=timezone.utc)).isoformat()
+
+        clauses, params = [], []
+        for field, value in (("agent_id", agent_id), ("rule_group_primary", rule_group_primary)):
+            if value:
+                clauses.append(f"json_extract(scored_data, '$.{field}') = ?")
+                params.append(value)
+        if start:
+            clauses.append("json_extract(scored_data, '$.end_time') >= ?")
+            params.append(iso(start))
+        if end:
+            clauses.append("json_extract(scored_data, '$.end_time') <= ?")
+            params.append(iso(end))
+        return (" WHERE " + " AND ".join(clauses)) if clauses else "", params
+
+    def finalized_filter_options(self) -> Dict[str, Any]:
+        """Agen dan rule group yang pernah muncul di history (untuk pilihan filter)."""
+        if not self.history_db_path.exists():
+            return {"agents": [], "rule_groups": []}
+        with sqlite3.connect(self.history_db_path) as conn:
+            agents = conn.execute(
+                "SELECT json_extract(scored_data, '$.agent_id'), MAX(json_extract(scored_data, '$.agent_name'))"
+                " FROM finalized_history GROUP BY 1 ORDER BY 1"
+            ).fetchall()
+            groups = conn.execute(
+                "SELECT DISTINCT json_extract(scored_data, '$.rule_group_primary') FROM finalized_history ORDER BY 1"
+            ).fetchall()
+        return {
+            "agents": [{"agent_id": a, "agent_name": n or a} for a, n in agents if a],
+            "rule_groups": [g[0] for g in groups if g[0]],
+        }
+
+    def summarize_finalized(self, **scope: Any) -> Dict[str, int]:
+        """Hitung KPI dari seluruh history SQLite (bukan cache memori yang dipotong)."""
+        keys = ("meta_count", "escalate", "digest", "suppress", "critical", "anomalies")
+        if not self.history_db_path.exists():
+            return dict.fromkeys(keys, 0)
+        where, params = self._scope_where(**scope)
+        with sqlite3.connect(self.history_db_path) as conn:
+            row = conn.execute(
+                """
+                SELECT COUNT(*),
+                  COALESCE(SUM(json_extract(scored_data, '$.action') = 'ESCALATE'), 0),
+                  COALESCE(SUM(json_extract(scored_data, '$.action') = 'DAILY_DIGEST'), 0),
+                  COALESCE(SUM(json_extract(scored_data, '$.action') = 'SUPPRESS'), 0),
+                  COALESCE(SUM(json_extract(scored_data, '$.decision') = 'CRITICAL'), 0),
+                  COALESCE(SUM(CAST(json_extract(scored_data, '$.anomaly_score') AS REAL)
+                      >= CAST(json_extract(scored_data, '$.threshold_used') AS REAL)), 0)
+                FROM finalized_history""" + where,
+                params,
+            ).fetchone()
+        return dict(zip(keys, (int(v) for v in row)))
+
+    def count_finalized(self) -> int:
+        if not self.history_db_path.exists():
+            return 0
+        with sqlite3.connect(self.history_db_path) as conn:
+            return int(conn.execute("SELECT COUNT(*) FROM finalized_history").fetchone()[0])
+
+    def latest_finalized_meta_id(self, agent_id: str, rule_group_primary: str) -> Optional[int]:
+        """meta_id final terbaru untuk bucket key ini, dari seluruh history SQLite."""
+        if not self.history_db_path.exists():
+            return None
+        with sqlite3.connect(self.history_db_path) as conn:
+            row = conn.execute(
+                "SELECT meta_id FROM finalized_history"
+                " WHERE json_extract(scored_data, '$.agent_id') = ?"
+                " AND json_extract(scored_data, '$.rule_group_primary') = ?"
+                " ORDER BY meta_id DESC LIMIT 1",
+                (agent_id, rule_group_primary),
+            ).fetchone()
+        return int(row[0]) if row else None
+
+    def count_finalized_by_hour(self, **scope: Any) -> Dict[str, int]:
+        """Jumlah MetaAlert final per jam (kunci 'YYYY-MM-DD HH:00') dari end_time."""
+        if not self.history_db_path.exists():
+            return {}
+        where, params = self._scope_where(**scope)
+        with sqlite3.connect(self.history_db_path) as conn:
+            rows = conn.execute(
+                "SELECT substr(json_extract(scored_data, '$.end_time'), 1, 13), COUNT(*) "
+                "FROM finalized_history" + where + " GROUP BY 1",
+                params,
+            ).fetchall()
+        return {f"{h.replace('T', ' ')}:00": int(n) for h, n in rows if h}
+
     def get_finalized(self, meta_id: int) -> Optional[Dict[str, Any]]:
         with sqlite3.connect(self.history_db_path) as conn:
             row = conn.execute(
@@ -234,6 +324,9 @@ class DurableStateManager:
         decision: Optional[str] = None,
         action: Optional[str] = None,
         agent_id: Optional[str] = None,
+        rule_group_primary: Optional[str] = None,
+        start: Optional[datetime] = None,
+        end: Optional[datetime] = None,
         search: Optional[str] = None,
         sort_by: str = "end_time",
         sort_order: str = "desc",
@@ -251,10 +344,14 @@ class DurableStateManager:
         direction = "ASC" if sort_order.lower() == "asc" else "DESC"
         clauses: List[str] = []
         params: List[Any] = []
-        for field, value in (("decision", decision), ("action", action), ("agent_id", agent_id)):
+        for field, value in (("decision", decision), ("action", action)):
             if value:
                 clauses.append(f"json_extract(scored_data, '$.{field}') = ?")
                 params.append(value)
+        scope_where, scope_params = self._scope_where(agent_id, rule_group_primary, start, end)
+        if scope_where:
+            clauses.append(scope_where[len(" WHERE "):])
+            params.extend(scope_params)
         if search and search.strip():
             clauses.append("(CAST(meta_id AS TEXT) LIKE ? OR lower(json_extract(scored_data, '$.rule_group_primary')) LIKE ? OR lower(json_extract(scored_data, '$.agent_name')) LIKE ? OR lower(json_extract(scored_data, '$.agent_id')) LIKE ?)")
             needle = f"%{search.strip().lower()}%"

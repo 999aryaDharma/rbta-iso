@@ -276,3 +276,83 @@ def test_replay_run_provenance_uses_exact_model_version(tmp_path: Path, test_sco
 
     assert meta_data["model_version"] == "rbta-truth-v42"
     assert meta_data["model_version"] != "v1"
+
+
+def test_summary_counts_full_history_beyond_memory_cap(tmp_path: Path, test_scoring_pipeline):
+    """KPI Overview harus menghitung seluruh SQLite, bukan cache memori RECENT_HISTORY_LIMIT."""
+    state_mgr = DurableStateManager(tmp_path / "state.json")
+    evidence_store = RawAlertEvidenceStore(tmp_path / "evidence.sqlite3")
+    service = LiveRBTAService(
+        scoring_pipeline=test_scoring_pipeline,
+        state_manager=state_mgr,
+        raw_evidence_store=evidence_store,
+    )
+    total = service.RECENT_HISTORY_LIMIT + 50
+    t0 = datetime(2026, 8, 29, 10, 0, 0, tzinfo=timezone.utc)
+    state_mgr.append_finalized([
+        {
+            "meta_id": i, "action": "SUPPRESS", "decision": "NOISE", "anomaly_score": 0.1,
+            "threshold_used": 0.5, "end_time": (t0 + timedelta(minutes=i)).isoformat(),
+        }
+        for i in range(1, total + 1)
+    ])
+
+    assert get_dashboard_summary(service, evidence_store)["meta_alert_count"] == total
+    series = get_dashboard_timeseries(service, evidence_store, start=t0, end=t0 + timedelta(hours=30))
+    assert sum(b["meta_alerts"] for b in series) == total
+
+
+def test_inactive_bucket_and_finalized_total_use_full_history(tmp_path: Path, test_scoring_pipeline):
+    """Lookup meta_id bucket nonaktif dan total final tidak boleh bergantung pada cache 1000."""
+    from src.runtime.observability import BucketNotActiveError, get_dashboard_bucket_raw_alerts
+    state_mgr = DurableStateManager(tmp_path / "state.json")
+    evidence_store = RawAlertEvidenceStore(tmp_path / "evidence.sqlite3")
+    service = LiveRBTAService(
+        scoring_pipeline=test_scoring_pipeline, state_manager=state_mgr, raw_evidence_store=evidence_store
+    )
+    t0 = datetime(2026, 8, 29, 10, 0, 0, tzinfo=timezone.utc)
+    state_mgr.append_finalized([
+        {"meta_id": i, "agent_id": "777" if i == 1 else "001", "rule_group_primary": "pam",
+         "end_time": (t0 + timedelta(minutes=i)).isoformat()}
+        for i in range(1, service.RECENT_HISTORY_LIMIT + 51)
+    ])
+    assert service.finalized_total() == service.RECENT_HISTORY_LIMIT + 50
+    with pytest.raises(BucketNotActiveError) as exc:
+        get_dashboard_bucket_raw_alerts(service, evidence_store, "777", "pam")
+    assert exc.value.finalized_meta_id == 1
+
+
+def test_summary_and_timeseries_respect_scope_filters(tmp_path: Path, test_scoring_pipeline):
+    """Filter agen/rule group/rentang menyempit ke KPI, tren, dan opsi filter."""
+    from src.runtime.observability import get_dashboard_filter_options
+    state_mgr = DurableStateManager(tmp_path / "state.json")
+    evidence_store = RawAlertEvidenceStore(tmp_path / "evidence.sqlite3")
+    service = LiveRBTAService(
+        scoring_pipeline=test_scoring_pipeline, state_manager=state_mgr, raw_evidence_store=evidence_store
+    )
+    t0 = datetime(2026, 8, 29, 10, 0, 0, tzinfo=timezone.utc)
+    rows = [("001", "pam", "ESCALATE", 0), ("001", "sshd", "SUPPRESS", 1), ("002", "pam", "SUPPRESS", 2)]
+    state_mgr.append_finalized([
+        {"meta_id": i + 1, "agent_id": a, "agent_name": f"host-{a}", "rule_group_primary": g,
+         "action": act, "decision": "NOISE", "anomaly_score": 0.1, "threshold_used": 0.5,
+         "end_time": (t0 + timedelta(hours=h)).isoformat()}
+        for i, (a, g, act, h) in enumerate(rows)
+    ])
+    for i in range(6):
+        evidence_store.store(_make_test_alert(i, t0 + timedelta(minutes=i)))
+
+    assert get_dashboard_summary(service, evidence_store)["meta_alert_count"] == 3
+    one = get_dashboard_summary(service, evidence_store, agent_id="001")
+    assert one["meta_alert_count"] == 2 and one["escalate_count"] == 1
+    assert one["raw_alert_count"] == 2  # agent 001: alert ke-0 dan ke-3
+    pam = get_dashboard_summary(service, evidence_store, agent_id="001", rule_group_primary="pam")
+    assert pam["meta_alert_count"] == 1
+    ranged = get_dashboard_summary(service, evidence_store, start=t0 + timedelta(hours=1), end=t0 + timedelta(hours=3))
+    assert ranged["meta_alert_count"] == 2
+
+    series = get_dashboard_timeseries(service, evidence_store, start=t0, end=t0 + timedelta(hours=3), agent_id="002")
+    assert sum(b["meta_alerts"] for b in series) == 1
+
+    opts = get_dashboard_filter_options(service)
+    assert {a["agent_id"] for a in opts["agents"]} == {"001", "002"}
+    assert opts["rule_groups"] == ["pam", "sshd"]

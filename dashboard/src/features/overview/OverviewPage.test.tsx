@@ -5,7 +5,8 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { OverviewPage } from './OverviewPage';
 
-const { mockFetchSummary, mockFetchTimeseries, mockFetchMetaAlerts } = vi.hoisted(() => ({
+const { mockFetchSummary, mockFetchTimeseries, mockFetchMetaAlerts, mockFetchFilterOptions } = vi.hoisted(() => ({
+  mockFetchFilterOptions: vi.fn(),
   mockFetchSummary: vi.fn(),
   mockFetchTimeseries: vi.fn(),
   mockFetchMetaAlerts: vi.fn(),
@@ -14,6 +15,7 @@ const { mockFetchSummary, mockFetchTimeseries, mockFetchMetaAlerts } = vi.hoiste
 vi.mock('@/api/dashboard', () => ({
   fetchSummary: mockFetchSummary,
   fetchTimeseries: mockFetchTimeseries,
+  fetchFilterOptions: mockFetchFilterOptions,
 }));
 
 vi.mock('@/api/metaAlerts', () => ({
@@ -48,6 +50,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mockFetchSummary.mockResolvedValue(summary);
   mockFetchTimeseries.mockResolvedValue([]);
+  mockFetchFilterOptions.mockResolvedValue({ agents: [{ agent_id: '001', agent_name: 'web-01' }], rule_groups: ['pam'] });
   mockFetchMetaAlerts.mockResolvedValue({ items: [], total: 0 });
 });
 
@@ -86,5 +89,21 @@ describe('OverviewPage kosakata Replay-vs-Live', () => {
     await screen.findByRole('heading', { name: /ringkasan replay/i });
     expect(screen.getAllByText(/pengurangan jumlah yang perlu dicek analyst, bukan akurasi/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/skor.*prioritas.*bukan vonis serangan/i).length).toBeGreaterThan(0);
+  });
+});
+
+describe('OverviewPage antrean dan filter', () => {
+  it('meminta antrean ESCALATE urut skor dan menampilkan keadaan kosong', async () => {
+    renderAt('/');
+    expect(await screen.findByText(/tidak ada meta-alert yang perlu dicek saat ini/i)).toBeInTheDocument();
+    const queueCall = mockFetchMetaAlerts.mock.calls.find(([p]) => p.action === 'ESCALATE');
+    expect(queueCall?.[0]).toMatchObject({ page_size: 5, sort_by: 'anomaly_score', sort_order: 'desc' });
+  });
+
+  it('memuat pilihan filter dari backend', async () => {
+    renderAt('/');
+    await screen.findByRole('heading', { name: /ringkasan live/i });
+    expect(mockFetchFilterOptions).toHaveBeenCalled();
+    expect(await screen.findByText('Semua waktu')).toBeInTheDocument();
   });
 });

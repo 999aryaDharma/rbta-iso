@@ -219,7 +219,7 @@ def create_app(
             "temporal_agents": len(service.engine.snapshot_agents()),
             "seen_alerts_count": seen_cnt,
             "outbox_count": len(service.outbox),
-            "finalized_history_count": len(service.finalized_history),
+            "finalized_history_count": service.finalized_total(),
             "pending_scoring_count": len(service.pending_scoring),
             "raw_evidence_count": app.state.raw_evidence_store.count() if app.state.raw_evidence_store else 0,
         }

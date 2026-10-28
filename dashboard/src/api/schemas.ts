@@ -17,6 +17,13 @@ export const DashboardSummarySchema = z.object({
 
 export type DashboardSummary = z.infer<typeof DashboardSummarySchema>;
 
+export const FilterOptionsSchema = z.object({
+  agents: z.array(z.object({ agent_id: z.string(), agent_name: z.string() })),
+  rule_groups: z.array(z.string()),
+});
+
+export type FilterOptions = z.infer<typeof FilterOptionsSchema>;
+
 export const AgentStateSchema = z.object({
   agent_id: z.string(),
   agent_name: z.string(),

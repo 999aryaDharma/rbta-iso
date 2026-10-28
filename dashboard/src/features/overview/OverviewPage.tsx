@@ -1,16 +1,16 @@
 import { useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { usePollingQuery } from '@/hooks/usePolling';
-import { fetchSummary, fetchTimeseries } from '@/api/dashboard';
+import { fetchSummary, fetchTimeseries, fetchFilterOptions, type OverviewScope } from '@/api/dashboard';
 import { fetchMetaAlerts } from '@/api/metaAlerts';
 import { resolveLiveContext } from '@/features/live/liveContext';
-import { MetricCard } from '@/components/shared/MetricCard';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { DecisionBadge } from '@/components/shared/DecisionBadge';
+import { Hint } from '@/components/shared/Hint';
 import { formatNumber, formatDateTime, formatScore } from '@/lib/formatters';
 import { ACTION_LABELS, TERM_HINTS, TERMS } from '@/lib/labels';
 import { Button } from '@cloudflare/kumo/components/button';
-import { Badge } from '@cloudflare/kumo/components/badge';
+import { Select } from '@cloudflare/kumo/components/select';
 import { Table } from '@cloudflare/kumo/components/table';
 import { DatePicker, type DateRange } from '@cloudflare/kumo/components/date-picker';
 import { WarningCircle, ArrowRight, CalendarBlank } from '@phosphor-icons/react';
@@ -18,37 +18,90 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts';
 
+const ALL = '__all__';
+
+function Kpi({ label, value, sub, hint, onClick }: {
+  label: string;
+  value: string;
+  sub: string;
+  hint?: string;
+  onClick?: () => void;
+}) {
+  const body = (
+    <>
+      <span className="text-sm text-kumo-subtle">{label}{hint && <Hint text={hint} />}</span>
+      <span className="font-mono text-2xl font-semibold text-kumo-strong">{value}</span>
+      <span className="text-sm text-kumo-subtle">{sub}</span>
+    </>
+  );
+  const cls = 'grid gap-1.5 rounded-xl bg-kumo-canvas px-5 py-4 ring ring-kumo-line text-left';
+  return onClick ? (
+    <button type="button" onClick={onClick} className={`${cls} hover:bg-kumo-recessed`}>{body}</button>
+  ) : (
+    <div className={cls}>{body}</div>
+  );
+}
+
+function SectionTitle({ title, description }: { title: string; description?: string }) {
+  return (
+    <div className="grid gap-1.5">
+      <h2 className="text-base font-semibold text-kumo-strong">{title}</h2>
+      {description && <p className="text-sm text-kumo-subtle">{description}</p>}
+    </div>
+  );
+}
+
 export function OverviewPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const runId = searchParams.get('run_id');
-
   const withRunId = (path: string) => (runId ? `${path}${path.includes('?') ? '&' : '?'}run_id=${encodeURIComponent(runId)}` : path);
 
-  const { data: summary } = usePollingQuery(['summary', runId || 'live'], () => fetchSummary(runId || undefined), 3000);
   const [range, setRange] = useState<DateRange | undefined>();
   const [pickerOpen, setPickerOpen] = useState(false);
-  // Rentang kustom dikirim sebagai awal hari s/d akhir hari (UTC, sesuai bin per jam di backend).
+  const [agentId, setAgentId] = useState(ALL);
+  const [ruleGroup, setRuleGroup] = useState(ALL);
+
+  // Rentang kustom = awal hari s/d akhir hari (UTC, sesuai bin per jam di backend).
   const rangeParam = range?.from
     ? {
         start: `${range.from.toLocaleDateString('sv')}T00:00:00Z`,
         end: `${(range.to ?? range.from).toLocaleDateString('sv')}T23:59:59Z`,
       }
     : undefined;
+  const scope: OverviewScope = {
+    ...rangeParam,
+    agent_id: agentId === ALL ? undefined : agentId,
+    rule_group_primary: ruleGroup === ALL ? undefined : ruleGroup,
+  };
+  const scopeKey = JSON.stringify(scope);
+  const isFiltered = Object.values(scope).some(Boolean);
+
+  const { data: options } = usePollingQuery(['overview-filters', runId || 'live'], () => fetchFilterOptions(runId || undefined), 30000);
+  const { data: summary, isError: summaryError } = usePollingQuery(
+    ['summary', runId || 'live', scopeKey],
+    () => fetchSummary(runId || undefined, scope),
+    3000,
+  );
   const { data: timeseries } = usePollingQuery(
-    ['timeseries', runId || 'live', rangeParam?.start ?? '', rangeParam?.end ?? ''],
-    () => fetchTimeseries(24, runId || undefined, rangeParam),
+    ['timeseries', runId || 'live', scopeKey],
+    () => fetchTimeseries(24, runId || undefined, scope),
+    5000,
+  );
+  const { data: queue } = usePollingQuery(
+    ['overview-queue', runId || 'live', scopeKey],
+    () => fetchMetaAlerts({ ...scope, action: 'ESCALATE', page: 1, page_size: 5, sort_by: 'anomaly_score', sort_order: 'desc', run_id: runId || undefined }),
     5000,
   );
   const { data: recentMetas } = usePollingQuery(
-    ['meta-alerts-recent', runId || 'live'],
-    () => fetchMetaAlerts({ page: 1, page_size: 10, sort_by: 'end_time', sort_order: 'desc', run_id: runId || undefined }),
+    ['meta-alerts-recent', runId || 'live', scopeKey],
+    () => fetchMetaAlerts({ ...scope, page: 1, page_size: 10, sort_by: 'end_time', sort_order: 'desc', run_id: runId || undefined }),
     5000,
   );
 
-  const needsInvestigation = recentMetas?.items.filter((m) => m.action === 'ESCALATE') || [];
-  const mode = resolveLiveContext(runId);
-  const isReplay = mode === 'replay';
+  const isReplay = resolveLiveContext(runId) === 'replay';
+  const num = (v: number | undefined) => (summary && v !== undefined ? formatNumber(v) : '-');
+  const reset = () => { setRange(undefined); setPickerOpen(false); setAgentId(ALL); setRuleGroup(ALL); };
 
   return (
     <>
@@ -62,90 +115,139 @@ export function OverviewPage() {
         }
       />
 
-      <div className="px-6 py-8 lg:px-10 space-y-8">
-        <p className="text-xs text-kumo-subtle leading-relaxed border border-kumo-hairline bg-kumo-canvas rounded-xl px-4 py-3">
+      <div className="sticky top-0 z-10 border-b border-kumo-line bg-kumo-canvas px-6 py-3 lg:px-10">
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="secondary" size="sm" onClick={() => setPickerOpen((o) => !o)}>
+            <CalendarBlank size={14} className="mr-1" />
+            {rangeParam
+              ? `${range!.from!.toLocaleDateString('sv')} – ${(range!.to ?? range!.from!).toLocaleDateString('sv')}`
+              : 'Semua waktu'}
+          </Button>
+          <Select
+            size="sm"
+            value={agentId}
+            onValueChange={(v) => setAgentId(v as string)}
+            placeholder="Semua agen"
+          >
+            <Select.Option value={ALL}>Semua agen</Select.Option>
+            {(options?.agents ?? []).map((a) => (
+              <Select.Option key={a.agent_id} value={a.agent_id}>{a.agent_name} ({a.agent_id})</Select.Option>
+            ))}
+          </Select>
+          <Select
+            size="sm"
+            value={ruleGroup}
+            onValueChange={(v) => setRuleGroup(v as string)}
+            placeholder="Semua kategori aturan"
+          >
+            <Select.Option value={ALL}>Semua kategori aturan</Select.Option>
+            {(options?.rule_groups ?? []).map((g) => (
+              <Select.Option key={g} value={g}>{g}</Select.Option>
+            ))}
+          </Select>
+          {isFiltered && (
+            <Button variant="ghost" size="sm" onClick={reset}>Reset filter</Button>
+          )}
+        </div>
+        {pickerOpen && (
+          <div className="mt-3 flex">
+            <DatePicker mode="range" selected={range} onChange={setRange} numberOfMonths={2} />
+          </div>
+        )}
+      </div>
+
+      <div className="grid gap-8 px-6 py-8 lg:px-10">
+        <p className="text-sm text-kumo-subtle">
           {isReplay
             ? `Konteks replay: data historis (sesi ${runId}). ARR = pengurangan jumlah yang perlu dicek analyst, bukan akurasi; skor = prioritas, bukan vonis serangan.`
             : 'Konteks live: data langsung dari Indexer/API. ARR = pengurangan jumlah yang perlu dicek analyst, bukan akurasi; skor = prioritas, bukan vonis serangan.'}
+          {isFiltered && ' Angka di bawah mengikuti filter yang aktif.'}
         </p>
-        {needsInvestigation.length > 0 && (
-          <div className="p-6 rounded-xl bg-rose-500/5 shadow-xs space-y-5">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-rose-500/20">
-              <div className="flex items-center gap-3">
-                <WarningCircle size={22} className="text-rose-600 dark:text-rose-400 shrink-0" weight="fill" />
-                <h2 className="text-xs font-semibold uppercase tracking-wider text-kumo-strong">
-                  Perlu dicek segera ({needsInvestigation.length} meta-alert, kode ESCALATE)
-                </h2>
-              </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-xs text-rose-600 dark:text-rose-400 hover:text-rose-700"
-                onClick={() => navigate(withRunId('/meta-alerts?action=ESCALATE'))}
-              >
-                Lihat semua yang perlu dicek <ArrowRight size={14} className="ml-1" />
-              </Button>
-            </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-              {needsInvestigation.slice(0, 3).map((m) => (
-                <div
-                  key={m.meta_id}
-                  onClick={() => navigate(withRunId(`/meta-alerts/${m.meta_id}`))}
-                  className="p-5 rounded-xl border border-kumo-hairline bg-kumo-canvas cursor-pointer transition-all hover:border-kumo-strong hover:shadow-xs space-y-3"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="font-mono text-xs font-bold text-kumo-strong">#{m.meta_id}</span>
-                    <DecisionBadge decision={m.decision} action={m.action} />
-                  </div>
-                  <div className="space-y-2 text-xs text-kumo-subtle">
-                    <div className="flex justify-between items-center">
-                      <span>Agen:</span>
-                      <span className="text-kumo-default font-medium truncate max-w-[160px]">{m.agent_name} ({m.agent_id})</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span>Kategori aturan:</span>
-                      <Badge variant="secondary">{m.rule_group_primary}</Badge>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span>Skor / batas skor:</span>
-                      <span className="font-mono text-kumo-strong font-semibold">{m.anomaly_score.toFixed(3)} / {m.threshold_used.toFixed(3)}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span>Alert digabung:</span>
-                      <span className="font-mono font-bold text-kumo-strong">{m.alert_count}</span>
-                    </div>
-                  </div>
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    className="w-full justify-center text-xs mt-2"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      navigate(withRunId(`/meta-alerts/${m.meta_id}`));
-                    }}
-                  >
-                    Periksa {m.alert_count} alert asli <ArrowRight size={13} className="ml-1" />
-                  </Button>
-                </div>
-              ))}
-            </div>
-          </div>
+        {summaryError && (
+          <p role="alert" className="text-sm text-rose-600 dark:text-rose-400">
+            Ringkasan gagal dimuat. Angka di bawah mungkin tidak terbaru; percobaan ulang berjalan otomatis.
+          </p>
         )}
 
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-5">
-          <MetricCard
-            label="Alert masuk"
-            value={summary ? formatNumber(summary.raw_alert_count) : '-'}
-            sub={isReplay ? 'Alert valid dari data historis' : 'Alert Wazuh dari data langsung'}
+        <section className="grid gap-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <span className="h-lh flex items-center">
+                <WarningCircle size={20} weight="fill" className="text-rose-600 dark:text-rose-400" />
+              </span>
+              <SectionTitle
+                title="Perlu dicek segera"
+                description={`Kode ESCALATE, diurutkan dari skor tertinggi. ${ACTION_LABELS.ESCALATE.hint}`}
+              />
+            </div>
+            <Button variant="secondary" size="sm" onClick={() => navigate(withRunId('/meta-alerts?action=ESCALATE'))}>
+              Lihat semua ({num(summary?.escalate_count)}) <ArrowRight size={13} className="ml-1" />
+            </Button>
+          </div>
+          <div className="overflow-hidden rounded-xl bg-kumo-canvas ring ring-kumo-line">
+            {queue && queue.items.length === 0 ? (
+              <p className="px-5 py-6 text-sm text-kumo-subtle">
+                Tidak ada meta-alert yang perlu dicek{isFiltered ? ' pada filter ini' : ' saat ini'}.
+              </p>
+            ) : (
+              <Table>
+                <Table.Header>
+                  <Table.Row className="bg-kumo-recessed text-sm">
+                    <Table.Head>Nomor</Table.Head>
+                    <Table.Head>Agen</Table.Head>
+                    <Table.Head>Kategori aturan</Table.Head>
+                    <Table.Head className="text-right">Jumlah alert</Table.Head>
+                    <Table.Head className="text-right">Skor / batas</Table.Head>
+                    <Table.Head>Waktu selesai</Table.Head>
+                    <Table.Head><span className="sr-only">Aksi</span></Table.Head>
+                  </Table.Row>
+                </Table.Header>
+                <Table.Body>
+                  {(queue?.items ?? []).map((m) => (
+                    <Table.Row
+                      key={m.meta_id}
+                      className="cursor-pointer text-sm hover:bg-kumo-recessed"
+                      onClick={() => navigate(withRunId(`/meta-alerts/${m.meta_id}`))}
+                    >
+                      <Table.Cell className="font-mono font-medium text-kumo-strong">#{m.meta_id}</Table.Cell>
+                      <Table.Cell className="text-kumo-default">{m.agent_name} <span className="text-kumo-subtle">({m.agent_id})</span></Table.Cell>
+                      <Table.Cell className="font-mono text-kumo-default">{m.rule_group_primary}</Table.Cell>
+                      <Table.Cell className="text-right font-mono text-kumo-strong">{m.alert_count}</Table.Cell>
+                      <Table.Cell className="text-right font-mono text-kumo-strong">{m.anomaly_score.toFixed(3)} / {m.threshold_used.toFixed(3)}</Table.Cell>
+                      <Table.Cell className="text-kumo-subtle">{formatDateTime(m.end_time)}</Table.Cell>
+                      <Table.Cell className="text-right">
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          onClick={(e) => { e.stopPropagation(); navigate(withRunId(`/meta-alerts/${m.meta_id}`)); }}
+                        >
+                          Periksa {m.alert_count} alert asli
+                        </Button>
+                      </Table.Cell>
+                    </Table.Row>
+                  ))}
+                </Table.Body>
+              </Table>
+            )}
+          </div>
+        </section>
+
+        <section className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          <Kpi
+            label="Perlu dicek segera"
+            value={num(summary?.escalate_count)}
+            sub="Prioritas, bukan insiden terbukti"
+            hint={`Kode ESCALATE. ${ACTION_LABELS.ESCALATE.hint}`}
+            onClick={() => navigate(withRunId('/meta-alerts?action=ESCALATE'))}
           />
-          <MetricCard
+          <Kpi
             label="Meta-alert selesai"
-            value={summary ? formatNumber(summary.meta_alert_count) : '-'}
-            sub="Hasil pengelompokan RBTA"
+            value={num(summary?.meta_alert_count)}
+            sub={`Dari ${num(summary?.raw_alert_count)} alert masuk`}
             hint={TERM_HINTS.RBTA}
           />
-          <MetricCard
+          <Kpi
             label="Pengurangan alert (ARR)"
             value={
               summary && summary.alert_reduction_rate_percent !== null && summary.alert_reduction_rate_percent !== undefined
@@ -155,143 +257,110 @@ export function OverviewPage() {
             sub="Bukan akurasi deteksi"
             hint={TERM_HINTS.ARR}
           />
-          <div
-            onClick={() => navigate(withRunId('/meta-alerts?action=ESCALATE'))}
-            className="cursor-pointer transition-opacity hover:opacity-95"
-          >
-            <MetricCard
-              label="Perlu dicek segera"
-              value={summary ? formatNumber(summary.escalate_count) : '-'}
-              sub="Prioritas, bukan insiden terbukti"
-              hint={`Kode ESCALATE. ${ACTION_LABELS.ESCALATE.hint}`}
-            />
-          </div>
-          <MetricCard
-            label="Melewati batas skor"
-            value={summary ? formatNumber(summary.anomalies_detected) : '-'}
-            sub="Prioritas, bukan vonis serangan"
-          />
-          <div
+          <Kpi
+            label="Kelompok alert terbuka"
+            value={num(summary?.active_buckets_count)}
+            sub={isReplay ? 'Per agen, sesi replay ini' : 'Per agen, data langsung'}
             onClick={() => navigate(withRunId('/rbta'))}
-            className="cursor-pointer transition-opacity hover:opacity-95"
-          >
-            <MetricCard
-              label="Kelompok alert terbuka"
-              value={summary ? formatNumber(summary.active_buckets_count) : '-'}
-              sub={isReplay ? 'Per agen, sesi replay ini' : 'Per agen, data langsung'}
+          />
+        </section>
+
+        <section className="grid gap-4 lg:grid-cols-3">
+          <div className="grid gap-4 rounded-xl bg-kumo-canvas px-5 py-4 ring ring-kumo-line lg:col-span-2">
+            <SectionTitle
+              title={TERMS.processingRate}
+              description={
+                (isReplay
+                  ? 'Alert historis vs meta-alert selesai per waktu (sesi replay ini)'
+                  : 'Alert masuk vs meta-alert selesai per waktu')
+                + (rangeParam ? '' : ' · 24 jam terakhir')
+              }
             />
-          </div>
-          <MetricCard
-            label="Ringkasan harian"
-            value={summary ? formatNumber(summary.digest_count) : '-'}
-            sub="Ditinjau berkala"
-            hint={`Kode DAILY_DIGEST. ${ACTION_LABELS.DAILY_DIGEST.hint}`}
-          />
-          <MetricCard
-            label="Tidak ditampilkan"
-            value={summary ? formatNumber(summary.suppress_count) : '-'}
-            sub="Bukan label aman"
-            hint={`Kode SUPPRESS. ${ACTION_LABELS.SUPPRESS.hint}`}
-          />
-        </div>
-
-        {timeseries && Array.isArray(timeseries) && timeseries.length > 0 && (
-          <div className="p-6 rounded-xl border border-kumo-hairline bg-kumo-canvas shadow-xs space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-kumo-hairline">
-              <div>
-                <h2 className="text-sm font-semibold text-kumo-strong">
-                  {TERMS.processingRate}
-                </h2>
-                <p className="text-xs text-kumo-subtle mt-0.5">
-                  {isReplay
-                    ? 'Alert historis vs meta-alert selesai per waktu (sesi replay ini)'
-                    : 'Alert masuk vs meta-alert selesai per waktu'}
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                <Button variant="secondary" size="sm" onClick={() => setPickerOpen((o) => !o)}>
-                  <CalendarBlank size={14} className="mr-1" />
-                  {rangeParam
-                    ? `${range!.from!.toLocaleDateString('sv')} – ${(range!.to ?? range!.from!).toLocaleDateString('sv')}`
-                    : '24 jam terakhir'}
-                </Button>
-                {range && (
-                  <Button variant="ghost" size="sm" onClick={() => { setRange(undefined); setPickerOpen(false); }}>
-                    Reset
-                  </Button>
-                )}
-              </div>
-            </div>
-            {pickerOpen && (
-              <div className="flex justify-end">
-                <DatePicker mode="range" selected={range} onChange={setRange} numberOfMonths={2} />
-              </div>
+            {timeseries && timeseries.length > 0 ? (
+              <ResponsiveContainer width="100%" height={240}>
+                <AreaChart data={timeseries}>
+                  <CartesianGrid strokeDasharray="3 3" opacity={0.15} />
+                  <XAxis dataKey="timestamp" tick={{ fontSize: 12 }} />
+                  <YAxis tick={{ fontSize: 12 }} />
+                  <Tooltip />
+                  <Legend wrapperStyle={{ fontSize: '14px' }} />
+                  <Area type="monotone" dataKey="raw_alerts" stroke="#64748b" fill="#64748b20" name="Alert masuk" />
+                  <Area type="monotone" dataKey="meta_alerts" stroke="#0f172a" fill="#0f172a20" name="Meta-alert" />
+                </AreaChart>
+              </ResponsiveContainer>
+            ) : (
+              <p className="text-sm text-kumo-subtle">Belum ada data pada rentang ini.</p>
             )}
-            <ResponsiveContainer width="100%" height={260}>
-              <AreaChart data={timeseries}>
-                <CartesianGrid strokeDasharray="3 3" opacity={0.15} />
-                <XAxis dataKey="timestamp" tick={{ fontSize: 11 }} />
-                <YAxis tick={{ fontSize: 11 }} />
-                <Tooltip />
-                <Legend wrapperStyle={{ fontSize: '12px' }} />
-                <Area type="monotone" dataKey="raw_alerts" stroke="#64748b" fill="#64748b20" name="Alert masuk" />
-                <Area type="monotone" dataKey="meta_alerts" stroke="#0f172a" fill="#0f172a20" name="Meta-alert" />
-              </AreaChart>
-            </ResponsiveContainer>
           </div>
-        )}
 
-        {recentMetas && recentMetas.items.length > 0 && (
-          <div className="rounded-xl border border-kumo-hairline bg-kumo-canvas shadow-xs overflow-hidden">
-            <div className="px-6 py-4 border-b border-kumo-hairline flex items-center justify-between">
-              <div>
-                <h2 className="text-sm font-semibold text-kumo-strong">
-                  Meta-alert terbaru
-                </h2>
-                <p className="text-xs text-kumo-subtle mt-0.5">
-                  Kelompok alert yang dinilai Isolation Forest; skor = prioritas, bukan vonis serangan
-                </p>
-              </div>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => navigate(withRunId('/meta-alerts'))}
-              >
-                Lihat semua meta-alert <ArrowRight size={13} className="ml-1" />
-              </Button>
-            </div>
-            <Table>
-              <Table.Header>
-                <Table.Row className="bg-kumo-recessed/50 text-[11px] uppercase tracking-wider">
-                  <Table.Head>Nomor</Table.Head>
-                  <Table.Head>Waktu selesai</Table.Head>
-                  <Table.Head>Agen</Table.Head>
-                  <Table.Head>Kategori aturan (Rule Group)</Table.Head>
-                  <Table.Head className="text-right">Jumlah alert</Table.Head>
-                  <Table.Head className="text-right">Skor keanehan</Table.Head>
-                  <Table.Head>Level & aksi</Table.Head>
-                </Table.Row>
-              </Table.Header>
-              <Table.Body>
-                {recentMetas.items.map((m) => (
-                  <Table.Row
-                    key={m.meta_id}
-                    className="cursor-pointer hover:bg-kumo-recessed/40 transition-colors text-xs"
-                    onClick={() => navigate(withRunId(`/meta-alerts/${m.meta_id}`))}
-                  >
-                    <Table.Cell className="font-mono font-semibold text-kumo-strong">#{m.meta_id}</Table.Cell>
-                    <Table.Cell className="text-kumo-subtle">{formatDateTime(m.end_time)}</Table.Cell>
-                    <Table.Cell className="font-medium text-kumo-default">{m.agent_name} <span className="text-kumo-subtle text-[11px]">({m.agent_id})</span></Table.Cell>
-                    <Table.Cell className="font-mono text-kumo-default">{m.rule_group_primary}</Table.Cell>
-                    <Table.Cell className="text-right font-mono font-bold text-kumo-strong">{m.alert_count}</Table.Cell>
-                    <Table.Cell className="text-right font-mono text-kumo-default">{formatScore(m.anomaly_score)}</Table.Cell>
-                    <Table.Cell><DecisionBadge decision={m.decision} action={m.action} /></Table.Cell>
-                  </Table.Row>
-                ))}
-              </Table.Body>
-            </Table>
+          <div className="grid content-start gap-4 rounded-xl bg-kumo-canvas px-5 py-4 ring ring-kumo-line">
+            <SectionTitle title="Sebaran aksi" description="Seluruh meta-alert pada filter aktif" />
+            <dl className="grid gap-3 text-sm">
+              {[
+                ['Perlu dicek segera', summary?.escalate_count, 'Prioritas'],
+                ['Ringkasan harian', summary?.digest_count, 'Ditinjau berkala'],
+                ['Tidak ditampilkan', summary?.suppress_count, 'Bukan label aman'],
+                ['Melewati batas skor', summary?.anomalies_detected, 'Prioritas, bukan vonis serangan'],
+              ].map(([label, value, note]) => (
+                <div key={label as string} className="grid gap-0.5">
+                  <div className="flex items-baseline justify-between">
+                    <dt className="text-kumo-default">{label as string}</dt>
+                    <dd className="font-mono font-medium text-kumo-strong">{num(value as number | undefined)}</dd>
+                  </div>
+                  <span className="text-kumo-subtle">{note as string}</span>
+                </div>
+              ))}
+            </dl>
           </div>
-        )}
+        </section>
+
+        <section className="grid gap-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <SectionTitle
+              title="Meta-alert terbaru"
+              description="Kelompok alert yang dinilai Isolation Forest; skor = prioritas, bukan vonis serangan"
+            />
+            <Button variant="secondary" size="sm" onClick={() => navigate(withRunId('/meta-alerts'))}>
+              Lihat semua meta-alert <ArrowRight size={13} className="ml-1" />
+            </Button>
+          </div>
+          <div className="overflow-hidden rounded-xl bg-kumo-canvas ring ring-kumo-line">
+            {recentMetas && recentMetas.items.length === 0 ? (
+              <p className="px-5 py-6 text-sm text-kumo-subtle">Belum ada meta-alert{isFiltered ? ' pada filter ini' : ''}.</p>
+            ) : (
+              <Table>
+                <Table.Header>
+                  <Table.Row className="bg-kumo-recessed text-sm">
+                    <Table.Head>Nomor</Table.Head>
+                    <Table.Head>Waktu selesai</Table.Head>
+                    <Table.Head>Agen</Table.Head>
+                    <Table.Head>Kategori aturan (Rule Group)</Table.Head>
+                    <Table.Head className="text-right">Jumlah alert</Table.Head>
+                    <Table.Head className="text-right">Skor keanehan</Table.Head>
+                    <Table.Head>Level & aksi</Table.Head>
+                  </Table.Row>
+                </Table.Header>
+                <Table.Body>
+                  {(recentMetas?.items ?? []).map((m) => (
+                    <Table.Row
+                      key={m.meta_id}
+                      className="cursor-pointer text-sm hover:bg-kumo-recessed"
+                      onClick={() => navigate(withRunId(`/meta-alerts/${m.meta_id}`))}
+                    >
+                      <Table.Cell className="font-mono font-medium text-kumo-strong">#{m.meta_id}</Table.Cell>
+                      <Table.Cell className="text-kumo-subtle">{formatDateTime(m.end_time)}</Table.Cell>
+                      <Table.Cell className="text-kumo-default">{m.agent_name} <span className="text-kumo-subtle">({m.agent_id})</span></Table.Cell>
+                      <Table.Cell className="font-mono text-kumo-default">{m.rule_group_primary}</Table.Cell>
+                      <Table.Cell className="text-right font-mono text-kumo-strong">{m.alert_count}</Table.Cell>
+                      <Table.Cell className="text-right font-mono text-kumo-default">{formatScore(m.anomaly_score)}</Table.Cell>
+                      <Table.Cell><DecisionBadge decision={m.decision} action={m.action} /></Table.Cell>
+                    </Table.Row>
+                  ))}
+                </Table.Body>
+              </Table>
+            )}
+          </div>
+        </section>
       </div>
     </>
   );

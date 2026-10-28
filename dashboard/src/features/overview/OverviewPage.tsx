@@ -289,16 +289,16 @@ export function OverviewPage() {
             )}
           </div>
 
-          <div className="grid content-start gap-4 rounded-xl bg-kumo-canvas px-5 py-4 ring ring-kumo-line">
+          <div className="flex flex-col gap-4 rounded-xl bg-kumo-canvas px-5 py-4 ring ring-kumo-line">
             <SectionTitle title="Sebaran aksi" description="Seluruh meta-alert pada filter aktif" />
-            <dl className="grid gap-3 text-sm">
+            <dl className="flex flex-1 flex-col justify-between text-sm">
               {[
                 ['Perlu dicek segera', summary?.escalate_count, 'Prioritas'],
                 ['Ringkasan harian', summary?.digest_count, 'Ditinjau berkala'],
                 ['Tidak ditampilkan', summary?.suppress_count, 'Bukan label aman'],
                 ['Melewati batas skor', summary?.anomalies_detected, 'Prioritas, bukan vonis serangan'],
               ].map(([label, value, note]) => (
-                <div key={label as string} className="grid gap-0.5">
+                <div key={label as string} className="grid gap-0.5 border-t border-kumo-line pt-3 first:border-t-0 first:pt-0">
                   <div className="flex items-baseline justify-between">
                     <dt className="text-kumo-default">{label as string}</dt>
                     <dd className="font-mono font-medium text-kumo-strong">{num(value as number | undefined)}</dd>

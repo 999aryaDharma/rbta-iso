@@ -106,4 +106,12 @@ describe('OverviewPage antrean dan filter', () => {
     expect(mockFetchFilterOptions).toHaveBeenCalled();
     expect(await screen.findByText('Semua waktu')).toBeInTheDocument();
   });
+
+  it('label filter menampilkan teks, bukan nilai internal', async () => {
+    renderAt('/');
+    await screen.findByRole('heading', { name: /ringkasan live/i });
+    expect(await screen.findByText('Semua agen')).toBeInTheDocument();
+    expect(screen.getByText('Semua kategori aturan')).toBeInTheDocument();
+    expect(screen.queryByText('__all__')).not.toBeInTheDocument();
+  });
 });

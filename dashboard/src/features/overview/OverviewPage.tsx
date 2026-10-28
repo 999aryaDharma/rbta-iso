@@ -127,24 +127,20 @@ export function OverviewPage() {
             size="sm"
             value={agentId}
             onValueChange={(v) => setAgentId(v as string)}
-            placeholder="Semua agen"
-          >
-            <Select.Option value={ALL}>Semua agen</Select.Option>
-            {(options?.agents ?? []).map((a) => (
-              <Select.Option key={a.agent_id} value={a.agent_id}>{a.agent_name} ({a.agent_id})</Select.Option>
-            ))}
-          </Select>
+            items={{
+              [ALL]: 'Semua agen',
+              ...Object.fromEntries((options?.agents ?? []).map((a) => [a.agent_id, `${a.agent_name} (${a.agent_id})`])),
+            }}
+          />
           <Select
             size="sm"
             value={ruleGroup}
             onValueChange={(v) => setRuleGroup(v as string)}
-            placeholder="Semua kategori aturan"
-          >
-            <Select.Option value={ALL}>Semua kategori aturan</Select.Option>
-            {(options?.rule_groups ?? []).map((g) => (
-              <Select.Option key={g} value={g}>{g}</Select.Option>
-            ))}
-          </Select>
+            items={{
+              [ALL]: 'Semua kategori aturan',
+              ...Object.fromEntries((options?.rule_groups ?? []).map((g) => [g, g])),
+            }}
+          />
           {isFiltered && (
             <Button variant="ghost" size="sm" onClick={reset}>Reset filter</Button>
           )}
